@@ -1,0 +1,21 @@
+export const PROJECT_STRUCTURE = [
+  'src',
+  'src/api',
+  'src/api/global-setup.ts',
+  'src/api/global-teardown.ts',
+  'src/docs',
+  'src/features',
+  'src/fixtures',
+  'src/schemas',
+  'src/steps',
+  'src/tests',
+  'src/types',
+  'src/types/common.ts'
+];
+
+export const TEMPLATE_FILES = {
+  PACKAGE_JSON: 'package.json.template',
+  PLAYWRIGHT_CONFIG: 'playwright.config.ts.template',
+  API_CONFIG: 'api.config.ts.template',
+  README: 'README.md.template'
+}; 

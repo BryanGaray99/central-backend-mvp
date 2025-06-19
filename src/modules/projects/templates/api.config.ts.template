@@ -1,0 +1,21 @@
+export const API_CONFIG = {
+  baseURL: '{{baseUrl}}',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+};
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: {
+    message: string;
+    code: string;
+  };
+  metadata?: {
+    timestamp: string;
+    path: string;
+  };
+} 
