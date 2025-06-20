@@ -1,0 +1,92 @@
+import { World, IWorldOptions, setWorldConstructor } from '@cucumber/cucumber';
+import { APIRequestContext, APIResponse } from '@playwright/test';
+
+export interface CustomWorld extends World {
+  // API context for making requests
+  apiContext?: APIRequestContext;
+  
+  // Test data
+  testData: {
+    [key: string]: any;
+  };
+  
+  // Last API response
+  lastResponse?: APIResponse;
+  
+  // Last error
+  lastError?: any;
+  
+  // Created entities for cleanup
+  createdEntities: Map<string, any>;
+  
+  // Base URL for API requests
+  baseUrl: string;
+}
+
+export class CustomWorld extends World implements CustomWorld {
+  public apiContext?: APIRequestContext;
+  public testData: { [key: string]: any } = {};
+  public lastResponse?: APIResponse;
+  public lastError?: any;
+  public createdEntities = new Map<string, any>();
+  public baseUrl: string;
+
+  constructor(options: IWorldOptions) {
+    super(options);
+    this.baseUrl = '{{baseUrl}}';
+  }
+
+  /**
+   * Store test data
+   */
+  setTestData(key: string, value: any): void {
+    this.testData[key] = value;
+  }
+
+  /**
+   * Get test data
+   */
+  getTestData(key: string): any {
+    return this.testData[key];
+  }
+
+  /**
+   * Store created entity for cleanup
+   */
+  storeCreatedEntity(type: string, id: string, data: any): void {
+    this.createdEntities.set(id, { type, data });
+  }
+
+  /**
+   * Get created entity
+   */
+  getCreatedEntity(id: string): any {
+    return this.createdEntities.get(id);
+  }
+
+  /**
+   * Clear all test data
+   */
+  clearTestData(): void {
+    this.testData = {};
+    this.lastResponse = undefined;
+    this.lastError = undefined;
+  }
+
+  /**
+   * Clean up created entities
+   */
+  async cleanupEntities(): Promise<void> {
+    for (const [entityId, entityData] of this.createdEntities) {
+      try {
+        // Implement cleanup logic based on entity type
+        console.log(`Cleaning up entity: ${entityId} of type: ${entityData.type}`);
+      } catch (error: any) {
+        console.warn(`Failed to cleanup entity ${entityId}:`, error.message);
+      }
+    }
+    this.createdEntities.clear();
+  }
+}
+
+setWorldConstructor(CustomWorld); 

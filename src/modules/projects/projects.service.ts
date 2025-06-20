@@ -6,6 +6,9 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { WorkspaceService } from '../workspace/workspace.service';
 import { GenerationService } from './generation.service';
+import { ValidationService } from './services/validation.service';
+import { QueueService } from './services/queue.service';
+import { CleanupService } from './services/cleanup.service';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -16,12 +19,23 @@ export class ProjectsService {
     private readonly projectRepo: Repository<Project>,
     private readonly workspaceService: WorkspaceService,
     private readonly generationService: GenerationService,
+    private readonly validationService: ValidationService,
+    private readonly queueService: QueueService,
+    private readonly cleanupService: CleanupService,
   ) {}
 
   async create(createDto: CreateProjectDto): Promise<Project> {
+    // Validar configuración de entrada
+    this.validationService.validateProjectConfiguration(createDto);
+    
     const exists = await this.projectRepo.findOne({ where: { name: createDto.name } });
     if (exists) throw new ConflictException('Project name already exists');
+    
     const workspacePath = await this.workspaceService.createWorkspace(createDto.name);
+    
+    // Validar configuración de workspace
+    this.validationService.validateWorkspaceConfiguration(workspacePath);
+    
     const project = this.projectRepo.create({
       ...createDto,
       displayName: createDto.displayName || createDto.name,
@@ -31,9 +45,12 @@ export class ProjectsService {
     });
     const savedProject = await this.projectRepo.save(project);
     await this.createProjectMetadata(savedProject);
-    this.generationService.generateProject(savedProject).catch(error => {
-      console.error('Error en la generación asíncrona:', error);
+    
+    // Agregar a la cola de generación en lugar de ejecutar directamente
+    this.queueService.enqueue(savedProject, 1).catch(error => {
+      console.error('Error agregando proyecto a la cola:', error);
     });
+    
     return savedProject;
   }
 

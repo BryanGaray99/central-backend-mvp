@@ -1,0 +1,19 @@
+const common = [
+  'src/features/**/*.feature',
+  '--require-module ts-node/register',
+  '--require src/steps/**/*.ts',
+  '--require src/steps/hooks.ts',
+  '--format @cucumber/pretty-formatter',
+  '--format json:test-results/cucumber-report.json',
+  '--format html:test-results/cucumber-report.html'
+].join(' ');
+
+module.exports = {
+  default: common,
+  smoke: common + ' --tags "@smoke"',
+  regression: common + ' --tags "@regression"',
+  api: common + ' --tags "@api"',
+  e2e: common + ' --tags "@e2e"',
+  positive: common + ' --tags "@positive"',
+  negative: common + ' --tags "@negative"'
+}; 

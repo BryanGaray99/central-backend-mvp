@@ -6,6 +6,7 @@ import * as path from 'path';
 import { FileSystemService } from './services/file-system.service';
 import { TemplateService } from './services/template.service';
 import { PlaywrightService } from './services/playwright.service';
+import { CleanupService } from './services/cleanup.service';
 import { PROJECT_STRUCTURE, TEMPLATE_FILES } from './constants/project-structure';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class GenerationService {
     private readonly fileSystemService: FileSystemService,
     private readonly templateService: TemplateService,
     private readonly playwrightService: PlaywrightService,
+    private readonly cleanupService: CleanupService,
   ) {}
 
   async generateProject(project: Project): Promise<void> {
@@ -47,6 +49,10 @@ export class GenerationService {
     } catch (error) {
       this.logger.error(`Error generando proyecto ${project.name}: ${error.message}`);
       await this.updateProjectStatus(project.id, ProjectStatus.FAILED);
+      
+      // Ejecutar limpieza automática en caso de fallo
+      await this.cleanupService.cleanupFailedProject(project, error);
+      
       throw error;
     }
   }
@@ -77,6 +83,27 @@ export class GenerationService {
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.API_CONFIG,
       path.join(project.path, 'src/api/api.config.ts'),
+      templateVariables,
+    );
+
+    // Generar cucumber.cjs
+    await this.templateService.writeRenderedTemplate(
+      TEMPLATE_FILES.CUCUMBER_CONFIG,
+      path.join(project.path, 'cucumber.cjs'),
+      templateVariables,
+    );
+
+    // Generar hooks.ts
+    await this.templateService.writeRenderedTemplate(
+      TEMPLATE_FILES.HOOKS,
+      path.join(project.path, 'src/steps/hooks.ts'),
+      templateVariables,
+    );
+
+    // Generar world.ts
+    await this.templateService.writeRenderedTemplate(
+      TEMPLATE_FILES.WORLD,
+      path.join(project.path, 'src/steps/world.ts'),
       templateVariables,
     );
 

@@ -1,0 +1,120 @@
+import { Before, After, BeforeAll, AfterAll, setDefaultTimeout, Given, Then } from '@cucumber/cucumber';
+import { expect } from '@playwright/test';
+
+// Set default timeout for all steps
+setDefaultTimeout(30000);
+
+// Test data storage
+export const testData = {
+  createdEntities: new Map<string, any>(),
+  lastResponse: null as any,
+  lastError: null as any
+};
+
+/**
+ * Initialize test environment before test suite
+ */
+BeforeAll(async function() {
+  console.log('🚀 Initializing test environment for BDD tests...');
+  
+  // Initialize any global setup here
+  // For example: API clients, database connections, etc.
+  
+  console.log('✅ Test environment initialized successfully');
+});
+
+/**
+ * Clean up before each scenario
+ */
+Before(async function() {
+  // Clear test data between scenarios
+  testData.lastResponse = null;
+  testData.lastError = null;
+  
+  // Note: We don't clear created entities as they might be needed across scenarios
+  // Cleanup will happen in After hook if needed
+});
+
+/**
+ * Clean up after each scenario
+ */
+After(async function() {
+  // Clean up created test data
+  try {
+    // Clean up in reverse order to respect dependencies
+    for (const [entityId, entityData] of testData.createdEntities) {
+      try {
+        // Implement cleanup logic based on entity type
+        // Example: await deleteEntity(entityData.type, entityId);
+        console.log(`Cleaning up entity: ${entityId}`);
+      } catch (error: any) {
+        console.warn(`Failed to cleanup entity ${entityId}:`, error.message);
+      }
+    }
+  } catch (error: any) {
+    console.warn('Error during test cleanup:', error.message);
+  } finally {
+    // Clear all test data
+    testData.createdEntities.clear();
+  }
+});
+
+/**
+ * Clean up after all scenarios
+ */
+AfterAll(async function() {
+  console.log('🧹 Cleaning up test environment...');
+  
+  // Implement any global cleanup here
+  
+  console.log('✅ Test environment cleaned up successfully');
+});
+
+/**
+ * Helper function to handle API responses and errors
+ */
+export function handleApiResponse(response: any, error?: any) {
+  if (error) {
+    testData.lastError = error;
+    testData.lastResponse = null;
+  } else if (response && response.status >= 400) {
+    // Treat 4xx and 5xx status codes as errors
+    testData.lastError = {
+      status: response.status,
+      message: response.data?.message || 'HTTP Error',
+      response: response
+    };
+    testData.lastResponse = null;
+  } else {
+    testData.lastResponse = response;
+    testData.lastError = null;
+  }
+}
+
+/**
+ * Helper function to get the last response
+ */
+export function getLastResponse() {
+  return testData.lastResponse;
+}
+
+/**
+ * Helper function to get the last error
+ */
+export function getLastError() {
+  return testData.lastError;
+}
+
+/**
+ * Helper function to store created entity
+ */
+export function storeCreatedEntity(type: string, id: string, data: any) {
+  testData.createdEntities.set(id, { type, data });
+}
+
+/**
+ * Helper function to get created entity
+ */
+export function getCreatedEntity(id: string) {
+  return testData.createdEntities.get(id);
+} 
