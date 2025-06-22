@@ -2,39 +2,39 @@
 
 {{description}}
 
-## Configuración
+## Setup
 
-1. Instalar dependencias:
+1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Instalar navegadores:
+2. Install browsers:
 ```bash
 npx playwright install
 ```
 
-## Scripts Disponibles
+## Available Scripts
 
-- `npm test` - Ejecutar todas las pruebas
-- `npm run test:ui` - Ejecutar pruebas en modo UI
-- `npm run test:debug` - Ejecutar pruebas en modo debug
-- `npm run test:chromium` - Ejecutar pruebas solo en Chrome
-- `npm run codegen` - Generar pruebas con Codegen
+- `npm test` - Run all tests
+- `npm run test:ui` - Run tests in UI mode
+- `npm run test:debug` - Run tests in debug mode
+- `npm run test:chromium` - Run tests only in Chrome
+- `npm run codegen` - Generate tests with Codegen
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 src/
-  ├── api/          # Clientes API
-  ├── features/     # Archivos .feature (Gherkin)
-  ├── fixtures/     # Datos de prueba
-  ├── schemas/      # Esquemas de validación
+  ├── api/          # API clients
+  ├── features/     # .feature files (Gherkin)
+  ├── fixtures/     # Test data
+  ├── schemas/      # Validation schemas
   ├── steps/        # Step definitions
-  ├── tests/        # Pruebas e2e
-  └── types/        # Tipos TypeScript
+  ├── tests/        # E2E tests
+  └── types/        # TypeScript types
 ```
 
-## Autor
+## Author
 
 {{author}} 

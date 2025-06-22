@@ -28,6 +28,6 @@ import { CleanupService } from './services/cleanup.service';
     CleanupService,
   ],
   controllers: [ProjectsController],
-  exports: [ProjectsService],
+  exports: [ProjectsService, FileSystemService, TemplateService],
 })
 export class ProjectsModule {} 

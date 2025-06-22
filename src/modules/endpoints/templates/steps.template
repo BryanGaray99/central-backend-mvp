@@ -1,0 +1,163 @@
+import { Given, When, Then } from '@cucumber/cucumber';
+import { expect } from '@playwright/test';
+import { CustomWorld } from '../../world';
+import { handleApiResponse, getLastResponse, getLastError } from '../../hooks';
+
+// Import the generated schema and fixture for this endpoint
+import { {{ entityName }}Schema } from '../../schemas/{{ entityNameLC }}.schema';
+import { {{ entityName }}Fixture } from '../../fixtures/{{ entityNameLC }}.fixture';
+import Ajv from 'ajv';
+
+const ajv = new Ajv();
+const validate{{ entityName }} = ajv.compile({{ entityName }}Schema);
+
+// Background steps
+Given('I have access to the API', function (this: CustomWorld) {
+  expect(this.apiContext).toBeDefined();
+  expect(this.baseUrl).toBeDefined();
+});
+
+Given('the endpoint {{ path }} is available', function (this: CustomWorld) {
+  // Verify that the endpoint responds (basic health check)
+  expect(this.baseUrl).toContain('http');
+});
+
+When('a {{ method }} request is sent to "{{ path }}"', async function (this: CustomWorld) {
+  try {
+    // Build the complete URL
+    const fullUrl = `${this.baseUrl}{{ path }}`;
+    
+    // Configure headers
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+
+    // Make request based on method
+    switch ('{{ methodLC }}') {
+      case 'get':
+        this.lastResponse = await this.apiContext?.get(fullUrl, { headers });
+        break;
+      case 'post':
+        const postData = {{ entityName }}Fixture.createDto();
+        this.lastResponse = await this.apiContext?.post(fullUrl, { data: postData, headers });
+        break;
+      case 'put':
+        const putData = {{ entityName }}Fixture.createDto();
+        this.lastResponse = await this.apiContext?.put(fullUrl, { data: putData, headers });
+        break;
+      case 'patch':
+        const patchData = {{ entityName }}Fixture.createDto();
+        this.lastResponse = await this.apiContext?.patch(fullUrl, { data: patchData, headers });
+        break;
+      case 'delete':
+        this.lastResponse = await this.apiContext?.delete(fullUrl, { headers });
+        break;
+      default:
+        throw new Error(`Unsupported HTTP method: {{ method }}`);
+    }
+
+    handleApiResponse(this.lastResponse);
+  } catch (error) {
+    handleApiResponse(null, error);
+  }
+});
+
+When('a {{ method }} request is sent to "{{ path }}" with {string}', async function (this: CustomWorld, errorCondition: string) {
+  try {
+    const fullUrl = `${this.baseUrl}{{ path }}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+
+    let requestData: any = null;
+    
+    // Modify data based on error condition
+    switch (errorCondition) {
+      case 'invalid_data':
+        requestData = { invalidField: 'invalid_value' };
+        break;
+      case 'unauthorized':
+        headers['Authorization'] = 'Bearer invalid_token';
+        break;
+      case 'not_found':
+        // Modify URL to simulate resource not found
+        const notFoundUrl = fullUrl.replace('{{ path }}', '/invalid/path');
+        this.lastResponse = await this.apiContext?.get(notFoundUrl, { headers });
+        handleApiResponse(this.lastResponse);
+        return;
+      case 'conflict':
+        // Use data that might cause conflict
+        requestData = {{ entityName }}Fixture.createDto({ id: 'duplicate_id' });
+        break;
+    }
+
+    // Make request
+    switch ('{{ methodLC }}') {
+      case 'get':
+        this.lastResponse = await this.apiContext?.get(fullUrl, { headers });
+        break;
+      case 'post':
+        this.lastResponse = await this.apiContext?.post(fullUrl, { data: requestData, headers });
+        break;
+      case 'put':
+        this.lastResponse = await this.apiContext?.put(fullUrl, { data: requestData, headers });
+        break;
+      case 'patch':
+        this.lastResponse = await this.apiContext?.patch(fullUrl, { data: requestData, headers });
+        break;
+      case 'delete':
+        this.lastResponse = await this.apiContext?.delete(fullUrl, { headers });
+        break;
+    }
+
+    handleApiResponse(this.lastResponse);
+  } catch (error) {
+    handleApiResponse(null, error);
+  }
+});
+
+Then('the response should be {{ inferredStatusCode }} and contain {{ entityName }} data', async function (this: CustomWorld) {
+  const response = getLastResponse();
+  const error = getLastError();
+  
+  expect(error).toBeNull();
+  expect(response).toBeDefined();
+  expect(response!.status()).toBe({{ inferredStatusCode }});
+
+  const responseBody = await response!.json();
+  
+  // Validate response schema
+  const isValid = validate{{ entityName }}(responseBody);
+  if (!isValid) {
+    console.error('Schema validation failed:', validate{{ entityName }}.errors);
+    expect(isValid).toBe(true);
+  }
+
+  // Verify that response contains valid data
+  expect(responseBody).toBeDefined();
+  
+  // If there's a specific dataPath, validate that part
+  {{#if inferredDataPath}}
+  const dataPath = '{{ inferredDataPath }}';
+  const data = dataPath.split('.').reduce((obj, key) => obj?.[key], responseBody);
+  expect(data).toBeDefined();
+  {{/if}}
+
+  console.log('Response validated successfully:', JSON.stringify(responseBody, null, 2));
+});
+
+Then('the response should be {int}', function (this: CustomWorld, expectedStatusCode: number) {
+  const response = getLastResponse();
+  const error = getLastError();
+  
+  // For errors, we expect either an error or a response with error code
+  if (error) {
+    expect(error.status || error.response?.status).toBe(expectedStatusCode);
+  } else if (response) {
+    expect(response.status()).toBe(expectedStatusCode);
+  } else {
+    throw new Error('No response or error received');
+  }
+}); 

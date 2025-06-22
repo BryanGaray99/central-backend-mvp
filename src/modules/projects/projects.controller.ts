@@ -12,32 +12,32 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crear un nuevo proyecto' })
-  @ApiResponse({ status: 201, description: 'Proyecto creado', type: Project })
-  @ApiResponse({ status: 409, description: 'Conflicto - Proyecto ya existe o recursos bloqueados' })
+  @ApiOperation({ summary: 'Create a new project' })
+  @ApiResponse({ status: 201, description: 'Project created', type: Project })
+  @ApiResponse({ status: 409, description: 'Conflict - Project already exists or resources are locked' })
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() dto: CreateProjectDto): Promise<Project> {
     return this.projectsService.create(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos los proyectos' })
-  @ApiResponse({ status: 200, description: 'Lista de proyectos', type: [Project] })
+  @ApiOperation({ summary: 'List all projects' })
+  @ApiResponse({ status: 200, description: 'List of projects', type: [Project] })
   async findAll(): Promise<Project[]> {
     return this.projectsService.findAll();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Obtener un proyecto por ID' })
-  @ApiResponse({ status: 200, description: 'Proyecto encontrado', type: Project })
+  @ApiOperation({ summary: 'Get a project by ID' })
+  @ApiResponse({ status: 200, description: 'Project found', type: Project })
   async findOne(@Param('id') id: string): Promise<Project> {
     return this.projectsService.findOne(id);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Actualizar un proyecto' })
-  @ApiResponse({ status: 200, description: 'Proyecto actualizado', type: Project })
-  @ApiResponse({ status: 409, description: 'Conflicto - Recursos bloqueados' })
+  @ApiOperation({ summary: 'Update a project' })
+  @ApiResponse({ status: 200, description: 'Project updated', type: Project })
+  @ApiResponse({ status: 409, description: 'Conflict - Resources are locked' })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateProjectDto,
@@ -46,10 +46,10 @@ export class ProjectsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Eliminar un proyecto por ID' })
-  @ApiResponse({ status: 200, description: 'Proyecto eliminado exitosamente' })
-  @ApiResponse({ status: 404, description: 'Proyecto no encontrado' })
-  @ApiResponse({ status: 409, description: 'Conflicto - Recursos bloqueados', schema: {
+  @ApiOperation({ summary: 'Delete a project by ID' })
+  @ApiResponse({ status: 200, description: 'Project deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  @ApiResponse({ status: 409, description: 'Conflict - Resources are locked', schema: {
     type: 'object',
     properties: {
       success: { type: 'boolean', example: false },
@@ -57,7 +57,7 @@ export class ProjectsController {
         type: 'object',
         properties: {
           statusCode: { type: 'number', example: 409 },
-          message: { type: 'string', example: 'No se puede eliminar el workspace porque hay archivos en uso.' },
+          message: { type: 'string', example: 'Cannot delete workspace because there are files in use.' },
           code: { type: 'string', example: 'RESOURCE_BUSY' },
           details: {
             type: 'object',
@@ -76,7 +76,7 @@ export class ProjectsController {
     return {
       success: true,
       data: null,
-      message: `Proyecto con ID ${id} eliminado exitosamente`
+      message: `Project with ID ${id} deleted successfully`
     };
   }
 } 

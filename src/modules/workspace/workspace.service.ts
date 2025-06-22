@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // 1 segundo
+const RETRY_DELAY = 1000; // 1 second
 
 @Injectable()
 export class WorkspaceService {
@@ -18,9 +18,9 @@ export class WorkspaceService {
   private async init() {
     try {
       await fs.access(this.workspacesDir);
-      this.logger.log(`Usando directorio de workspaces: ${this.workspacesDir}`);
+      this.logger.log(`Using workspaces directory: ${this.workspacesDir}`);
     } catch {
-      this.logger.warn(`Directorio de workspaces no encontrado, creando: ${this.workspacesDir}`);
+      this.logger.warn(`Workspaces directory not found, creating: ${this.workspacesDir}`);
       await fs.mkdir(this.workspacesDir, { recursive: true });
     }
   }
@@ -30,11 +30,11 @@ export class WorkspaceService {
     
     try {
       await fs.access(workspacePath);
-      throw new ConflictException(`El workspace ${name} ya existe`);
+      throw new ConflictException(`Workspace ${name} already exists`);
     } catch (error) {
       if (error.code === 'ENOENT') {
         await fs.mkdir(workspacePath, { recursive: true });
-        this.logger.log(`Workspace creado: ${workspacePath}`);
+        this.logger.log(`Workspace created: ${workspacePath}`);
         return workspacePath;
       }
       throw error;
@@ -53,18 +53,18 @@ export class WorkspaceService {
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        // Verificar si hay archivos bloqueados
+        // Check if there are blocked files
         const blockedFiles = await this.findBlockedFiles(workspacePath);
         if (blockedFiles.length > 0) {
-          this.logger.warn(`Intento ${attempt}: Archivos bloqueados encontrados:`, blockedFiles);
+          this.logger.warn(`Attempt ${attempt}: Blocked files found:`, blockedFiles);
           if (attempt === MAX_RETRIES) {
             throw new ConflictException({
-              message: 'No se puede eliminar el workspace porque hay archivos en uso.',
+              message: 'Cannot delete workspace because there are files in use.',
               code: 'RESOURCE_BUSY',
               details: {
                 workspace: name,
                 blockedFiles: blockedFiles.map(file => path.relative(workspacePath, file)),
-                suggestion: 'Por favor, cierre todos los archivos abiertos e intente nuevamente.'
+                suggestion: 'Please close all open files and try again.'
               }
             });
           }
@@ -73,33 +73,33 @@ export class WorkspaceService {
         }
 
         await fs.rm(workspacePath, { recursive: true, force: true });
-        this.logger.log(`Workspace eliminado: ${workspacePath}`);
+        this.logger.log(`Workspace deleted: ${workspacePath}`);
         return;
       } catch (error) {
         if (error.code === 'ENOENT') {
-          return; // El directorio ya no existe
+          return; // Directory no longer exists
         }
         
         if (error instanceof ConflictException) {
-          throw error; // Re-lanzar errores de conflicto
+          throw error; // Re-throw conflict errors
         }
         
         if (attempt === MAX_RETRIES) {
           if (error.code === 'EBUSY') {
             throw new ConflictException({
-              message: 'No se puede eliminar el workspace porque está en uso.',
+              message: 'Cannot delete workspace because it is in use.',
               code: 'RESOURCE_BUSY',
               details: {
                 workspace: name,
-                suggestion: 'Por favor, cierre todos los archivos abiertos e intente nuevamente.'
+                suggestion: 'Please close all open files and try again.'
               }
             });
           }
-          this.logger.error(`No se pudo eliminar el workspace después de ${MAX_RETRIES} intentos`);
+          this.logger.error(`Could not delete workspace after ${MAX_RETRIES} attempts`);
           throw error;
         }
         
-        this.logger.warn(`Intento ${attempt}: Error al eliminar workspace:`, error.message);
+        this.logger.warn(`Attempt ${attempt}: Error deleting workspace:`, error.message);
         await this.sleep(RETRY_DELAY);
       }
     }
@@ -119,7 +119,7 @@ export class WorkspaceService {
             const subDirBlocked = await this.findBlockedFiles(fullPath);
             blockedFiles.push(...subDirBlocked);
           } else {
-            // Intentar abrir el archivo para escritura
+            // Try to open the file for writing
             const fileHandle = await fs.open(fullPath, 'r+');
             await fileHandle.close();
           }
@@ -130,7 +130,7 @@ export class WorkspaceService {
         }
       }
     } catch (error) {
-      this.logger.error(`Error al buscar archivos bloqueados: ${error.message}`);
+      this.logger.error(`Error searching for blocked files: ${error.message}`);
     }
     
     return blockedFiles;

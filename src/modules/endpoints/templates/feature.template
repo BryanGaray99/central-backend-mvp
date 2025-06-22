@@ -1,0 +1,26 @@
+@{{ entityNameLowerCase }} @auto-generated @api
+Feature: {{ entityName }} API
+  As a developer
+  I want to test the endpoint {{ method }} {{ path }}
+  To ensure it works correctly
+
+  Background:
+    Given I have access to the API
+    And the endpoint {{ path }} is available
+
+  @positive @{{ methodLC }}
+  Scenario: Make a successful request to {{ path }}
+    When a {{ method }} request is sent to "{{ path }}"
+    Then the response should be {{ inferredStatusCode }} and contain {{ entityName }} data
+
+  @negative @{{ methodLC }}
+  Scenario Outline: Handle common errors in {{ path }}
+    When a {{ method }} request is sent to "{{ path }}" with <error_condition>
+    Then the response should be <error_code>
+
+    Examples:
+      | error_condition | error_code |
+      | invalid_data    | 400        |
+      | unauthorized    | 401        |
+      | not_found       | 404        |
+      | conflict        | 409        | 

@@ -5,135 +5,135 @@ import { CreateProjectDto } from '../dto/create-project.dto';
 export class ValidationService {
   
   /**
-   * Valida la configuración de entrada para crear un proyecto
+   * Validates input configuration for creating a project
    */
   validateProjectConfiguration(dto: CreateProjectDto): void {
-    // Validar nombre del proyecto
+    // Validate project name
     this.validateProjectName(dto.name);
     
-    // Validar URL base
+    // Validate base URL
     this.validateBaseUrl(dto.baseUrl);
     
-    // Validar metadatos si existen
+    // Validate metadata if it exists
     if (dto.metadata) {
       this.validateMetadata(dto.metadata);
     }
   }
 
   /**
-   * Valida el nombre del proyecto
+   * Validates project name
    */
   private validateProjectName(name: string): void {
     if (!name || name.trim().length === 0) {
-      throw new BadRequestException('El nombre del proyecto no puede estar vacío');
+      throw new BadRequestException('Project name cannot be empty');
     }
 
     if (name.length > 50) {
-      throw new BadRequestException('El nombre del proyecto no puede exceder 50 caracteres');
+      throw new BadRequestException('Project name cannot exceed 50 characters');
     }
 
-    // Validar caracteres permitidos (solo letras, números, guiones y guiones bajos)
+    // Validate allowed characters (only letters, numbers, hyphens and underscores)
     const nameRegex = /^[a-zA-Z0-9_-]+$/;
     if (!nameRegex.test(name)) {
-      throw new BadRequestException('El nombre del proyecto solo puede contener letras, números, guiones (-) y guiones bajos (_)');
+      throw new BadRequestException('Project name can only contain letters, numbers, hyphens (-) and underscores (_)');
     }
 
 
-    // Validar nombres reservados
+    // Validate reserved names
     const reservedNames = ['node_modules', 'dist', 'build', 'src', 'test', 'tests', 'playwright-workspaces'];
     if (reservedNames.includes(name.toLowerCase())) {
-      throw new BadRequestException(`El nombre '${name}' está reservado y no puede ser usado`);
+      throw new BadRequestException(`Name '${name}' is reserved and cannot be used`);
     }
   }
 
   /**
-   * Valida la URL base
+   * Validates base URL
    */
   private validateBaseUrl(baseUrl: string): void {
     if (!baseUrl || baseUrl.trim().length === 0) {
-      throw new BadRequestException('La URL base no puede estar vacía');
+      throw new BadRequestException('Base URL cannot be empty');
     }
 
     try {
       const url = new URL(baseUrl);
       
-      // Validar protocolo
+      // Validate protocol
       if (!['http:', 'https:'].includes(url.protocol)) {
-        throw new BadRequestException('La URL base debe usar HTTP o HTTPS');
+        throw new BadRequestException('Base URL must use HTTP or HTTPS');
       }
 
-      // Validar que tenga hostname
+      // Validate that it has a hostname
       if (!url.hostname) {
-        throw new BadRequestException('La URL base debe incluir un hostname válido');
+        throw new BadRequestException('Base URL must include a valid hostname');
       }
 
-      // Validar longitud
+      // Validate length
       if (baseUrl.length > 500) {
-        throw new BadRequestException('La URL base no puede exceder 500 caracteres');
+        throw new BadRequestException('Base URL cannot exceed 500 characters');
       }
 
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new BadRequestException('La URL base no tiene un formato válido');
+      throw new BadRequestException('Base URL does not have a valid format');
     }
   }
 
   /**
-   * Valida los metadatos del proyecto
+   * Validates project metadata
    */
   private validateMetadata(metadata: Record<string, any>): void {
     if (typeof metadata !== 'object' || metadata === null) {
-      throw new BadRequestException('Los metadatos deben ser un objeto válido');
+      throw new BadRequestException('Metadata must be a valid object');
     }
 
-    // Validar tamaño máximo de metadatos (1MB)
+    // Validate maximum metadata size (1MB)
     const metadataSize = JSON.stringify(metadata).length;
     if (metadataSize > 1024 * 1024) {
-      throw new BadRequestException('Los metadatos no pueden exceder 1MB');
+      throw new BadRequestException('Metadata cannot exceed 1MB');
     }
 
-    // Validar claves de metadatos
+    // Validate metadata keys
     for (const [key, value] of Object.entries(metadata)) {
       if (typeof key !== 'string' || key.length === 0) {
-        throw new BadRequestException('Las claves de metadatos deben ser strings no vacíos');
+        throw new BadRequestException('Metadata keys must be non-empty strings');
       }
 
       if (key.length > 100) {
-        throw new BadRequestException('Las claves de metadatos no pueden exceder 100 caracteres');
+        throw new BadRequestException('Metadata keys cannot exceed 100 characters');
       }
 
-      // Validar que las claves no contengan caracteres peligrosos
+      // Validate that keys don't contain dangerous characters
       const keyRegex = /^[a-zA-Z0-9_-]+$/;
       if (!keyRegex.test(key)) {
-        throw new BadRequestException('Las claves de metadatos solo pueden contener letras, números, guiones (-) y guiones bajos (_)');
+        throw new BadRequestException('Metadata keys can only contain letters, numbers, hyphens (-) and underscores (_)');
       }
 
-      // Validar valores (no permitir funciones)
+      // Validate values (don't allow functions)
       if (typeof value === 'function') {
-        throw new BadRequestException('Los metadatos no pueden contener funciones');
+        throw new BadRequestException('Metadata cannot contain functions');
       }
     }
   }
 
   /**
-   * Valida la configuración de workspace
+   * Validates workspace configuration
    */
   validateWorkspaceConfiguration(workspacePath: string): void {
     if (!workspacePath || workspacePath.trim().length === 0) {
-      throw new BadRequestException('La ruta del workspace no puede estar vacía');
+      throw new BadRequestException('Workspace path cannot be empty');
     }
 
-    // Validar que la ruta no contenga caracteres peligrosos
+    // Validate that the path doesn't contain dangerous characters
     const dangerousChars = /[<>:"|?*\x00-\x1f]/;
     if (dangerousChars.test(workspacePath)) {
-      throw new BadRequestException('La ruta del workspace contiene caracteres no permitidos');
+      throw new BadRequestException('Workspace path contains disallowed characters');
     }
 
-    // Validar longitud de ruta
+    // Validate path length
     if (workspacePath.length > 500) {
-      throw new BadRequestException('La ruta del workspace no puede exceder 500 caracteres');
+      throw new BadRequestException('Workspace path cannot exceed 500 characters');
     }
   }
 } 

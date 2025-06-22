@@ -1,40 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Project, ProjectStatus } from '../project.entity';
+import { Project } from '../project.entity';
 import { GenerationService } from '../generation.service';
 
 interface QueueItem {
-  projectId: string;
   project: Project;
   priority: number;
-  createdAt: Date;
-  retryCount: number;
+  retries: number;
+  addedAt: Date;
 }
 
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
   private readonly queue: QueueItem[] = [];
-  private readonly processing = new Set<string>();
   private readonly maxRetries = 3;
-  private readonly maxConcurrent = 2; // Máximo 2 proyectos procesándose simultáneamente
-  private readonly timeoutMs = 5 * 60 * 1000; // 5 minutos
+  private readonly timeoutMs = 5 * 60 * 1000; // 5 minutes
   private isProcessing = false;
 
   constructor(private readonly generationService: GenerationService) {}
 
   /**
-   * Agrega un proyecto a la cola de generación
+   * Add a project to the generation queue
    */
-  async enqueue(project: Project, priority: number = 1): Promise<void> {
+  enqueue(project: Project, priority: number = 1): void {
     const queueItem: QueueItem = {
-      projectId: project.id,
       project,
       priority,
-      createdAt: new Date(),
-      retryCount: 0,
+      retries: 0,
+      addedAt: new Date(),
     };
 
-    // Insertar en la cola ordenada por prioridad (mayor prioridad primero)
+    // Insert based on priority (higher priority first)
     const insertIndex = this.queue.findIndex(item => item.priority < priority);
     if (insertIndex === -1) {
       this.queue.push(queueItem);
@@ -42,136 +38,106 @@ export class QueueService {
       this.queue.splice(insertIndex, 0, queueItem);
     }
 
-    this.logger.log(`Proyecto ${project.name} agregado a la cola (prioridad: ${priority})`);
+    this.logger.log(`Project ${project.name} added to queue with priority ${priority}`);
     
-    // Iniciar procesamiento si no está activo
+    // Start processing if not already running
     if (!this.isProcessing) {
       this.processQueue();
     }
   }
 
   /**
-   * Procesa la cola de generación
+   * Process the queue
    */
   private async processQueue(): Promise<void> {
-    if (this.isProcessing) return;
+    if (this.isProcessing || this.queue.length === 0) {
+      return;
+    }
     
     this.isProcessing = true;
-    this.logger.log('Iniciando procesamiento de cola de generación');
+    this.logger.log(`Starting queue processing with ${this.queue.length} items`);
 
-    while (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
+    while (this.queue.length > 0) {
       const item = this.queue.shift();
-      if (!item) break;
+      if (!item) continue;
 
-      // Verificar si el proyecto ya está siendo procesado
-      if (this.processing.has(item.projectId)) {
-        this.queue.unshift(item); // Devolver al inicio de la cola
-        continue;
+      try {
+        await this.processItem(item);
+      } catch (error) {
+        this.logger.error(`Error processing queue item: ${error.message}`);
       }
-
-      // Procesar el proyecto
-      this.processProject(item);
     }
 
     this.isProcessing = false;
-    
-    // Si quedan items en la cola, continuar procesando
-    if (this.queue.length > 0) {
-      setTimeout(() => this.processQueue(), 1000);
-    }
+    this.logger.log('Queue processing completed');
   }
 
   /**
-   * Procesa un proyecto individual
+   * Process a single queue item
    */
-  private async processProject(item: QueueItem): Promise<void> {
-    this.processing.add(item.projectId);
-    
-    this.logger.log(`Procesando proyecto ${item.project.name} (intento ${item.retryCount + 1})`);
+  private async processItem(item: QueueItem): Promise<void> {
+    this.logger.log(`Processing project ${item.project.name} (attempt ${item.retries + 1}/${this.maxRetries + 1})`);
 
     try {
-      // Configurar timeout para la generación
+      // Create a timeout promise
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout: La generación excedió el tiempo límite')), this.timeoutMs);
+        setTimeout(() => reject(new Error('Timeout: Generation exceeded time limit')), this.timeoutMs);
       });
 
-      // Ejecutar generación con timeout
-      await Promise.race([
-        this.generationService.generateProject(item.project),
-        timeoutPromise
-      ]);
+      // Create the generation promise
+      const generationPromise = this.generationService.generateProject(item.project);
 
-      this.logger.log(`Proyecto ${item.project.name} generado exitosamente`);
+      // Race between generation and timeout
+      await Promise.race([generationPromise, timeoutPromise]);
+
+      this.logger.log(`Project ${item.project.name} generated successfully`);
       
     } catch (error) {
-      this.logger.error(`Error generando proyecto ${item.project.name}: ${error.message}`);
-      
-      // Manejar reintentos
-      if (item.retryCount < this.maxRetries) {
-        item.retryCount++;
-        item.createdAt = new Date();
+      this.logger.error(`Error generating project ${item.project.name}: ${error.message}`);
+
+      // Retry logic
+      if (item.retries < this.maxRetries) {
+        item.retries++;
+        this.logger.log(`Retrying project ${item.project.name} (attempt ${item.retries + 1}/${this.maxRetries + 1})`);
         
-        // Reinsertar en la cola con menor prioridad
-        this.queue.push(item);
-        this.logger.log(`Proyecto ${item.project.name} reencolado para reintento ${item.retryCount}`);
+        // Add back to queue with lower priority
+        this.enqueue(item.project, Math.max(1, item.priority - 1));
       } else {
-        this.logger.error(`Proyecto ${item.project.name} falló después de ${this.maxRetries} intentos`);
-      }
-    } finally {
-      this.processing.delete(item.projectId);
-      
-      // Continuar procesando la cola
-      if (this.queue.length > 0) {
-        setTimeout(() => this.processQueue(), 1000);
+        this.logger.error(`Project ${item.project.name} failed after ${this.maxRetries} attempts`);
       }
     }
   }
 
   /**
-   * Obtiene el estado de la cola
+   * Get queue status
    */
   getQueueStatus(): {
-    queueLength: number;
-    processingCount: number;
     isProcessing: boolean;
-  } {
-    return {
-      queueLength: this.queue.length,
-      processingCount: this.processing.size,
-      isProcessing: this.isProcessing,
-    };
-  }
-
-  /**
-   * Obtiene información detallada de la cola
-   */
-  getQueueDetails(): {
-    queue: Array<{
-      projectId: string;
+    queueLength: number;
+    items: Array<{
       projectName: string;
       priority: number;
-      createdAt: Date;
-      retryCount: number;
+      retries: number;
+      addedAt: Date;
     }>;
-    processing: string[];
   } {
     return {
-      queue: this.queue.map(item => ({
-        projectId: item.projectId,
+      isProcessing: this.isProcessing,
+      queueLength: this.queue.length,
+      items: this.queue.map(item => ({
         projectName: item.project.name,
         priority: item.priority,
-        createdAt: item.createdAt,
-        retryCount: item.retryCount,
+        retries: item.retries,
+        addedAt: item.addedAt,
       })),
-      processing: Array.from(this.processing),
     };
   }
 
   /**
-   * Limpia la cola (útil para testing o emergencias)
+   * Clear the queue
    */
   clearQueue(): void {
     this.queue.length = 0;
-    this.logger.warn('Cola de generación limpiada');
+    this.logger.log('Queue cleared');
   }
 }

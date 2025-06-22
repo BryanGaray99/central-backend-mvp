@@ -26,19 +26,19 @@ export class GenerationService {
     try {
       await this.updateProjectStatus(project.id, ProjectStatus.PENDING);
       
-      // Inicializar proyecto Playwright (esto crea la estructura básica)
+      // Initialize Playwright project (this creates the basic structure)
       await this.playwrightService.initializeProject(project);
       
-      // Crear estructura adicional para BDD ANTES de generar archivos
+      // Create additional structure for BDD BEFORE generating files
       await this.fileSystemService.createDirectoryStructure(
         project.path,
         PROJECT_STRUCTURE,
       );
       
-      // Generar/modificar archivos desde plantillas
+      // Generate/modify files from templates
       await this.generateProjectFiles(project);
       
-      // Ejecutar health check antes de marcar como ready
+      // Run health check before marking as ready
       const isHealthy = await this.playwrightService.runHealthCheck(project);
       
       if (isHealthy) {
@@ -47,10 +47,10 @@ export class GenerationService {
         throw new Error('Health check failed');
       }
     } catch (error) {
-      this.logger.error(`Error generando proyecto ${project.name}: ${error.message}`);
+      this.logger.error(`Error generating project ${project.name}: ${error.message}`);
       await this.updateProjectStatus(project.id, ProjectStatus.FAILED);
       
-      // Ejecutar limpieza automática en caso de fallo
+      // Execute automatic cleanup in case of failure
       await this.cleanupService.cleanupFailedProject(project, error);
       
       throw error;
@@ -62,52 +62,52 @@ export class GenerationService {
       name: project.name,
       baseUrl: project.baseUrl,
       author: project.metadata?.author || '',
-      description: project.metadata?.description || 'Proyecto de pruebas API con Playwright + BDD',
+      description: project.metadata?.description || 'API testing project with Playwright + BDD',
     };
 
-    // Modificar package.json existente con nuestras configuraciones
+    // Modify existing package.json with our configurations
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.PACKAGE_JSON,
       path.join(project.path, 'package.json'),
       templateVariables,
     );
 
-    // Modificar playwright.config.ts existente
+    // Modify existing playwright.config.ts
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.PLAYWRIGHT_CONFIG,
       path.join(project.path, 'playwright.config.ts'),
       templateVariables,
     );
 
-    // Generar api.config.ts
+    // Generate api.config.ts
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.API_CONFIG,
       path.join(project.path, 'src/api/api.config.ts'),
       templateVariables,
     );
 
-    // Generar cucumber.cjs
+    // Generate cucumber.cjs
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.CUCUMBER_CONFIG,
       path.join(project.path, 'cucumber.cjs'),
       templateVariables,
     );
 
-    // Generar hooks.ts
+    // Generate hooks.ts
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.HOOKS,
       path.join(project.path, 'src/steps/hooks.ts'),
       templateVariables,
     );
 
-    // Generar world.ts
+    // Generate world.ts
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.WORLD,
       path.join(project.path, 'src/steps/world.ts'),
       templateVariables,
     );
 
-    // Modificar README.md existente
+    // Modify existing README.md
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.README,
       path.join(project.path, 'README.md'),

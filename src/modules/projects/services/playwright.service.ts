@@ -7,26 +7,26 @@ import * as path from 'path';
 
 const exec = promisify(execCallback);
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // 1 segundo
+const RETRY_DELAY = 1000; // 1 second
 
 @Injectable()
 export class PlaywrightService {
   private readonly logger = new Logger(PlaywrightService.name);
 
   async initializeProject(project: Project): Promise<void> {
-    // Inicializar proyecto Playwright con todas las configuraciones básicas
+    // Initialize Playwright project with all basic configurations
     await this.execCommand(
       'npm init playwright@latest --quiet --yes -- --quiet',
       project.path,
     );
 
-    // Instalar dependencias adicionales para BDD
+    // Install additional dependencies for BDD
     await this.execCommand(
       'npm install --save-dev @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats',
       project.path,
     );
 
-    // Limpiar archivos de ejemplo
+    // Clean example files
     await this.cleanExampleFiles(project.path);
   }
 
@@ -42,16 +42,16 @@ export class PlaywrightService {
       
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-          // Verificar si el archivo está bloqueado
+          // Check if file is blocked
           try {
             const fileHandle = await fs.open(fullPath, 'r+');
             await fileHandle.close();
           } catch (error) {
             if (error.code === 'EBUSY' || error.code === 'EPERM') {
-              this.logger.warn(`Archivo bloqueado en intento ${attempt}: ${file}`);
+              this.logger.warn(`Blocked file on attempt ${attempt}: ${file}`);
               if (attempt === MAX_RETRIES) {
-                this.logger.error(`No se pudo eliminar archivo bloqueado: ${file}`);
-                continue; // Saltamos al siguiente archivo
+                this.logger.error(`Could not delete blocked file: ${file}`);
+                continue; // Skip to next file
               }
               await this.sleep(RETRY_DELAY);
               continue;
@@ -59,15 +59,15 @@ export class PlaywrightService {
           }
 
           await fs.rm(fullPath, { recursive: true, force: true });
-          this.logger.debug(`Archivo de ejemplo eliminado: ${file}`);
-          break; // Salimos del loop de reintentos si se eliminó correctamente
+          this.logger.debug(`Example file deleted: ${file}`);
+          break; // Exit retry loop if deleted successfully
         } catch (error) {
           if (error.code === 'ENOENT') {
-            break; // El archivo ya no existe, continuamos con el siguiente
+            break; // File no longer exists, continue with next
           }
           
           if (attempt === MAX_RETRIES) {
-            this.logger.warn(`No se pudo eliminar ${file}: ${error.message}`);
+            this.logger.warn(`Could not delete ${file}: ${error.message}`);
             break;
           }
           
@@ -83,15 +83,15 @@ export class PlaywrightService {
 
   async runHealthCheck(project: Project): Promise<boolean> {
     try {
-      // Crear un test básico de health check
+      // Create a basic health check test
       const healthTestContent = `
 import { test, expect } from '@playwright/test';
 
 test('health check - project setup', async () => {
-  // Verificar que la configuración base está correcta
+  // Verify that base configuration is correct
   expect(process.env.npm_package_name).toBe('${project.name}');
   
-  // Verificar que podemos importar las dependencias principales
+  // Verify that we can import main dependencies
   const { Given, When, Then } = require('@cucumber/cucumber');
   const { faker } = require('@faker-js/faker');
   const Ajv = require('ajv');
@@ -106,12 +106,12 @@ test('health check - project setup', async () => {
         healthTestContent
       );
 
-      // Ejecutar el test de health check
+      // Run health check test
       await this.execCommand('npx playwright test tests/health.spec.ts', project.path);
       
       return true;
     } catch (error) {
-      this.logger.error('Health check falló:', error);
+      this.logger.error('Health check failed:', error);
       return false;
     }
   }
@@ -122,7 +122,7 @@ test('health check - project setup', async () => {
       if (stdout) this.logger.debug(stdout);
       if (stderr) this.logger.warn(stderr);
     } catch (error) {
-      this.logger.error(`Error ejecutando comando: ${command}`);
+      this.logger.error(`Error executing command: ${command}`);
       this.logger.error(error);
       throw error;
     }

@@ -4,22 +4,22 @@ import { ProjectType } from '../project.entity';
 
 export class CreateProjectDto {
   @ApiProperty({
-    description: 'Identificador único del proyecto (usado para el workspace)',
-    example: 'mi-proyecto-test'
+    description: 'Unique identifier for the project (used for the workspace)',
+    example: 'my-test-project'
   })
   @IsString()
   name: string;
 
   @ApiPropertyOptional({
-    description: 'Nombre para mostrar del proyecto',
-    example: 'Mi Proyecto de Pruebas E2E'
+    description: 'Display name for the project',
+    example: 'My E2E Testing Project'
   })
   @IsString()
   @IsOptional()
   displayName?: string;
 
   @ApiProperty({
-    description: 'URL base para las pruebas',
+    description: 'Base URL for testing',
     example: 'http://localhost:3000'
   })
   @IsUrl({
@@ -30,7 +30,7 @@ export class CreateProjectDto {
   baseUrl: string;
 
   @ApiPropertyOptional({
-    description: 'Tipo de proyecto',
+    description: 'Type of project',
     enum: ProjectType,
     default: ProjectType.PLAYWRIGHT_BDD
   })
@@ -39,8 +39,8 @@ export class CreateProjectDto {
   type?: ProjectType;
 
   @ApiPropertyOptional({
-    description: 'Metadatos adicionales del proyecto',
-    example: { tags: ['e2e', 'api'], description: 'Pruebas E2E para API' }
+    description: 'Additional project metadata',
+    example: { tags: ['e2e', 'api'], description: 'E2E tests for API' }
   })
   @IsOptional()
   metadata?: Record<string, any>;

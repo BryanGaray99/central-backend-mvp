@@ -25,7 +25,7 @@ export class ProjectsService {
   ) {}
 
   async create(createDto: CreateProjectDto): Promise<Project> {
-    // Validar configuración de entrada
+    // Validate input configuration
     this.validationService.validateProjectConfiguration(createDto);
     
     const exists = await this.projectRepo.findOne({ where: { name: createDto.name } });
@@ -33,7 +33,7 @@ export class ProjectsService {
     
     const workspacePath = await this.workspaceService.createWorkspace(createDto.name);
     
-    // Validar configuración de workspace
+    // Validate workspace configuration
     this.validationService.validateWorkspaceConfiguration(workspacePath);
     
     const project = this.projectRepo.create({
@@ -46,10 +46,12 @@ export class ProjectsService {
     const savedProject = await this.projectRepo.save(project);
     await this.createProjectMetadata(savedProject);
     
-    // Agregar a la cola de generación en lugar de ejecutar directamente
-    this.queueService.enqueue(savedProject, 1).catch(error => {
-      console.error('Error agregando proyecto a la cola:', error);
-    });
+    // Add to generation queue instead of executing directly
+    try {
+      this.queueService.enqueue(savedProject, 1);
+    } catch (error) {
+      console.error('Error adding project to queue:', error);
+    }
     
     return savedProject;
   }
@@ -67,7 +69,7 @@ export class ProjectsService {
   async update(id: string, updateDto: UpdateProjectDto): Promise<Project> {
     const project = await this.findOne(id);
     
-    // Solo actualizamos los campos permitidos
+    // Only update allowed fields
     if (updateDto.displayName !== undefined) project.displayName = updateDto.displayName;
     if (updateDto.baseUrl !== undefined) project.baseUrl = updateDto.baseUrl;
     if (updateDto.metadata !== undefined) project.metadata = updateDto.metadata;

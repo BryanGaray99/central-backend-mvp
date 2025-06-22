@@ -8,41 +8,42 @@ import * as path from 'path';
 export class CleanupService {
   private readonly logger = new Logger(CleanupService.name);
   private readonly maxRetries = 3;
-  private readonly retryDelay = 1000; // 1 segundo
+  private readonly retryDelay = 1000; // 1 second
 
   constructor(private readonly workspaceService: WorkspaceService) {}
 
   /**
-   * Limpia un proyecto en caso de fallo
+   * Clean up a failed project
    */
   async cleanupFailedProject(project: Project, error: Error): Promise<void> {
-    this.logger.warn(`Iniciando limpieza del proyecto fallido: ${project.name}`);
+    this.logger.warn(`Starting cleanup for failed project: ${project.name}`);
+    this.logger.warn(`Error that triggered cleanup: ${error.message}`);
     
     try {
-      // 1. Limpiar archivos generados parcialmente
+      // 1. Clean partially generated files
       await this.cleanupGeneratedFiles(project);
       
-      // 2. Limpiar dependencias instaladas
+      // 2. Clean installed dependencies
       await this.cleanupDependencies(project);
       
-      // 3. Limpiar archivos temporales
+      // 3. Clean temporary files
       await this.cleanupTempFiles(project);
       
-      // 4. Restaurar estado del proyecto
+      // 4. Restore project state
       await this.restoreProjectState(project);
       
-      this.logger.log(`Limpieza completada para el proyecto: ${project.name}`);
+      this.logger.log(`Cleanup completed for project: ${project.name}`);
       
     } catch (cleanupError) {
-      this.logger.error(`Error durante la limpieza del proyecto ${project.name}: ${cleanupError.message}`);
+      this.logger.error(`Error during cleanup of project ${project.name}: ${cleanupError.message}`);
       
-      // Si la limpieza falla, intentar eliminar el workspace completo
+      // If cleanup fails, try to delete the entire workspace
       await this.emergencyCleanup(project);
     }
   }
 
   /**
-   * Limpia archivos generados parcialmente
+   * Clean partially generated files
    */
   private async cleanupGeneratedFiles(project: Project): Promise<void> {
     const filesToClean = [
@@ -59,16 +60,16 @@ export class CleanupService {
       for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
         try {
           await fs.unlink(filePath);
-          this.logger.debug(`Archivo eliminado: ${file}`);
+          this.logger.debug(`File deleted: ${file}`);
           break;
         } catch (error: any) {
           if (error.code === 'ENOENT') {
-            // El archivo no existe, continuar
+            // File doesn't exist, continue
             break;
           }
           
           if (attempt === this.maxRetries) {
-            this.logger.warn(`No se pudo eliminar ${file}: ${error.message}`);
+            this.logger.warn(`Could not delete ${file}: ${error.message}`);
             break;
           }
           
@@ -79,30 +80,30 @@ export class CleanupService {
   }
 
   /**
-   * Limpia dependencias instaladas
+   * Clean installed dependencies
    */
   private async cleanupDependencies(project: Project): Promise<void> {
     const nodeModulesPath = path.join(project.path, 'node_modules');
     const packageLockPath = path.join(project.path, 'package-lock.json');
     
     try {
-      // Eliminar node_modules
+      // Delete node_modules
       await fs.rm(nodeModulesPath, { recursive: true, force: true });
-      this.logger.debug('node_modules eliminado');
+      this.logger.debug('node_modules deleted');
       
-      // Eliminar package-lock.json
+      // Delete package-lock.json
       await fs.unlink(packageLockPath);
-      this.logger.debug('package-lock.json eliminado');
+      this.logger.debug('package-lock.json deleted');
       
     } catch (error: any) {
       if (error.code !== 'ENOENT') {
-        this.logger.warn(`Error limpiando dependencias: ${error.message}`);
+        this.logger.warn(`Error cleaning dependencies: ${error.message}`);
       }
     }
   }
 
   /**
-   * Limpia archivos temporales
+   * Clean temporary files
    */
   private async cleanupTempFiles(project: Project): Promise<void> {
     const tempDirs = [
@@ -117,25 +118,25 @@ export class CleanupService {
       
       try {
         await fs.rm(dirPath, { recursive: true, force: true });
-        this.logger.debug(`Directorio temporal eliminado: ${dir}`);
+        this.logger.debug(`Temporary directory deleted: ${dir}`);
       } catch (error: any) {
         if (error.code !== 'ENOENT') {
-          this.logger.warn(`Error eliminando directorio temporal ${dir}: ${error.message}`);
+          this.logger.warn(`Error deleting temporary directory ${dir}: ${error.message}`);
         }
       }
     }
   }
 
   /**
-   * Restaura el estado del proyecto
+   * Restore project state
    */
   private async restoreProjectState(project: Project): Promise<void> {
-    // Restaurar package.json original
+    // Restore original package.json
     const packageJsonPath = path.join(project.path, 'package.json');
     const originalPackageJson = {
       name: project.name,
       version: "1.0.0",
-      description: "Proyecto de pruebas generado automáticamente",
+      description: "Automatically generated test project",
       type: "commonjs",
       scripts: {
         test: "echo \"Error: no test specified\" && exit 1"
@@ -147,12 +148,12 @@ export class CleanupService {
 
     try {
       await fs.writeFile(packageJsonPath, JSON.stringify(originalPackageJson, null, 2));
-      this.logger.debug('package.json restaurado');
+      this.logger.debug('package.json restored');
     } catch (error: any) {
-      this.logger.warn(`Error restaurando package.json: ${error.message}`);
+      this.logger.warn(`Error restoring package.json: ${error.message}`);
     }
 
-    // Restaurar playwright.config.ts básico
+    // Restore basic playwright.config.ts
     const playwrightConfigPath = path.join(project.path, 'playwright.config.ts');
     const basicPlaywrightConfig = `import { defineConfig, devices } from '@playwright/test';
 
@@ -177,39 +178,39 @@ export default defineConfig({
 
     try {
       await fs.writeFile(playwrightConfigPath, basicPlaywrightConfig);
-      this.logger.debug('playwright.config.ts restaurado');
+      this.logger.debug('playwright.config.ts restored');
     } catch (error: any) {
-      this.logger.warn(`Error restaurando playwright.config.ts: ${error.message}`);
+      this.logger.warn(`Error restoring playwright.config.ts: ${error.message}`);
     }
   }
 
   /**
-   * Limpieza de emergencia - elimina el workspace completo
+   * Emergency cleanup - delete entire workspace
    */
   private async emergencyCleanup(project: Project): Promise<void> {
-    this.logger.error(`Ejecutando limpieza de emergencia para: ${project.name}`);
+    this.logger.error(`Executing emergency cleanup for: ${project.name}`);
     
     try {
       await this.workspaceService.deleteWorkspace(project.name);
-      this.logger.log(`Workspace eliminado en limpieza de emergencia: ${project.name}`);
+      this.logger.log(`Workspace deleted in emergency cleanup: ${project.name}`);
     } catch (error: any) {
-      this.logger.error(`Error en limpieza de emergencia: ${error.message}`);
+      this.logger.error(`Error in emergency cleanup: ${error.message}`);
     }
   }
 
   /**
-   * Limpia proyectos huérfanos (proyectos que quedaron en estado PENDING por mucho tiempo)
+   * Clean orphaned projects (projects that remained in PENDING status for too long)
    */
   async cleanupOrphanedProjects(projects: Project[]): Promise<void> {
     const orphanedProjects = projects.filter(project => {
       const timeDiff = Date.now() - project.createdAt.getTime();
-      const maxPendingTime = 30 * 60 * 1000; // 30 minutos
+      const maxPendingTime = 30 * 60 * 1000; // 30 minutes
       return project.status === ProjectStatus.PENDING && timeDiff > maxPendingTime;
     });
 
     for (const project of orphanedProjects) {
-      this.logger.warn(`Limpiando proyecto huérfano: ${project.name}`);
-      await this.cleanupFailedProject(project, new Error('Proyecto huérfano detectado'));
+      this.logger.warn(`Cleaning orphaned project: ${project.name}`);
+      await this.cleanupFailedProject(project, new Error('Orphaned project detected'));
     }
   }
 
