@@ -14,6 +14,12 @@ services:
       - PORT=3000
       - DATABASE_PATH=/app/data/central-backend.sqlite
       - PLAYWRIGHT_WORKSPACES_PATH=/playwright-workspaces
+
+      # ---- Variables para init de Playwright ----
+      - CI=true
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+      - TEST_OPTIONS={"language":"TypeScript","testDir":"tests","installGitHubActions":false,"installPlaywrightBrowsers":false}
+
     volumes:
       # Persistir la base de datos en una carpeta del host
       - ./data:/app/data
@@ -41,13 +47,20 @@ services:
       - PORT=3000
       - DATABASE_PATH=/app_data/central-backend.sqlite
       - PLAYWRIGHT_WORKSPACES_PATH=/app_playwright-workspaces
+
+      # Puedes añadir aquí las mismas vars si quieres testear init dentro de dev
+      - CI=true
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+      - TEST_OPTIONS={"language":"TypeScript","testDir":"tests","installGitHubActions":false,"installPlaywrightBrowsers":false}
+
     volumes:
       - ../data:/app_data
       - ../playwright-workspaces:/app_playwright-workspaces
       - ./src:/app/src
     command: npm run start:dev
     profiles:
-      - dev 
+      - dev
+
 # NOTA:
 # - En local, usa DATABASE_PATH=central-backend.sqlite en tu .env
-# - En Docker, la base de datos se persiste en ./data/central-backend.sqlite del host 
+# - En Docker, la base de datos se persiste en ./data/central-backend.sqlite del host

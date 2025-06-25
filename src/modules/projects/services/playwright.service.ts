@@ -6,9 +6,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const exec = promisify(execCallback);
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 1;
 const RETRY_DELAY = 1000; // 1 second
-const COMMAND_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const COMMAND_TIMEOUT = 10 * 60 * 1000; // 5 minutes
 
 @Injectable()
 export class PlaywrightService {
@@ -18,20 +18,31 @@ export class PlaywrightService {
     this.logger.log(`Starting Playwright initialization for project: ${project.name}`);
     
     try {
-      // Step 1: Initialize Playwright project with timeout
+      // Step 1: Initialize Playwright project with skip browser download and pre-seeded options
       this.logger.log('Step 1: Initializing Playwright project...');
       await this.execCommandWithTimeout(
-        'npm init playwright@latest --quiet --yes -- --quiet',
+        'npm init playwright@latest -- --yes --quiet',
         project.path,
-        'Playwright initialization'
+        'Playwright initialization',
+        {
+          NODE_ENV: 'development',
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1',
+          TEST_OPTIONS: JSON.stringify({
+            language: 'TypeScript',
+            testDir: 'tests',
+            installGitHubActions: false,
+            installPlaywrightBrowsers: false,
+          }),
+        },
       );
 
       // Step 2: Install additional dependencies for BDD
       this.logger.log('Step 2: Installing BDD dependencies...');
       await this.execCommandWithTimeout(
-        'npm install --save-dev @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats',
+        'npm install --save-dev @playwright/test @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats',
         project.path,
-        'BDD dependencies installation'
+        'BDD dependencies installation',
+        { NODE_ENV: 'development' },
       );
 
       // Step 3: Clean example files
@@ -61,12 +72,12 @@ export class PlaywrightService {
           try {
             const fileHandle = await fs.open(fullPath, 'r+');
             await fileHandle.close();
-          } catch (error) {
-            if (error.code === 'EBUSY' || error.code === 'EPERM') {
+          } catch (err) {
+            if (err.code === 'EBUSY' || err.code === 'EPERM') {
               this.logger.warn(`Blocked file on attempt ${attempt}: ${file}`);
               if (attempt === MAX_RETRIES) {
                 this.logger.error(`Could not delete blocked file: ${file}`);
-                continue; // Skip to next file
+                continue;
               }
               await this.sleep(RETRY_DELAY);
               continue;
@@ -75,17 +86,13 @@ export class PlaywrightService {
 
           await fs.rm(fullPath, { recursive: true, force: true });
           this.logger.debug(`Example file deleted: ${file}`);
-          break; // Exit retry loop if deleted successfully
-        } catch (error) {
-          if (error.code === 'ENOENT') {
-            break; // File no longer exists, continue with next
-          }
-          
+          break;
+        } catch (err) {
+          if (err.code === 'ENOENT') break;
           if (attempt === MAX_RETRIES) {
-            this.logger.warn(`Could not delete ${file}: ${error.message}`);
+            this.logger.warn(`Could not delete ${file}: ${err.message}`);
             break;
           }
-          
           await this.sleep(RETRY_DELAY);
         }
       }
@@ -100,19 +107,14 @@ export class PlaywrightService {
     this.logger.log(`Running health check for project: ${project.name}`);
     
     try {
-      // Create a basic health check test
       const healthTestContent = `
 import { test, expect } from '@playwright/test';
 
 test('health check - project setup', async () => {
-  // Verify that base configuration is correct
   expect(process.env.npm_package_name).toBe('${project.name}');
-  
-  // Verify that we can import main dependencies
   const { Given, When, Then } = require('@cucumber/cucumber');
   const { faker } = require('@faker-js/faker');
   const Ajv = require('ajv');
-  
   expect(Given).toBeDefined();
   expect(faker).toBeDefined();
   expect(Ajv).toBeDefined();
@@ -120,14 +122,15 @@ test('health check - project setup', async () => {
 
       await fs.writeFile(
         path.join(project.path, 'tests/health.spec.ts'),
-        healthTestContent
+        healthTestContent,
       );
 
-      // Run health check test with timeout
+      // Run health check with NODE_ENV=development to ensure devDependencies are present
       await this.execCommandWithTimeout(
         'npx playwright test tests/health.spec.ts',
         project.path,
-        'Health check test'
+        'Health check test',
+        { NODE_ENV: 'development' },
       );
       
       this.logger.log(`Health check passed for project: ${project.name}`);
@@ -139,49 +142,34 @@ test('health check - project setup', async () => {
   }
 
   private async execCommandWithTimeout(
-    command: string, 
-    cwd: string, 
-    operationName: string
+    command: string,
+    cwd: string,
+    operationName: string,
+    extraEnv: Record<string, string> = {},
   ): Promise<void> {
     this.logger.log(`Executing: ${operationName} in ${cwd}`);
     this.logger.debug(`Command: ${command}`);
-    
+    this.logger.debug(`Env extras: ${JSON.stringify(extraEnv)}`);
+
     try {
-      const { stdout, stderr } = await exec(command, { 
-        cwd,
-        timeout: COMMAND_TIMEOUT,
-        env: {
-          ...process.env,
-          // Ensure npm doesn't hang on interactive prompts
-          CI: 'true',
-          NODE_ENV: 'production',
-          // Force npm to use non-interactive mode
-          npm_config_yes: 'true',
-          npm_config_quiet: 'true'
-        }
-      });
-      
-      if (stdout) {
-        this.logger.debug(`${operationName} stdout: ${stdout.substring(0, 500)}...`);
-      }
-      if (stderr) {
-        this.logger.warn(`${operationName} stderr: ${stderr.substring(0, 500)}...`);
-      }
-      
+      const env = {
+        ...process.env,
+        CI: 'true',
+        npm_config_yes: 'true',
+        npm_config_quiet: 'true',
+        ...extraEnv,
+      };
+
+      const { stdout, stderr } = await exec(command, { cwd, timeout: COMMAND_TIMEOUT, env });
+      if (stdout) this.logger.debug(`${operationName} stdout: ${stdout.substring(0, 500)}...`);
+      if (stderr) this.logger.warn(`${operationName} stderr: ${stderr.substring(0, 500)}...`);
       this.logger.log(`${operationName} completed successfully`);
     } catch (error) {
       this.logger.error(`${operationName} failed:`, error);
       this.logger.error(`Command: ${command}`);
       this.logger.error(`Working directory: ${cwd}`);
-      
-      // Provide more specific error information
-      if (error.code === 'ETIMEDOUT') {
-        throw new Error(`${operationName} timed out after ${COMMAND_TIMEOUT}ms`);
-      }
-      if (error.code === 'ENOENT') {
-        throw new Error(`${operationName} failed: Command not found. Make sure npm/node is available`);
-      }
-      
+      if (error.code === 'ETIMEDOUT') throw new Error(`${operationName} timed out after ${COMMAND_TIMEOUT}ms`);
+      if (error.code === 'ENOENT') throw new Error(`${operationName} failed: Command not found.`);
       throw error;
     }
   }
@@ -189,4 +177,4 @@ test('health check - project setup', async () => {
   private async execCommand(command: string, cwd: string): Promise<void> {
     return this.execCommandWithTimeout(command, cwd, 'Command execution');
   }
-} 
+}
