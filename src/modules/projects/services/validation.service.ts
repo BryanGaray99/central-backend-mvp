@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { CreateProjectDto } from '../dto/create-project.dto';
+import * as path from 'path';
 
 @Injectable()
 export class ValidationService {
@@ -125,13 +126,21 @@ export class ValidationService {
       throw new BadRequestException('Workspace path cannot be empty');
     }
 
-    // Validate that the path doesn't contain dangerous characters
+    // Solo valida el nombre del workspace, no la ruta completa
+    const workspaceName = path.basename(workspacePath);
+
+    // Validar caracteres peligrosos solo en el nombre
     const dangerousChars = /[<>:"|?*\x00-\x1f]/;
-    if (dangerousChars.test(workspacePath)) {
-      throw new BadRequestException('Workspace path contains disallowed characters');
+    if (dangerousChars.test(workspaceName)) {
+      throw new BadRequestException('Workspace name contains disallowed characters');
     }
 
-    // Validate path length
+    // Validar longitud del nombre
+    if (workspaceName.length > 50) {
+      throw new BadRequestException('Workspace name cannot exceed 50 characters');
+    }
+
+    // Validar longitud de la ruta completa (opcional, pero más permisivo)
     if (workspacePath.length > 500) {
       throw new BadRequestException('Workspace path cannot exceed 500 characters');
     }

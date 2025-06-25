@@ -4,7 +4,6 @@ import { TemplateService } from '../../projects/services/template.service';
 import { Project } from '../../projects/project.entity';
 import { RegisterEndpointDto } from '../dto/register-endpoint.dto';
 import * as path from 'path';
-import { kebabCase } from 'change-case';
 
 @Injectable()
 export class ArtifactsGenerationService {
@@ -21,7 +20,7 @@ export class ArtifactsGenerationService {
 
     const basePath = project.path;
     const sectionPath = dto.section;
-    const entityFileName = kebabCase(dto.entityName);
+    const entityFileName = this.kebabCase(dto.entityName);
     
     // Create necessary directories
     const fixturesDir = path.join(basePath, 'src', 'fixtures', sectionPath);
@@ -43,6 +42,14 @@ export class ArtifactsGenerationService {
     await this.generateTypesFile(typesDir, entityFileName, dto, analysisResult.inferredResponseSchema);
     
     this.logger.log('Artifacts generation completed.');
+  }
+
+  private kebabCase(str: string): string {
+    return str
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .replace(/[\s_]+/g, '-')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '');
   }
 
   private async generateSchemaFile(dir: string, fileName: string, schema: any) {

@@ -8,26 +8,41 @@ import * as path from 'path';
 const exec = promisify(execCallback);
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
+const COMMAND_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 @Injectable()
 export class PlaywrightService {
   private readonly logger = new Logger(PlaywrightService.name);
 
   async initializeProject(project: Project): Promise<void> {
-    // Initialize Playwright project with all basic configurations
-    await this.execCommand(
-      'npm init playwright@latest --quiet --yes -- --quiet',
-      project.path,
-    );
+    this.logger.log(`Starting Playwright initialization for project: ${project.name}`);
+    
+    try {
+      // Step 1: Initialize Playwright project with timeout
+      this.logger.log('Step 1: Initializing Playwright project...');
+      await this.execCommandWithTimeout(
+        'npm init playwright@latest --quiet --yes -- --quiet',
+        project.path,
+        'Playwright initialization'
+      );
 
-    // Install additional dependencies for BDD
-    await this.execCommand(
-      'npm install --save-dev @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats',
-      project.path,
-    );
+      // Step 2: Install additional dependencies for BDD
+      this.logger.log('Step 2: Installing BDD dependencies...');
+      await this.execCommandWithTimeout(
+        'npm install --save-dev @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats',
+        project.path,
+        'BDD dependencies installation'
+      );
 
-    // Clean example files
-    await this.cleanExampleFiles(project.path);
+      // Step 3: Clean example files
+      this.logger.log('Step 3: Cleaning example files...');
+      await this.cleanExampleFiles(project.path);
+      
+      this.logger.log(`Playwright initialization completed successfully for: ${project.name}`);
+    } catch (error) {
+      this.logger.error(`Playwright initialization failed for ${project.name}:`, error);
+      throw error;
+    }
   }
 
   private async cleanExampleFiles(projectPath: string): Promise<void> {
@@ -82,6 +97,8 @@ export class PlaywrightService {
   }
 
   async runHealthCheck(project: Project): Promise<boolean> {
+    this.logger.log(`Running health check for project: ${project.name}`);
+    
     try {
       // Create a basic health check test
       const healthTestContent = `
@@ -106,25 +123,70 @@ test('health check - project setup', async () => {
         healthTestContent
       );
 
-      // Run health check test
-      await this.execCommand('npx playwright test tests/health.spec.ts', project.path);
+      // Run health check test with timeout
+      await this.execCommandWithTimeout(
+        'npx playwright test tests/health.spec.ts',
+        project.path,
+        'Health check test'
+      );
       
+      this.logger.log(`Health check passed for project: ${project.name}`);
       return true;
     } catch (error) {
-      this.logger.error('Health check failed:', error);
+      this.logger.error(`Health check failed for ${project.name}:`, error);
       return false;
     }
   }
 
-  private async execCommand(command: string, cwd: string): Promise<void> {
+  private async execCommandWithTimeout(
+    command: string, 
+    cwd: string, 
+    operationName: string
+  ): Promise<void> {
+    this.logger.log(`Executing: ${operationName} in ${cwd}`);
+    this.logger.debug(`Command: ${command}`);
+    
     try {
-      const { stdout, stderr } = await exec(command, { cwd });
-      if (stdout) this.logger.debug(stdout);
-      if (stderr) this.logger.warn(stderr);
+      const { stdout, stderr } = await exec(command, { 
+        cwd,
+        timeout: COMMAND_TIMEOUT,
+        env: {
+          ...process.env,
+          // Ensure npm doesn't hang on interactive prompts
+          CI: 'true',
+          NODE_ENV: 'production',
+          // Force npm to use non-interactive mode
+          npm_config_yes: 'true',
+          npm_config_quiet: 'true'
+        }
+      });
+      
+      if (stdout) {
+        this.logger.debug(`${operationName} stdout: ${stdout.substring(0, 500)}...`);
+      }
+      if (stderr) {
+        this.logger.warn(`${operationName} stderr: ${stderr.substring(0, 500)}...`);
+      }
+      
+      this.logger.log(`${operationName} completed successfully`);
     } catch (error) {
-      this.logger.error(`Error executing command: ${command}`);
-      this.logger.error(error);
+      this.logger.error(`${operationName} failed:`, error);
+      this.logger.error(`Command: ${command}`);
+      this.logger.error(`Working directory: ${cwd}`);
+      
+      // Provide more specific error information
+      if (error.code === 'ETIMEDOUT') {
+        throw new Error(`${operationName} timed out after ${COMMAND_TIMEOUT}ms`);
+      }
+      if (error.code === 'ENOENT') {
+        throw new Error(`${operationName} failed: Command not found. Make sure npm/node is available`);
+      }
+      
       throw error;
     }
+  }
+
+  private async execCommand(command: string, cwd: string): Promise<void> {
+    return this.execCommandWithTimeout(command, cwd, 'Command execution');
   }
 } 

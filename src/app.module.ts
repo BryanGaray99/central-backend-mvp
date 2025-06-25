@@ -15,12 +15,18 @@ import { EndpointsModule } from './modules/endpoints/endpoints.module';
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'sqlite',
-        database: configService.get<string>('DATABASE_PATH', 'central-backend.sqlite'),
-        entities: [Project],
-        synchronize: true,
-      }),
+      useFactory: (configService: ConfigService) => {
+        const dbPath = configService.get('DATABASE_PATH');
+        if (!dbPath) {
+          throw new Error('DATABASE_PATH must be defined as an absolute or relative path.');
+        }
+        return {
+          type: 'sqlite',
+          database: dbPath,
+          entities: [Project],
+          synchronize: true,
+        };
+      },
       inject: [ConfigService],
     }),
     WorkspaceModule,

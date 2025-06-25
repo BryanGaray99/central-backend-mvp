@@ -11,7 +11,20 @@ export class WorkspaceService {
   private readonly workspacesDir: string;
 
   constructor() {
-    this.workspacesDir = process.env.WORKSPACES_DIR || '../playwright-workspaces';
+    const envPath = process.env.PLAYWRIGHT_WORKSPACES_PATH;
+    if (!envPath) {
+      throw new Error('PLAYWRIGHT_WORKSPACES_PATH must be defined as an absolute or relative path OUTSIDE the backend central.');
+    }
+    let dir = envPath;
+    if (!path.isAbsolute(dir)) {
+      dir = path.resolve(process.cwd(), dir);
+    }
+    // Detecta si la ruta está dentro del backend central
+    const backendRoot = path.resolve(__dirname, '../../..');
+    if (dir.startsWith(backendRoot)) {
+      throw new Error('PLAYWRIGHT_WORKSPACES_PATH no puede estar dentro del backend central.');
+    }
+    this.workspacesDir = dir;
     this.init();
   }
 

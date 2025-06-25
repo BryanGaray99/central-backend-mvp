@@ -1,98 +1,181 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🚀 Central Backend MVP - Generador de Proyectos de Testing
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Sistema backend para generar automáticamente proyectos de testing Playwright + BDD en TypeScript.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 📋 Requisitos
 
-## Description
+- **Node.js** (versión 18 o superior)
+- **npm** (incluido con Node.js)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 🚀 Instalación y Ejecución
 
-## Project setup
+### Método 1: Instalación Directa (Recomendado)
 
+#### 1. Instalar Dependencias
 ```bash
-$ npm install
+npm install
 ```
 
-## Compile and run the project
-
+#### 2. Ejecutar el Servidor
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run start:dev
 ```
 
-## Run tests
+#### 3. Verificar que Funciona
+- **API**: http://localhost:3000
+- **Documentación**: http://localhost:3000/api
+- **Health Check**: http://localhost:3000/health
 
+### Método 2: Con Docker (Alternativa)
+
+Si tienes Docker instalado, puedes usar esta opción:
+
+#### 1. Construir y Ejecutar con Docker Compose
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker-compose up --build
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
+#### 2. O ejecutar solo el contenedor
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+docker build -t central-backend .
+docker run -p 3000:3000 central-backend
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+#### 3. Verificar que Funciona
+- **API**: http://localhost:3000
+- **Documentación**: http://localhost:3000/api
+- **Health Check**: http://localhost:3000/health
 
-## Resources
+## 📚 Endpoints Disponibles
 
-Check out a few resources that may come in handy when working with NestJS:
+### Proyectos
+- `POST /projects` - Crear proyecto
+- `GET /projects` - Listar proyectos
+- `GET /projects/:id` - Obtener proyecto
+- `PUT /projects/:id` - Actualizar proyecto
+- `DELETE /projects/:id` - Eliminar proyecto
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Endpoints
+- `POST /endpoints/register` - Registrar y analizar endpoint
+- `GET /endpoints/:projectId` - Listar endpoints de un proyecto
+- `PUT /endpoints/:id` - Actualizar endpoint
+- `DELETE /endpoints/:id` - Eliminar endpoint
 
-## Support
+## 🧪 Probar la API
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Crear un Proyecto
+```bash
+curl -X POST http://localhost:3000/projects \
+-H "Content-Type: application/json" \
+-d '{
+  "name": "mi-proyecto-test",
+  "displayName": "Mi Proyecto de Testing",
+  "baseUrl": "http://localhost:3004",
+  "metadata": {
+    "author": "Tu Nombre",
+    "description": "Proyecto de prueba"
+  }
+}'
+```
 
-## Stay in touch
+### Listar Proyectos
+```bash
+curl http://localhost:3000/projects
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Verificar Health
+```bash
+curl http://localhost:3000/health
+```
 
-## License
+## 🛠️ Scripts Disponibles
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+npm run start:dev    # Desarrollo (hot reload)
+npm run build        # Construir para producción
+npm run start:prod   # Ejecutar en producción
+npm run test         # Ejecutar tests
+```
+
+## 🛠️ Solución de Problemas
+
+### Puerto ocupado
+```bash
+PORT=3001 npm run start:dev
+```
+
+### Problemas de dependencias
+```bash
+npm cache clean --force
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Base de datos corrupta
+```bash
+rm central-backend.sqlite
+npm run start:dev
+```
+
+### Problemas con Docker
+```bash
+# Limpiar contenedores
+docker-compose down
+docker system prune -f
+
+# Reconstruir
+docker-compose up --build
+```
+
+## 📁 Estructura
+
+```
+src/
+├── modules/
+│   ├── projects/     # Gestión de proyectos
+│   ├── endpoints/    # Gestión de endpoints
+│   └── workspace/    # Gestión de workspaces
+├── common/           # Utilidades comunes
+└── main.ts          # Punto de entrada
+```
+
+## 📝 Notas
+
+- La base de datos SQLite se crea automáticamente
+- Los workspaces se generan en `playwright-workspaces/`
+- Documentación interactiva disponible en Swagger UI
+- No requiere configuración adicional
+- **Método Docker**: Garantiza funcionamiento en cualquier entorno
+- **Método Directo**: Más rápido para desarrollo local
+
+## Uso de base de datos en local y Docker
+
+- **En local (Windows/desarrollo):**
+  - Usa `.env` con:
+    ```env
+    DATABASE_PATH=central-backend.sqlite
+    PLAYWRIGHT_WORKSPACES_PATH=../playwright-workspaces
+    ```
+  - El archivo `central-backend.sqlite` se crea y usa solo en tu máquina.
+
+- **En Docker:**
+  - La base de datos se crea automáticamente dentro del contenedor en `/app/data/central-backend.sqlite` y **se persiste en `./data/central-backend.sqlite` del host**.
+  - Se mapea como volumen para mantener los datos entre reinicios del contenedor:
+    ```yaml
+    volumes:
+      - ./data:/app/data
+      - ../playwright-workspaces:/playwright-workspaces
+    ```
+  - Si quieres una base de datos nueva cada vez, elimina el volumen `./data:/app/data` del docker-compose.yml.
+
+- **Comando para construir y levantar el contenedor:**
+
+```sh
+docker-compose up --build
+```
+
+---
+
+**¡Listo! El servidor estará ejecutándose en http://localhost:3000**
+
+**💡 Recomendación**: Usa el método directo para desarrollo y Docker para demostraciones o distribución.
