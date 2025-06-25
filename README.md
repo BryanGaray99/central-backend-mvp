@@ -1,15 +1,29 @@
 # 🚀 Central Backend MVP - Generador de Proyectos de Testing
 
-Sistema backend para generar automáticamente proyectos de testing Playwright + BDD en TypeScript.
+## 📋 Descripción del Proyecto
+
+Este es el **motor de generación** de un sistema completo de testing automatizado. Su propósito es crear automáticamente proyectos de testing Playwright + BDD en TypeScript a partir de una configuración simple.
 
 ## 📋 Requisitos
 
 - **Node.js** (versión 18 o superior)
 - **npm** (incluido con Node.js)
 
+## 🎯 Propósito de este MVP
+
+Este es el **motor de generación** del sistema completo. Se enfoca en crear proyectos de testing automáticamente desde una configuración simple. 
+
+**¿Por qué instalación directa?**
+- Este MVP está diseñado para ejecutarse **localmente** donde se generarán los proyectos
+- Genera archivos, instala dependencias y ejecuta comandos npm/playwright
+- En contenedores sería costoso y complejo manejar múltiples instalaciones de dependencias
+- La parte que irá en la nube (con IA) será una fase posterior separada
+
 ## 🚀 Instalación y Ejecución
 
-### Método 1: Instalación Directa (Recomendado)
+### Método 1: Instalación Directa con Node.js (⭐ RECOMENDADO)
+
+Este es el método recomendado para este MVP del motor de generación.
 
 #### 1. Instalar Dependencias
 ```bash
@@ -26,25 +40,72 @@ npm run start:dev
 - **Documentación**: http://localhost:3000/api
 - **Health Check**: http://localhost:3000/health
 
-### Método 2: Con Docker (Alternativa)
+### Método 2: Con Docker (Solo para desarrollo/pruebas)
 
-Si tienes Docker instalado, puedes usar esta opción:
+⚠️ **Nota**: Se configuró el Docker pero lo ideal sería instalarlo localmente ya que este MVP es para la parte de la solución que se instalaría localmente. 
 
-#### 1. Construir y Ejecutar con Docker Compose
 ```bash
 docker-compose up --build
 ```
 
-#### 2. O ejecutar solo el contenedor
-```bash
-docker build -t central-backend .
-docker run -p 3000:3000 central-backend
+### 🎯 ¿Qué hace este MVP?
+
+1. **Genera proyectos completos** de testing con Playwright + Cucumber
+2. **Instala automáticamente** todas las dependencias necesarias
+3. **Crea la estructura de carpetas** estándar para BDD
+4. **Genera archivos de configuración** (playwright.config.ts, cucumber.cjs, etc.)
+5. **Ejecuta health checks** para validar que todo funciona
+6. **Gestiona endpoints** para analizar APIs y generar artefactos de testing
+
+### 🏗️ Arquitectura del Sistema Completo
+
+Este MVP es la **primera parte** de un sistema más grande:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SISTEMA COMPLETO                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🌐 Backend con IA (Fase Posterior)                        │
+│  ├── Ejecuta en la nube con Docker                         │
+│  ├── Recibe peticiones en lenguaje natural                 │
+│  ├── Traduce a JSON de generación                          │
+│  └── Se comunica con este motor local                      │
+│                                                             │
+│  🔧 Motor de Generación (Este MVP)                         │
+│  ├── Ejecuta localmente                                    │
+│  ├── Genera proyectos de testing                           │
+│  ├── Instala dependencias                                  │
+│  └── Valida que todo funcione                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-#### 3. Verificar que Funciona
-- **API**: http://localhost:3000
-- **Documentación**: http://localhost:3000/api
-- **Health Check**: http://localhost:3000/health
+## 📊 Status Actual del MVP
+
+### ✅ **Completado**
+- ✅ Backend NestJS con TypeORM y SQLite
+- ✅ Sistema de detección automática de puertos (3000, 3001, 3002)
+- ✅ Generación de proyectos Playwright + BDD
+- ✅ Instalación automática de dependencias
+- ✅ Health checks robustos
+- ✅ Sistema de colas para generación asíncrona
+- ✅ Limpieza automática en caso de fallos
+- ✅ Gestión de workspaces aislados
+- ✅ API REST completa con Swagger
+- ✅ Validación de entrada y manejo de errores
+- ✅ Módulo de endpoints para análisis de APIs
+
+### 🔄 **En Desarrollo**
+- 🔄 Generación de artefactos de testing (features, steps, fixtures)
+- 🔄 Análisis automático de endpoints de APIs
+- 🔄 Validación de proyectos generados
+
+### 📋 **Próximos Pasos**
+- 📋 Módulo de casos de prueba específicos
+- 📋 Sistema de ejecución y reportes
+- 📋 Integración con el backend de IA (fase posterior)
+
 
 ## 📚 Endpoints Disponibles
 
@@ -100,8 +161,9 @@ npm run test         # Ejecutar tests
 ## 🛠️ Solución de Problemas
 
 ### Puerto ocupado
+El sistema automáticamente prueba puertos 3000, 3001 y 3002. Si todos están ocupados, puedes especificar manualmente:
 ```bash
-PORT=3001 npm run start:dev
+PORT=3003 npm run start:dev
 ```
 
 ### Problemas de dependencias
@@ -117,16 +179,6 @@ rm central-backend.sqlite
 npm run start:dev
 ```
 
-### Problemas con Docker
-```bash
-# Limpiar contenedores
-docker-compose down
-docker system prune -f
-
-# Reconstruir
-docker-compose up --build
-```
-
 ## 📁 Estructura
 
 ```
@@ -139,43 +191,24 @@ src/
 └── main.ts          # Punto de entrada
 ```
 
-## 📝 Notas
+## 📝 Notas Importantes
 
-- La base de datos SQLite se crea automáticamente
-- Los workspaces se generan en `playwright-workspaces/`
-- Documentación interactiva disponible en Swagger UI
-- No requiere configuración adicional
-- **Método Docker**: Garantiza funcionamiento en cualquier entorno
-- **Método Directo**: Más rápido para desarrollo local
+- **Ejecución Local**: Este MVP está diseñado para ejecutarse localmente donde se generarán los proyectos
+- **Base de datos**: SQLite se crea automáticamente
+- **Workspaces**: Se generan en `playwright-workspaces/` (fuera del backend)
+- **Documentación**: Swagger UI disponible en `/api`
+- **Sin configuración adicional**: Funciona inmediatamente después de `npm install`
 
-## Uso de base de datos en local y Docker
+## 🔮 Arquitectura Futura
 
-- **En local (Windows/desarrollo):**
-  - Usa `.env` con:
-    ```env
-    DATABASE_PATH=central-backend.sqlite
-    PLAYWRIGHT_WORKSPACES_PATH=../playwright-workspaces
-    ```
-  - El archivo `central-backend.sqlite` se crea y usa solo en tu máquina.
+Este MVP es solo la primera parte del sistema completo:
 
-- **En Docker:**
-  - La base de datos se crea automáticamente dentro del contenedor en `/app/data/central-backend.sqlite` y **se persiste en `./data/central-backend.sqlite` del host**.
-  - Se mapea como volumen para mantener los datos entre reinicios del contenedor:
-    ```yaml
-    volumes:
-      - ./data:/app/data
-      - ../playwright-workspaces:/playwright-workspaces
-    ```
-  - Si quieres una base de datos nueva cada vez, elimina el volumen `./data:/app/data` del docker-compose.yml.
-
-- **Comando para construir y levantar el contenedor:**
-
-```sh
-docker-compose up --build
-```
+1. **Motor de Generación** (este MVP) - Ejecuta localmente
+2. **Backend con IA** (fase posterior) - Ejecuta en la nube con Docker
+   - Gestiona peticiones de lenguaje natural
+   - Traduce descripciones a JSON de generación
+   - Se comunica con este motor local
 
 ---
 
 **¡Listo! El servidor estará ejecutándose en http://localhost:3000**
-
-**💡 Recomendación**: Usa el método directo para desarrollo y Docker para demostraciones o distribución.
