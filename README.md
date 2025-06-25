@@ -66,17 +66,17 @@ Este MVP es la **primera parte** de un sistema más grande:
 │                    SISTEMA COMPLETO                         │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  🌐 Backend con IA (Fase Posterior)                        │
-│  ├── Ejecuta en la nube con Docker                         │
-│  ├── Recibe peticiones en lenguaje natural                 │
-│  ├── Traduce a JSON de generación                          │
-│  └── Se comunica con este motor local                      │
+│   Backend con IA - Fase Posterior                           │
+│  ├── Ejecuta en la nube con Docker                          │
+│  ├── Recibe peticiones en lenguaje natural                  │
+│  ├── Traduce a JSON de generación                           │
+│  └── Se comunica con este motor local                       │
 │                                                             │
-│  🔧 Motor de Generación (Este MVP)                         │
-│  ├── Ejecuta localmente                                    │
-│  ├── Genera proyectos de testing                           │
-│  ├── Instala dependencias                                  │
-│  └── Valida que todo funcione                              │
+│  Motor de Generación (Este MVP)                             │
+│  ├── Ejecuta localmente                                     │
+│  ├── Genera proyectos de testing                            │
+│  ├── Instala dependencias                                   │
+│  └── Valida que todo funcione                               │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
