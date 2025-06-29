@@ -1,26 +1,152 @@
-@{{ entityNameLowerCase }} @auto-generated @api
-Feature: {{ entityName }} API
-  As a developer
-  I want to test the endpoint {{ method }} {{ path }}
-  To ensure it works correctly
+@{{section}} @{{entityName}} @smoke
+Feature: {{entityName}} API
+  As a user of the {{projectName}} API
+  I want to manage {{entityNamePlural}}
+  So that I can perform {{entityName}} operations
 
   Background:
-    Given I have access to the API
-    And the endpoint {{ path }} is available
+    Given the API is available
+    {{#if requiresAuth}}And I have valid authentication{{/if}}
 
-  @positive @{{ methodLC }}
-  Scenario: Make a successful request to {{ path }}
-    When a {{ method }} request is sent to "{{ path }}"
-    Then the response should be {{ inferredStatusCode }} and contain {{ entityName }} data
+  {{#each methods}}
+  {{#if (eq method "POST")}}
+  @create @smoke
+  Scenario: Create a new {{../entityName}} successfully
+    Given I have valid {{../entityName}} data
+    When I create a {{../entityName}}
+    Then the {{../entityName}} should be created successfully
+    And I should receive a {{expectedStatusCode}} status code
+    And the response should contain valid {{../entityName}} data
 
-  @negative @{{ methodLC }}
-  Scenario Outline: Handle common errors in {{ path }}
-    When a {{ method }} request is sent to "{{ path }}" with <error_condition>
-    Then the response should be <error_code>
+  @create @negative
+  Scenario Outline: Create {{../entityName}} with invalid data
+    Given I have invalid {{../entityName}} data with missing "<field>"
+    When I create a {{../entityName}}
+    Then I should receive a validation error
+    And I should receive a 422 status code
 
     Examples:
-      | error_condition | error_code |
-      | invalid_data    | 400        |
-      | unauthorized    | 401        |
-      | not_found       | 404        |
-      | conflict        | 409        | 
+      {{#each ../createFields}}
+      {{#if required}}
+      | field       |
+      | {{name}}    |
+      {{/if}}
+      {{/each}}
+
+  @create @negative
+  Scenario Outline: Create {{../entityName}} with invalid field values
+    Given I have {{../entityName}} data with invalid "<field>"
+    When I create a {{../entityName}}
+    Then I should receive a validation error
+    And I should receive a 422 status code
+
+    Examples:
+      {{#each ../createFields}}
+      {{#if validations}}
+      | field |
+      | {{name}} |
+      {{/if}}
+      {{/each}}
+  {{/if}}
+
+  {{#if (eq method "GET")}}
+  {{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
+  @read @smoke
+  Scenario: Get all {{../entityNamePlural}}
+    Given multiple {{../entityNamePlural}} exist in the system
+    When I get all {{../entityNamePlural}}
+    Then I should get a list of {{../entityNamePlural}}
+    And I should receive a {{expectedStatusCode}} status code
+    And each {{../entityName}} should have required fields
+  {{else}}
+  @read @smoke
+  Scenario: Get {{../entityName}} by ID
+    Given a {{../entityName}} exists in the system
+    When I get the {{../entityName}} by ID
+    Then I should get the {{../entityName}} details
+    And I should receive a {{expectedStatusCode}} status code
+    And the response should contain valid {{../entityName}} data
+
+  @read @negative
+  Scenario: Get {{../entityName}} with non-existent ID
+    When I get a {{../entityName}} with ID "non-existent-id"
+    Then I should receive a not found error
+    And I should receive a 404 status code
+  {{/if}}
+  {{/if}}
+
+  {{#if (eq method "PATCH")}}
+  @update @smoke
+  Scenario: Update an existing {{../entityName}}
+    Given a {{../entityName}} exists in the system
+    When I update the {{../entityName}}
+    Then the {{../entityName}} should be updated successfully
+    And I should receive a {{expectedStatusCode}} status code
+    And the response should contain valid {{../entityName}} data
+
+  @update @negative
+  Scenario Outline: Update {{../entityName}} with invalid data
+    Given a {{../entityName}} exists in the system
+    And I have invalid update data for "<field>"
+    When I update the {{../entityName}}
+    Then I should receive a validation error
+    And I should receive a 422 status code
+
+    Examples:
+      {{#each ../updateFields}}
+      {{#if validations}}
+      | field |
+      | {{name}} |
+      {{/if}}
+      {{/each}}
+  {{/if}}
+
+  {{#if (eq method "PUT")}}
+  @update @smoke
+  Scenario: Replace an existing {{../entityName}}
+    Given a {{../entityName}} exists in the system
+    When I replace the {{../entityName}}
+    Then the {{../entityName}} should be replaced successfully
+    And I should receive a {{expectedStatusCode}} status code
+    And the response should contain valid {{../entityName}} data
+  {{/if}}
+
+  {{#if (eq method "DELETE")}}
+  @delete @smoke
+  Scenario: Delete an existing {{../entityName}}
+    Given a {{../entityName}} exists in the system
+    When I delete the {{../entityName}}
+    Then the {{../entityName}} should be deleted successfully
+    And I should receive a {{expectedStatusCode}} status code
+
+  @delete @negative
+  Scenario: Delete non-existent {{../entityName}}
+    When I delete a {{../entityName}} with ID "non-existent-id"
+    Then I should receive a not found error
+    And I should receive a 404 status code
+  {{/if}}
+  {{/each}}
+
+  @regression
+  Scenario: Complete {{entityName}} lifecycle
+    {{#each methods}}
+    {{#if (eq method "POST")}}
+    Given I have valid {{../entityName}} data
+    When I create a {{../entityName}}
+    Then the {{../entityName}} should be created successfully
+    {{/if}}
+    {{#if (eq method "GET")}}
+    {{#unless (eq ../endpointPath (concat "/" ../entityNamePlural))}}
+    When I get the {{../entityName}} by ID
+    Then I should get the {{../entityName}} details
+    {{/unless}}
+    {{/if}}
+    {{#if (eq method "PATCH")}}
+    When I update the {{../entityName}}
+    Then the {{../entityName}} should be updated successfully
+    {{/if}}
+    {{#if (eq method "DELETE")}}
+    When I delete the {{../entityName}}
+    Then the {{../entityName}} should be deleted successfully
+    {{/if}}
+    {{/each}} 

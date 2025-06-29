@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Project, ProjectStatus, ProjectType } from './project.entity';
@@ -27,15 +31,19 @@ export class ProjectsService {
   async create(createDto: CreateProjectDto): Promise<Project> {
     // Validate input configuration
     this.validationService.validateProjectConfiguration(createDto);
-    
-    const exists = await this.projectRepo.findOne({ where: { name: createDto.name } });
+
+    const exists = await this.projectRepo.findOne({
+      where: { name: createDto.name },
+    });
     if (exists) throw new ConflictException('Project name already exists');
-    
-    const workspacePath = await this.workspaceService.createWorkspace(createDto.name);
-    
+
+    const workspacePath = await this.workspaceService.createWorkspace(
+      createDto.name,
+    );
+
     // Validate workspace configuration
     this.validationService.validateWorkspaceConfiguration(workspacePath);
-    
+
     const project = this.projectRepo.create({
       ...createDto,
       displayName: createDto.displayName || createDto.name,
@@ -45,14 +53,14 @@ export class ProjectsService {
     });
     const savedProject = await this.projectRepo.save(project);
     await this.createProjectMetadata(savedProject);
-    
+
     // Add to generation queue instead of executing directly
     try {
       this.queueService.enqueue(savedProject, 1);
     } catch (error) {
       console.error('Error adding project to queue:', error);
     }
-    
+
     return savedProject;
   }
 
@@ -68,9 +76,10 @@ export class ProjectsService {
 
   async update(id: string, updateDto: UpdateProjectDto): Promise<Project> {
     const project = await this.findOne(id);
-    
+
     // Only update allowed fields
-    if (updateDto.displayName !== undefined) project.displayName = updateDto.displayName;
+    if (updateDto.displayName !== undefined)
+      project.displayName = updateDto.displayName;
     if (updateDto.baseUrl !== undefined) project.baseUrl = updateDto.baseUrl;
     if (updateDto.metadata !== undefined) project.metadata = updateDto.metadata;
 
@@ -105,4 +114,4 @@ export class ProjectsService {
     };
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
   }
-} 
+}

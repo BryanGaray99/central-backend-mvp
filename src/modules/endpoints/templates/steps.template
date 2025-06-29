@@ -1,163 +1,379 @@
 import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from '@playwright/test';
-import { CustomWorld } from '../../world';
-import { handleApiResponse, getLastResponse, getLastError } from '../../hooks';
+import { {{entityName}}Client, handleApiResponse, getLastResponse, getLastError, storeCreatedEntity } from '../hooks';
+import { {{entityName}}Fixture } from '../../fixtures/{{section}}/{{entityLower}}.fixture';
+import { isValid{{entityName}}, isValid{{entityName}}List, get{{entityName}}ValidationErrors } from '../../schemas/{{section}}/{{entityLower}}.schema';
 
-// Import the generated schema and fixture for this endpoint
-import { {{ entityName }}Schema } from '../../schemas/{{ entityNameLC }}.schema';
-import { {{ entityName }}Fixture } from '../../fixtures/{{ entityNameLC }}.fixture';
-import Ajv from 'ajv';
-
-const ajv = new Ajv();
-const validate{{ entityName }} = ajv.compile({{ entityName }}Schema);
-
-// Background steps
-Given('I have access to the API', function (this: CustomWorld) {
-  expect(this.apiContext).toBeDefined();
-  expect(this.baseUrl).toBeDefined();
+// Given steps
+Given('I have valid {{entityName}} data', function () {
+  this.{{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
 });
 
-Given('the endpoint {{ path }} is available', function (this: CustomWorld) {
-  // Verify that the endpoint responds (basic health check)
-  expect(this.baseUrl).toContain('http');
+Given('I have invalid {{entityName}} data with missing {string}', function (field: string) {
+  this.{{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
+  delete this.{{entityLower}}Data[field];
 });
 
-When('a {{ method }} request is sent to "{{ path }}"', async function (this: CustomWorld) {
+Given('I have {{entityName}} data with invalid {string}', function (field: string) {
+  this.{{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
+  switch (field) {
+    {{#each createFields}}
+    {{#if validations}}
+    case '{{name}}':
+      this.{{../entityLower}}Data.{{name}} = {{{invalidValue}}};
+      break;
+    {{/if}}
+    {{/each}}
+  }
+});
+
+Given('I have invalid update data for {string}', function (field: string) {
+  this.updateData = {{entityName}}Fixture.update{{entityName}}Dto();
+  switch (field) {
+    {{#each updateFields}}
+    {{#if validations}}
+    case '{{name}}':
+      this.updateData.{{name}} = {{{invalidValue}}};
+      break;
+    {{/if}}
+    {{/each}}
+  }
+});
+
+Given('a {{entityName}} exists in the system', async function () {
+  this.existing{{entityName}} = {{entityName}}Fixture.create{{entityName}}Dto();
+  
   try {
-    // Build the complete URL
-    const fullUrl = `${this.baseUrl}{{ path }}`;
+    const response = await {{entityName}}Client.create{{entityName}}(this.existing{{entityName}});
+    expect(response.status).toBe({{expectedStatusCode}});
     
-    // Configure headers
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
+    const {{entityLower}}Data = (response.data as any)?.data?.data || response.data;
+    this.{{entityLower}}Id = {{entityLower}}Data.id;
+    storeCreatedEntity('{{entityName}}', this.{{entityLower}}Id, response.data);
+  } catch (error: any) {
+    console.log(`❌ Error creating {{entityName}}:`, error.status || 'Unknown error');
+    throw error;
+  }
+});
 
-    // Make request based on method
-    switch ('{{ methodLC }}') {
-      case 'get':
-        this.lastResponse = await this.apiContext?.get(fullUrl, { headers });
-        break;
-      case 'post':
-        const postData = {{ entityName }}Fixture.createDto();
-        this.lastResponse = await this.apiContext?.post(fullUrl, { data: postData, headers });
-        break;
-      case 'put':
-        const putData = {{ entityName }}Fixture.createDto();
-        this.lastResponse = await this.apiContext?.put(fullUrl, { data: putData, headers });
-        break;
-      case 'patch':
-        const patchData = {{ entityName }}Fixture.createDto();
-        this.lastResponse = await this.apiContext?.patch(fullUrl, { data: patchData, headers });
-        break;
-      case 'delete':
-        this.lastResponse = await this.apiContext?.delete(fullUrl, { headers });
-        break;
-      default:
-        throw new Error(`Unsupported HTTP method: {{ method }}`);
+Given('multiple {{entityNamePlural}} exist in the system', async function () {
+  this.created{{entityNamePlural}} = [];
+  
+  for (let i = 0; i < 3; i++) {
+    const {{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
+    
+    try {
+      const response = await {{entityName}}Client.create{{entityName}}({{entityLower}}Data);
+      expect(response.status).toBe({{expectedStatusCode}});
+      
+      const {{entityLower}}DataResponse = (response.data as any)?.data?.data || response.data;
+      this.created{{entityNamePlural}}.push({{entityLower}}DataResponse);
+      storeCreatedEntity('{{entityName}}', {{entityLower}}DataResponse.id, response.data);
+    } catch (error: any) {
+      console.log(`❌ Error creating {{entityName}} ${i}:`, error.status || 'Unknown error');
+      throw error;
     }
+  }
+});
 
-    handleApiResponse(this.lastResponse);
-  } catch (error) {
+// When steps
+{{#each methods}}
+{{#if (eq method "POST")}}
+When('I create a {{../entityName}}', async function () {
+  try {
+    const response = await {{../entityName}}Client.create{{../entityName}}(this.{{../entityLower}}Data);
+    handleApiResponse(response);
+    
+    if (response.status === {{expectedStatusCode}} && response.data) {
+      const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+      if ({{../entityLower}}Data?.id) {
+        this.{{../entityLower}}Id = {{../entityLower}}Data.id;
+        storeCreatedEntity('{{../entityName}}', {{../entityLower}}Data.id, response.data);
+      }
+    }
+  } catch (error: any) {
+    console.log(`❌ Error creating {{../entityName}}:`, error.status || 'Unknown error');
+    handleApiResponse(null, error);
+  }
+});
+{{/if}}
+
+{{#if (eq method "GET")}}
+{{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
+When('I get all {{../entityNamePlural}}', async function () {
+  try {
+    const response = await {{../entityName}}Client.getAll{{../entityNamePlural}}();
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`❌ Error getting all {{../entityNamePlural}}:`, error.status || 'Unknown error');
+    handleApiResponse(null, error);
+  }
+});
+{{else}}
+When('I get the {{../entityName}} by ID', async function () {
+  try {
+    const response = await {{../entityName}}Client.get{{../entityName}}ById(this.{{../entityLower}}Id);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`❌ Error getting {{../entityName}} by ID:`, error.status || 'Unknown error');
     handleApiResponse(null, error);
   }
 });
 
-When('a {{ method }} request is sent to "{{ path }}" with {string}', async function (this: CustomWorld, errorCondition: string) {
+When('I get a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
   try {
-    const fullUrl = `${this.baseUrl}{{ path }}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
+    const response = await {{../entityName}}Client.get{{../entityName}}ById({{../entityLower}}Id);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`❌ Error getting {{../entityName}} with ID ${ {{../entityLower}}Id}:`, error.status || 'Unknown error');
+    handleApiResponse(null, error);
+  }
+});
+{{/if}}
+{{/if}}
 
-    let requestData: any = null;
-    
-    // Modify data based on error condition
-    switch (errorCondition) {
-      case 'invalid_data':
-        requestData = { invalidField: 'invalid_value' };
-        break;
-      case 'unauthorized':
-        headers['Authorization'] = 'Bearer invalid_token';
-        break;
-      case 'not_found':
-        // Modify URL to simulate resource not found
-        const notFoundUrl = fullUrl.replace('{{ path }}', '/invalid/path');
-        this.lastResponse = await this.apiContext?.get(notFoundUrl, { headers });
-        handleApiResponse(this.lastResponse);
-        return;
-      case 'conflict':
-        // Use data that might cause conflict
-        requestData = {{ entityName }}Fixture.createDto({ id: 'duplicate_id' });
-        break;
-    }
+{{#if (eq method "PATCH")}}
+When('I update the {{../entityName}}', async function () {
+  this.updateData = {{../entityName}}Fixture.update{{../entityName}}Dto();
+  
+  try {
+    const response = await {{../entityName}}Client.update{{../entityName}}(this.{{../entityLower}}Id, this.updateData);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`❌ Error updating {{../entityName}}:`, error.status || 'Unknown error');
+    handleApiResponse(null, error);
+  }
+});
+{{/if}}
 
-    // Make request
-    switch ('{{ methodLC }}') {
-      case 'get':
-        this.lastResponse = await this.apiContext?.get(fullUrl, { headers });
-        break;
-      case 'post':
-        this.lastResponse = await this.apiContext?.post(fullUrl, { data: requestData, headers });
-        break;
-      case 'put':
-        this.lastResponse = await this.apiContext?.put(fullUrl, { data: requestData, headers });
-        break;
-      case 'patch':
-        this.lastResponse = await this.apiContext?.patch(fullUrl, { data: requestData, headers });
-        break;
-      case 'delete':
-        this.lastResponse = await this.apiContext?.delete(fullUrl, { headers });
-        break;
-    }
+{{#if (eq method "PUT")}}
+When('I replace the {{../entityName}}', async function () {
+  this.replaceData = {{../entityName}}Fixture.create{{../entityName}}Dto();
+  
+  try {
+    const response = await {{../entityName}}Client.replace{{../entityName}}(this.{{../entityLower}}Id, this.replaceData);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`❌ Error replacing {{../entityName}}:`, error.status || 'Unknown error');
+    handleApiResponse(null, error);
+  }
+});
+{{/if}}
 
-    handleApiResponse(this.lastResponse);
-  } catch (error) {
+{{#if (eq method "DELETE")}}
+When('I delete the {{../entityName}}', async function () {
+  try {
+    const response = await {{../entityName}}Client.delete{{../entityName}}(this.{{../entityLower}}Id);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`❌ Error deleting {{../entityName}}:`, error.status || 'Unknown error');
     handleApiResponse(null, error);
   }
 });
 
-Then('the response should be {{ inferredStatusCode }} and contain {{ entityName }} data', async function (this: CustomWorld) {
+When('I delete a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
+  try {
+    const response = await {{../entityName}}Client.delete{{../entityName}}({{../entityLower}}Id);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`❌ Error deleting {{../entityName}} with ID ${ {{../entityLower}}Id}:`, error.status || 'Unknown error');
+    handleApiResponse(null, error);
+  }
+});
+{{/if}}
+{{/each}}
+
+// Then steps
+{{#each methods}}
+{{#if (eq method "POST")}}
+Then('the {{../entityName}} should be created successfully', function () {
   const response = getLastResponse();
   const error = getLastError();
-  
-  expect(error).toBeNull();
-  expect(response).toBeDefined();
-  expect(response!.status()).toBe({{ inferredStatusCode }});
 
-  const responseBody = await response!.json();
+  if (error) {
+    console.log(`❌ {{../entityName}} creation failed:`, error);
+  }
+
+  expect(response).toBeTruthy();
+  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.data).toBeTruthy();
+  
+  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+  expect({{../entityLower}}Data.id).toBeTruthy();
   
   // Validate response schema
-  const isValid = validate{{ entityName }}(responseBody);
-  if (!isValid) {
-    console.error('Schema validation failed:', validate{{ entityName }}.errors);
-    expect(isValid).toBe(true);
+  expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
+});
+{{/if}}
+
+{{#if (eq method "GET")}}
+{{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
+Then('I should get a list of {{../entityNamePlural}}', function () {
+  const response = getLastResponse();
+  const error = getLastError();
+
+  if (error) {
+    console.log(`❌ Getting {{../entityNamePlural}} failed:`, error);
   }
 
-  // Verify that response contains valid data
-  expect(responseBody).toBeDefined();
+  expect(response).toBeTruthy();
+  expect(response.status).toBe({{expectedStatusCode}});
+  const {{../entityNamePlural}}Data = (response.data as any)?.data?.data || response.data;
+  expect(Array.isArray({{../entityNamePlural}}Data)).toBe(true);
   
-  // If there's a specific dataPath, validate that part
-  {{#if inferredDataPath}}
-  const dataPath = '{{ inferredDataPath }}';
-  const data = dataPath.split('.').reduce((obj, key) => obj?.[key], responseBody);
-  expect(data).toBeDefined();
-  {{/if}}
-
-  console.log('Response validated successfully:', JSON.stringify(responseBody, null, 2));
+  // Validate response schema
+  expect(isValid{{../entityName}}List({{../entityNamePlural}}Data)).toBe(true);
 });
 
-Then('the response should be {int}', function (this: CustomWorld, expectedStatusCode: number) {
+Then('each {{../entityName}} should have required fields', function () {
   const response = getLastResponse();
   const error = getLastError();
   
-  // For errors, we expect either an error or a response with error code
   if (error) {
-    expect(error.status || error.response?.status).toBe(expectedStatusCode);
-  } else if (response) {
-    expect(response.status()).toBe(expectedStatusCode);
-  } else {
-    throw new Error('No response or error received');
+    console.log(`❌ {{../entityName}} fields validation failed:`, error);
   }
+
+  expect(response).toBeTruthy();
+  const {{../entityNamePlural}}Data = (response.data as any)?.data?.data || response.data;
+  expect(Array.isArray({{../entityNamePlural}}Data)).toBe(true);
+  
+  {{../entityNamePlural}}Data.forEach(({{../entityLower}}: any) => {
+    {{#each ../fields}}
+    {{#if required}}
+    expect({{../entityLower}}.{{name}}).toBeTruthy();
+    {{/if}}
+    {{/each}}
+  });
+});
+{{else}}
+Then('I should get the {{../entityName}} details', function () {
+  const response = getLastResponse();
+  const error = getLastError();
+  
+  if (error) {
+    console.log(`❌ Error getting {{../entityName}} details:`, error);
+  }
+  
+  expect(response).toBeTruthy();
+  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.data).toBeTruthy();
+  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+  expect({{../entityLower}}Data.id).toBe(this.{{../entityLower}}Id);
+  
+  // Validate response schema
+  expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
+});
+{{/if}}
+{{/if}}
+
+{{#if (eq method "PATCH")}}
+Then('the {{../entityName}} should be updated successfully', function () {
+  const response = getLastResponse();
+  const error = getLastError();
+
+  if (error) {
+    console.log(`❌ Update failed:`, error);
+  }
+
+  expect(response).toBeTruthy();
+  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.data).toBeTruthy();
+
+  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+  Object.keys(this.updateData).forEach(key => {
+    let expected = this.updateData[key];
+    let actual = {{../entityLower}}Data[key];
+    if ([{{#each ../updateFields}}{{#if (eq type "number")}}'{{name}}'{{#unless @last}}, {{/unless}}{{/if}}{{/each}}].includes(key)) {
+      expected = Number(expected);
+      actual = Number(actual);
+    }
+    expect(actual).toBe(expected);
+  });
+
+  // Validate response schema
+  expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
+});
+{{/if}}
+
+{{#if (eq method "PUT")}}
+Then('the {{../entityName}} should be replaced successfully', function () {
+  const response = getLastResponse();
+  const error = getLastError();
+
+  if (error) {
+    console.log(`❌ Replace failed:`, error);
+  }
+
+  expect(response).toBeTruthy();
+  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.data).toBeTruthy();
+
+  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+  expect({{../entityLower}}Data.id).toBe(this.{{../entityLower}}Id);
+  
+  // Validate response schema
+  expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
+});
+  {{/if}}
+
+{{#if (eq method "DELETE")}}
+Then('the {{../entityName}} should be deleted successfully', function () {
+  const response = getLastResponse();
+  const error = getLastError();
+  
+  if (error) {
+    console.log(`❌ Delete failed:`, error);
+  }
+  
+  expect(response).toBeTruthy();
+  expect(response.status).toBe({{expectedStatusCode}});
+});
+{{/if}}
+{{/each}}
+
+// Common validation steps
+Then('the response should contain valid {{entityName}} data', function () {
+  const response = getLastResponse();
+  const error = getLastError();
+
+  if (error) {
+    console.log(`❌ {{entityName}} validation failed:`, error);
+  }
+
+  expect(response).toBeTruthy();
+  expect(response.data).toBeTruthy();
+  const {{entityLower}}Data = (response.data as any)?.data?.data || response.data;
+  
+  // Validate response schema
+  expect(isValid{{entityName}}({{entityLower}}Data)).toBe(true);
+  
+  if (!isValid{{entityName}}({{entityLower}}Data)) {
+    const errors = get{{entityName}}ValidationErrors({{entityLower}}Data);
+    throw new Error(`Invalid {{entityName}} data: ${errors.join(', ')}`);
+  }
+});
+
+Then('I should receive a {int} status code', function (statusCode: number) {
+  const response = getLastResponse();
+  const error = getLastError();
+  
+  if (error) {
+    console.log(`❌ Status code validation failed:`, error);
+  }
+  
+  expect(response).toBeTruthy();
+  expect(response.status).toBe(statusCode);
+});
+
+Then('I should receive a validation error', function () {
+  const error = getLastError();
+  expect(error).toBeTruthy();
+  expect(error.status).toBeGreaterThanOrEqual(400);
+  expect(error.status).toBeLessThan(500);
+});
+
+Then('I should receive a not found error', function () {
+  const error = getLastError();
+  expect(error).toBeTruthy();
+  expect(error.status).toBe(404);
 }); 

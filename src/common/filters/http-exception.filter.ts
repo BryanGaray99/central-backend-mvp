@@ -32,7 +32,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (exception.code === 'EBUSY') {
       // Manejo específico para archivos bloqueados
       status = HttpStatus.CONFLICT;
-      message = 'Recurso ocupado o bloqueado. Por favor, cierre todos los archivos abiertos e intente nuevamente.';
+      message =
+        'Recurso ocupado o bloqueado. Por favor, cierre todos los archivos abiertos e intente nuevamente.';
       code = 'RESOURCE_BUSY';
     }
 
@@ -54,4 +55,4 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     response.status(status).json(errorResponse);
   }
-} 
+}

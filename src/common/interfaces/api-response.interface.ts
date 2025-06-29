@@ -6,4 +6,4 @@ export interface CustomApiResponse<T = any> {
     timestamp: string;
     path: string;
   };
-} 
+}

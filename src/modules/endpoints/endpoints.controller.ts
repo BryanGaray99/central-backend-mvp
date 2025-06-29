@@ -1,212 +1,237 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, Query, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Patch,
+  Delete,
+  Logger,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { EndpointsService } from './endpoints.service';
 import { RegisterEndpointDto } from './dto/register-endpoint.dto';
 import { UpdateEndpointDto } from './dto/update-endpoint.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Project } from '../projects/project.entity';
-import { Repository } from 'typeorm';
-import * as path from 'path';
-import * as fs from 'fs/promises';
 
-@ApiTags('Endpoints')
-@Controller('endpoints')
+@ApiTags('endpoints')
+@Controller('projects/:projectId/endpoints')
 export class EndpointsController {
-  constructor(
-    private readonly endpointsService: EndpointsService,
-    @InjectRepository(Project)
-    private readonly projectRepository: Repository<Project>,
-  ) {}
+  private readonly logger = new Logger(EndpointsController.name);
 
-  @Post('register-and-analyze')
-  @ApiOperation({ summary: 'Analyzes an endpoint and generates its testing artifacts' })
-  async registerAndAnalyze(@Body() dto: RegisterEndpointDto) {
-    return this.endpointsService.registerAndAnalyze(dto);
+  constructor(private readonly endpointsService: EndpointsService) {}
+
+  @Post()
+  @ApiOperation({
+    summary: 'Register and analyze an endpoint to generate testing artifacts',
+    description:
+      'Analyzes a user API endpoint and automatically generates all necessary testing artifacts (features, steps, fixtures, schemas, types, API client).',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiResponse({
+    status: 202,
+    description: 'Analysis started successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'object',
+          properties: {
+            jobId: { type: 'string' },
+            projectId: { type: 'string' },
+            name: {
+              type: 'string',
+              description: 'Descriptive name of the endpoint',
+            },
+            endpointId: {
+              type: 'string',
+              description: 'Unique endpoint ID (UUID)',
+            },
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data or API not accessible',
+  })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async registerAndAnalyze(
+    @Param('projectId') projectId: string,
+    @Body() dto: RegisterEndpointDto,
+  ) {
+    // Automatically inject projectId from path parameter
+    dto.projectId = projectId;
+
+    this.logger.log(
+      `[CONTROLLER] Registering endpoint: ${dto.entityName} with ${dto.methods.length} methods in project: ${projectId}`,
+    );
+
+    const result = await this.endpointsService.registerAndAnalyze(dto);
+
+    return {
+      success: true,
+      data: {
+        jobId: result.jobId,
+        projectId: projectId,
+        name: result.name, // Descriptive name
+        endpointId: result.id, // Real unique ID (UUID)
+        message: `Analysis and generation for endpoint '${dto.entityName}' (${dto.methods.map((m) => m.method).join(', ')}) started successfully.`,
+      },
+    };
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lists registered endpoints for a project' })
-  async getEndpoints(@Query('projectId') projectId: string) {
-    if (!projectId) {
-      throw new NotFoundException('projectId is required');
-    }
-    
-    // Get project from database to obtain its real path
-    const project = await this.projectRepository.findOneBy({ id: projectId });
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
-    
-    const metaPath = path.join(project.path, 'project-meta.json');
-    
-    try {
-      const metaContent = await fs.readFile(metaPath, 'utf-8');
-      const meta = JSON.parse(metaContent);
+  @ApiOperation({
+    summary: 'List registered endpoints of a project',
+    description:
+      'Gets the list of all registered endpoints for a specific project.',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiResponse({
+    status: 200,
+    description: 'Endpoint list retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              endpointId: {
+                type: 'string',
+                description: 'Unique endpoint ID (UUID)',
+              },
+              name: {
+                type: 'string',
+                description: 'Descriptive name of the endpoint',
+              },
+              entityName: { type: 'string' },
+              path: { type: 'string' },
+              methods: { type: 'array', items: { type: 'string' } },
+              section: { type: 'string' },
+              status: { type: 'string' },
+              createdAt: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async listEndpoints(@Param('projectId') projectId: string) {
+    this.logger.log(`[CONTROLLER] Listing endpoints for project: ${projectId}`);
+
+    const endpoints = await this.endpointsService.listEndpoints(projectId);
       
       return {
         success: true,
-        data: meta.endpoints || []
-      };
-    } catch (error) {
-      throw new NotFoundException(`Could not read project-meta.json for project ${projectId}`);
-    }
+      data: endpoints.map((endpoint) => ({
+        endpointId: endpoint.id, // Real unique ID (UUID)
+        name: endpoint.name, // Descriptive name
+        entityName: endpoint.entityName,
+        path: endpoint.path,
+        methods: endpoint.methods.map((m) => m.method),
+        section: endpoint.section,
+        status: endpoint.status,
+        createdAt: endpoint.createdAt,
+      })),
+    };
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Gets details of a specific endpoint' })
-  async getEndpointById(@Param('id') id: string, @Query('projectId') projectId: string) {
-    if (!projectId) {
-      throw new NotFoundException('projectId is required');
-    }
-    
-    // Get project from database to obtain its real path
-    const project = await this.projectRepository.findOneBy({ id: projectId });
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
-    
-    const metaPath = path.join(project.path, 'project-meta.json');
-    
-    try {
-      const metaContent = await fs.readFile(metaPath, 'utf-8');
-      const meta = JSON.parse(metaContent);
-      
-      const endpoint = meta.endpoints?.find((ep: any) => ep.id === id);
-      if (!endpoint) {
-        throw new NotFoundException(`Endpoint with ID ${id} not found`);
-      }
+  @Get(':endpointId')
+  @ApiOperation({
+    summary: 'Get details of a specific endpoint',
+    description:
+      'Gets the complete details of a registered endpoint, including analysis results and generated artifacts.',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'endpointId', description: 'Unique endpoint ID (UUID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Endpoint details retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Project or endpoint not found' })
+  async getEndpoint(
+    @Param('projectId') projectId: string,
+    @Param('endpointId') endpointId: string,
+  ) {
+    this.logger.log(
+      `[CONTROLLER] Getting endpoint with ID: ${endpointId} from project: ${projectId}`,
+    );
+
+    const endpoint = await this.endpointsService.getEndpoint(
+      endpointId,
+      projectId,
+    );
       
       return {
         success: true,
-        data: endpoint
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new NotFoundException(`Could not read project-meta.json for project ${projectId}`);
-    }
+      data: endpoint,
+    };
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Updates endpoint metadata' })
-  async updateEndpoint(@Param('id') id: string, @Query('projectId') projectId: string, @Body() updateData: UpdateEndpointDto) {
-    if (!projectId) {
-      throw new NotFoundException('projectId is required');
-    }
-    
-    // Get project from database
-    const project = await this.projectRepository.findOneBy({ id: projectId });
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
-    
-    const metaPath = path.join(project.path, 'project-meta.json');
-    
-    try {
-      const metaContent = await fs.readFile(metaPath, 'utf-8');
-      const meta = JSON.parse(metaContent);
-      
-      const endpointIndex = meta.endpoints?.findIndex((ep: any) => ep.id === id);
-      if (endpointIndex === -1 || endpointIndex === undefined) {
-        throw new NotFoundException(`Endpoint with ID ${id} not found`);
-      }
-      
-      const endpoint = meta.endpoints[endpointIndex];
-      
-      // Update allowed fields
-      if (updateData.entityName) {
-        endpoint.entityName = updateData.entityName;
-      }
-      if (updateData.section) {
-        endpoint.section = updateData.section;
-      }
-      
-      // Update timestamp
-      endpoint.lastAnalysis.timestamp = new Date().toISOString();
-      
-      // Write updated meta
-      await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));
+  @Patch(':endpointId')
+  @ApiOperation({
+    summary: 'Update endpoint metadata',
+    description:
+      'Updates the metadata of a registered endpoint (entityName, section, description).',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'endpointId', description: 'Unique endpoint ID (UUID)' })
+  @ApiResponse({ status: 200, description: 'Endpoint updated successfully' })
+  @ApiResponse({ status: 404, description: 'Project or endpoint not found' })
+  async updateEndpoint(
+    @Param('projectId') projectId: string,
+    @Param('endpointId') endpointId: string,
+    @Body() dto: UpdateEndpointDto,
+  ) {
+    this.logger.log(
+      `[CONTROLLER] Updating endpoint with ID: ${endpointId} in project: ${projectId}`,
+    );
+
+    const updatedEndpoint = await this.endpointsService.updateEndpoint(
+      endpointId,
+      projectId,
+      dto,
+    );
       
       return {
         success: true,
-        data: endpoint
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new BadRequestException(`Error updating endpoint: ${error.message}`);
-    }
+      data: updatedEndpoint,
+    };
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Deletes an endpoint and its associated artifacts' })
-  async deleteEndpoint(@Param('id') id: string, @Query('projectId') projectId: string) {
-    if (!projectId) {
-      throw new NotFoundException('projectId is required');
-    }
-    
-    // Get project from database
-    const project = await this.projectRepository.findOneBy({ id: projectId });
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
-    
-    const metaPath = path.join(project.path, 'project-meta.json');
-    
-    try {
-      const metaContent = await fs.readFile(metaPath, 'utf-8');
-      const meta = JSON.parse(metaContent);
-      
-      const endpointIndex = meta.endpoints?.findIndex((ep: any) => ep.id === id);
-      if (endpointIndex === -1 || endpointIndex === undefined) {
-        throw new NotFoundException(`Endpoint with ID ${id} not found`);
-      }
-      
-      const endpoint = meta.endpoints[endpointIndex];
-      
-      // Delete artifact files
-      await this.deleteArtifactFiles(project.path, endpoint.generatedArtifacts);
-      
-      // Remove endpoint from meta
-      meta.endpoints.splice(endpointIndex, 1);
-      
-      // Write updated meta
-      await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));
+  @Delete(':endpointId')
+  @ApiOperation({
+    summary: 'Delete an endpoint and its artifacts',
+    description:
+      'Deletes a registered endpoint and all its associated testing artifacts.',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'endpointId', description: 'Unique endpoint ID (UUID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Endpoint and artifacts deleted successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Project or endpoint not found' })
+  async deleteEndpoint(
+    @Param('projectId') projectId: string,
+    @Param('endpointId') endpointId: string,
+  ) {
+    this.logger.log(
+      `[CONTROLLER] Deleting endpoint with ID: ${endpointId} from project: ${projectId}`,
+    );
+
+    await this.endpointsService.deleteEndpoint(endpointId, projectId);
       
       return {
         success: true,
-        message: `Endpoint and associated artifacts deleted successfully.`
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new BadRequestException(`Error deleting endpoint: ${error.message}`);
-    }
+      message: 'Endpoint and associated artifacts deleted successfully.',
+    };
   }
-
-  private async deleteArtifactFiles(projectPath: string, artifacts: any): Promise<void> {
-    const filesToDelete = [
-      artifacts.feature,
-      artifacts.steps,
-      artifacts.fixture,
-      artifacts.schema,
-      artifacts.types
-    ];
-    
-    for (const file of filesToDelete) {
-      if (file) {
-        const filePath = path.join(projectPath, file);
-        try {
-          await fs.unlink(filePath);
-        } catch (error: any) {
-          if (error.code !== 'ENOENT') {
-            console.warn(`Could not delete ${filePath}: ${error.message}`);
-          }
-        }
-      }
-    }
-  }
-} 
+}

@@ -15,8 +15,10 @@ export class PlaywrightService {
   private readonly logger = new Logger(PlaywrightService.name);
 
   async initializeProject(project: Project): Promise<void> {
-    this.logger.log(`Starting Playwright initialization for project: ${project.name}`);
-    
+    this.logger.log(
+      `Starting Playwright initialization for project: ${project.name}`,
+    );
+
     try {
       // Step 1: Initialize Playwright project with skip browser download and pre-seeded options
       this.logger.log('Step 1: Initializing Playwright project...');
@@ -48,10 +50,15 @@ export class PlaywrightService {
       // Step 3: Clean example files
       this.logger.log('Step 3: Cleaning example files...');
       await this.cleanExampleFiles(project.path);
-      
-      this.logger.log(`Playwright initialization completed successfully for: ${project.name}`);
+
+      this.logger.log(
+        `Playwright initialization completed successfully for: ${project.name}`,
+      );
     } catch (error) {
-      this.logger.error(`Playwright initialization failed for ${project.name}:`, error);
+      this.logger.error(
+        `Playwright initialization failed for ${project.name}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -60,12 +67,12 @@ export class PlaywrightService {
     const filesToDelete = [
       'tests/example.spec.ts',
       'tests-examples/demo-todo-app.spec.ts',
-      'tests-examples'
+      'tests-examples',
     ];
 
     for (const file of filesToDelete) {
       const fullPath = path.join(projectPath, file);
-      
+
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           // Check if file is blocked
@@ -100,12 +107,12 @@ export class PlaywrightService {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async runHealthCheck(project: Project): Promise<boolean> {
     this.logger.log(`Running health check for project: ${project.name}`);
-    
+
     try {
       const healthTestContent = `
 import { test, expect } from '@playwright/test';
@@ -132,7 +139,7 @@ test('health check - project setup', async () => {
         'Health check test',
         { NODE_ENV: 'development' },
       );
-      
+
       this.logger.log(`Health check passed for project: ${project.name}`);
       return true;
     } catch (error) {
@@ -160,16 +167,30 @@ test('health check - project setup', async () => {
         ...extraEnv,
       };
 
-      const { stdout, stderr } = await exec(command, { cwd, timeout: COMMAND_TIMEOUT, env });
-      if (stdout) this.logger.debug(`${operationName} stdout: ${stdout.substring(0, 500)}...`);
-      if (stderr) this.logger.warn(`${operationName} stderr: ${stderr.substring(0, 500)}...`);
+      const { stdout, stderr } = await exec(command, {
+        cwd,
+        timeout: COMMAND_TIMEOUT,
+        env,
+      });
+      if (stdout)
+        this.logger.debug(
+          `${operationName} stdout: ${stdout.substring(0, 500)}...`,
+        );
+      if (stderr)
+        this.logger.warn(
+          `${operationName} stderr: ${stderr.substring(0, 500)}...`,
+        );
       this.logger.log(`${operationName} completed successfully`);
     } catch (error) {
       this.logger.error(`${operationName} failed:`, error);
       this.logger.error(`Command: ${command}`);
       this.logger.error(`Working directory: ${cwd}`);
-      if (error.code === 'ETIMEDOUT') throw new Error(`${operationName} timed out after ${COMMAND_TIMEOUT}ms`);
-      if (error.code === 'ENOENT') throw new Error(`${operationName} failed: Command not found.`);
+      if (error.code === 'ETIMEDOUT')
+        throw new Error(
+          `${operationName} timed out after ${COMMAND_TIMEOUT}ms`,
+        );
+      if (error.code === 'ENOENT')
+        throw new Error(`${operationName} failed: Command not found.`);
       throw error;
     }
   }

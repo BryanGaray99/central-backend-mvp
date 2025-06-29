@@ -1,0 +1,87 @@
+import Ajv, { JSONSchemaType } from 'ajv';
+import addFormats from 'ajv-formats';
+import { {{entityName}}, Create{{entityName}}Dto, Update{{entityName}}Dto } from '../../types/{{section}}/{{entityLower}}';
+
+const ajv = new Ajv();
+addFormats(ajv);
+
+/**
+ * {{entityName}} schema validation
+ */
+export const {{entityLower}}Schema: JSONSchemaType<{{entityName}}> = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    {{#each fields}}
+    {{name}}: { type: '{{jsonType}}'{{#ifDefined format}}, format: '{{format}}'{{/ifDefined}}{{#ifDefined minLength}}, minLength: {{minLength}}{{/ifDefined}}{{#ifDefined minimum}}, minimum: {{minimum}}{{/ifDefined}}{{#ifDefined maximum}}, maximum: {{maximum}}{{/ifDefined}}{{#ifDefined pattern}}, pattern: '{{pattern}}'{{/ifDefined}}{{#unless required}}, nullable: true{{/unless}} },
+    {{/each}}
+    createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time' }
+  },
+  required: ['id'{{#each fields}}{{#if required}}, '{{name}}'{{/if}}{{/each}}, 'createdAt', 'updatedAt'],
+  additionalProperties: false
+};
+
+{{#if hasCreate}}
+export const create{{entityName}}Schema: JSONSchemaType<Create{{entityName}}Dto> = {
+  type: 'object',
+  properties: {
+    {{#each createFields}}
+    {{name}}: { type: '{{jsonType}}'{{#ifDefined format}}, format: '{{format}}'{{/ifDefined}}{{#ifDefined minLength}}, minLength: {{minLength}}{{/ifDefined}}{{#ifDefined minimum}}, minimum: {{minimum}}{{/ifDefined}}{{#ifDefined maximum}}, maximum: {{maximum}}{{/ifDefined}}{{#ifDefined pattern}}, pattern: '{{pattern}}'{{/ifDefined}}{{#unless required}}, nullable: true{{/unless}} },
+    {{/each}}
+  },
+  required: [{{#each createFields}}{{#if required}}'{{name}}'{{#unless @last}}, {{/unless}}{{/if}}{{/each}}],
+  additionalProperties: false
+};
+{{/if}}
+
+{{#if hasUpdate}}
+export const update{{entityName}}Schema: JSONSchemaType<Update{{entityName}}Dto> = {
+  type: 'object',
+  properties: {
+    {{#each updateFields}}
+    {{name}}: { type: '{{jsonType}}'{{#ifDefined format}}, format: '{{format}}'{{/ifDefined}}{{#ifDefined minLength}}, minLength: {{minLength}}{{/ifDefined}}{{#ifDefined minimum}}, minimum: {{minimum}}{{/ifDefined}}{{#ifDefined maximum}}, maximum: {{maximum}}{{/ifDefined}}{{#ifDefined pattern}}, pattern: '{{pattern}}'{{/ifDefined}}, nullable: true },
+    {{/each}}
+  },
+  required: [],
+  additionalProperties: false
+};
+{{/if}}
+
+export const {{entityLower}}ListSchema: JSONSchemaType<{{entityName}}[]> = {
+  type: 'array',
+  items: {{entityLower}}Schema
+};
+
+// Compiled validators
+export const validate{{entityName}} = ajv.compile({{entityLower}}Schema);
+{{#if hasCreate}}export const validateCreate{{entityName}} = ajv.compile(create{{entityName}}Schema);{{/if}}
+{{#if hasUpdate}}export const validateUpdate{{entityName}} = ajv.compile(update{{entityName}}Schema);{{/if}}
+export const validate{{entityName}}List = ajv.compile({{entityLower}}ListSchema);
+
+// Validation helper functions
+export function isValid{{entityName}}(data: any): data is {{entityName}} {
+  return validate{{entityName}}(data);
+}
+
+{{#if hasCreate}}
+export function isValidCreate{{entityName}}(data: any): data is Create{{entityName}}Dto {
+  return validateCreate{{entityName}}(data);
+}
+{{/if}}
+
+{{#if hasUpdate}}
+export function isValidUpdate{{entityName}}(data: any): data is Update{{entityName}}Dto {
+  return validateUpdate{{entityName}}(data);
+}
+{{/if}}
+
+export function isValid{{entityName}}List(data: any): data is {{entityName}}[] {
+  return validate{{entityName}}List(data);
+}
+
+// Get validation errors
+export function get{{entityName}}ValidationErrors(data: any): string[] {
+  validate{{entityName}}(data);
+  return validate{{entityName}}.errors?.map(err => `${err.instancePath} ${err.message}`) || [];
+}

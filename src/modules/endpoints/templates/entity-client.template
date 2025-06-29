@@ -1,0 +1,115 @@
+import { BaseApiClient, ApiResponse } from '../BaseApiClient';
+import { {{entityName}}, Create{{entityName}}Dto, Update{{entityName}}Dto } from '../../types/{{section}}/{{entityLower}}';
+
+/**
+ * {{entityName}} API client for managing {{entityName}} resources
+ */
+export class {{entityName}}Client extends BaseApiClient {
+  private readonly endpoint = '{{endpointPath}}';
+
+  {{#each methods}}
+  {{#if (eq method "POST")}}
+  /**
+   * Create a new {{../entityName}}
+   */
+  async create{{../entityName}}({{../entityLower}}Data: Create{{../entityName}}Dto): Promise<ApiResponse<{{../entityName}}>> {
+    this.logRequest('POST', this.endpoint, {{../entityLower}}Data);
+    const response = await this.post<{{../entityName}}>(this.endpoint, {{../entityLower}}Data);
+    this.logResponse(response);
+    return response;
+  }
+  {{/if}}
+
+  {{#if (eq method "GET")}}
+  {{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
+  /**
+   * Get all {{../entityNamePlural}} with optional filters
+   */
+  async getAll{{../entityNamePlural}}(): Promise<ApiResponse<{{../entityName}}[]>> {
+    this.logRequest('GET', this.endpoint);
+    const response = await this.get<{{../entityName}}[]>(this.endpoint);
+    this.logResponse(response);
+    return response;
+  }
+  {{else}}
+  /**
+   * Get {{../entityName}} by ID
+   */
+  async get{{../entityName}}ById(id: string): Promise<ApiResponse<{{../entityName}}>> {
+    const url = `${this.endpoint}/${id}`;
+    this.logRequest('GET', url);
+    const response = await this.get<{{../entityName}}>(url);
+    this.logResponse(response);
+    return response;
+  }
+  {{/if}}
+  {{/if}}
+
+  {{#if (eq method "PATCH")}}
+  /**
+   * Update a {{../entityName}}
+   */
+  async update{{../entityName}}(id: string, {{../entityLower}}Data: Update{{../entityName}}Dto): Promise<ApiResponse<{{../entityName}}>> {
+    const url = `${this.endpoint}/${id}`;
+    this.logRequest('PATCH', url, {{../entityLower}}Data);
+    const response = await this.patch<{{../entityName}}>(url, {{../entityLower}}Data);
+    this.logResponse(response);
+    return response;
+  }
+  {{/if}}
+
+  {{#if (eq method "PUT")}}
+  /**
+   * Replace a {{../entityName}}
+   */
+  async replace{{../entityName}}(id: string, {{../entityLower}}Data: Create{{../entityName}}Dto): Promise<ApiResponse<{{../entityName}}>> {
+    const url = `${this.endpoint}/${id}`;
+    this.logRequest('PUT', url, {{../entityLower}}Data);
+    const response = await this.put<{{../entityName}}>(url, {{../entityLower}}Data);
+    this.logResponse(response);
+    return response;
+  }
+  {{/if}}
+
+  {{#if (eq method "DELETE")}}
+  /**
+   * Delete a {{../entityName}}
+   */
+  async delete{{../entityName}}(id: string): Promise<ApiResponse<void>> {
+    const url = `${this.endpoint}/${id}`;
+    this.logRequest('DELETE', url);
+    const response = await this.delete<void>(url);
+    this.logResponse(response);
+    return response;
+  }
+  {{/if}}
+  {{/each}}
+
+  {{#if hasSearch}}
+  /**
+   * Search {{entityNamePlural}} (if endpoint supports it)
+   */
+  async search{{entityNamePlural}}(query: string): Promise<ApiResponse<{{entityName}}[]>> {
+    const params = { q: query };
+    this.logRequest('GET', this.endpoint);
+    const response = await this.get<{{entityName}}[]>(this.endpoint, { params });
+    this.logResponse(response);
+    return response;
+  }
+  {{/if}}
+
+  {{#if hasFilters}}
+  {{#each filterFields}}
+  /**
+   * Get {{../entityNamePlural}} by {{name}}
+   */
+  async get{{../entityNamePlural}}By{{capitalize name}}({{name}}: {{type}}): Promise<ApiResponse<{{../entityName}}[]>> {
+    const params = { {{name}} };
+    this.logRequest('GET', this.endpoint);
+    const response = await this.get<{{../entityName}}[]>(this.endpoint, { params });
+    this.logResponse(response);
+    return response;
+  }
+  {{/each}}
+  {{/if}}
+} 

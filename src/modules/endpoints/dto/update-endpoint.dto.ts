@@ -4,7 +4,7 @@ import { IsString, IsOptional } from 'class-validator';
 export class UpdateEndpointDto {
   @ApiPropertyOptional({
     description: 'New entity name for the endpoint',
-    example: 'Product'
+    example: 'Product',
   })
   @IsString()
   @IsOptional()
@@ -12,9 +12,17 @@ export class UpdateEndpointDto {
 
   @ApiPropertyOptional({
     description: 'New section to organize the endpoint',
-    example: 'ecommerce'
+    example: 'ecommerce',
   })
   @IsString()
   @IsOptional()
   section?: string;
-} 
+
+  @ApiPropertyOptional({
+    description: 'New description for the endpoint',
+    example: 'CRUD operations for products',
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
+}

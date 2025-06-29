@@ -13,10 +13,7 @@ import { QueueService } from './services/queue.service';
 import { CleanupService } from './services/cleanup.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Project]),
-    WorkspaceModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Project]), WorkspaceModule],
   providers: [
     ProjectsService,
     GenerationService,
@@ -30,4 +27,4 @@ import { CleanupService } from './services/cleanup.service';
   controllers: [ProjectsController],
   exports: [ProjectsService, FileSystemService, TemplateService],
 })
-export class ProjectsModule {} 
+export class ProjectsModule {}

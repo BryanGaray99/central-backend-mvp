@@ -14,11 +14,18 @@ export class FileSystemService {
     await fs.writeFile(filePath, content, 'utf8');
   }
 
-  async createDirectoryStructure(basePath: string, structure: string[]): Promise<void> {
+  async readFile(filePath: string): Promise<string> {
+    return await fs.readFile(filePath, 'utf8');
+  }
+
+  async createDirectoryStructure(
+    basePath: string,
+    structure: string[],
+  ): Promise<void> {
     for (const item of structure) {
       const fullPath = path.join(basePath, item);
       const isFile = path.extname(item) !== '';
-      
+
       if (isFile) {
         await this.createDirectory(path.dirname(fullPath));
         await this.writeFile(fullPath, '// TODO: Implement this file\n');
@@ -27,4 +34,4 @@ export class FileSystemService {
       }
     }
   }
-} 
+}

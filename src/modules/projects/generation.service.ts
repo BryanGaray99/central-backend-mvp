@@ -7,7 +7,10 @@ import { FileSystemService } from './services/file-system.service';
 import { TemplateService } from './services/template.service';
 import { PlaywrightService } from './services/playwright.service';
 import { CleanupService } from './services/cleanup.service';
-import { PROJECT_STRUCTURE, TEMPLATE_FILES } from './constants/project-structure';
+import {
+  PROJECT_STRUCTURE,
+  TEMPLATE_FILES,
+} from './constants/project-structure';
 
 @Injectable()
 export class GenerationService {
@@ -25,34 +28,36 @@ export class GenerationService {
   async generateProject(project: Project): Promise<void> {
     try {
       await this.updateProjectStatus(project.id, ProjectStatus.PENDING);
-      
+
       // Initialize Playwright project (this creates the basic structure)
       await this.playwrightService.initializeProject(project);
-      
+
       // Create additional structure for BDD BEFORE generating files
       await this.fileSystemService.createDirectoryStructure(
         project.path,
         PROJECT_STRUCTURE,
       );
-      
+
       // Generate/modify files from templates
       await this.generateProjectFiles(project);
-      
+
       // Run health check before marking as ready
       const isHealthy = await this.playwrightService.runHealthCheck(project);
-      
+
       if (isHealthy) {
         await this.updateProjectStatus(project.id, ProjectStatus.READY);
       } else {
         throw new Error('Health check failed');
       }
     } catch (error) {
-      this.logger.error(`Error generating project ${project.name}: ${error.message}`);
+      this.logger.error(
+        `Error generating project ${project.name}: ${error.message}`,
+      );
       await this.updateProjectStatus(project.id, ProjectStatus.FAILED);
-      
+
       // Execute automatic cleanup in case of failure
       await this.cleanupService.cleanupFailedProject(project, error);
-      
+
       throw error;
     }
   }
@@ -61,8 +66,11 @@ export class GenerationService {
     const templateVariables = {
       name: project.name,
       baseUrl: project.baseUrl,
+      basePath: '/v1/api', // Default API base path
       author: project.metadata?.author || '',
-      description: project.metadata?.description || 'API testing project with Playwright + BDD',
+      description:
+        project.metadata?.description ||
+        'API testing project with Playwright + BDD',
     };
 
     // Modify existing package.json with our configurations
@@ -79,10 +87,24 @@ export class GenerationService {
       templateVariables,
     );
 
-    // Generate api.config.ts
+    // Generate BaseApiClient.ts
     await this.templateService.writeRenderedTemplate(
-      TEMPLATE_FILES.API_CONFIG,
-      path.join(project.path, 'src/api/api.config.ts'),
+      path.join(__dirname, 'templates', 'base-api-client.template'),
+      path.join(project.path, 'src/api/BaseApiClient.ts'),
+      templateVariables,
+    );
+
+    // Generate global-setup.ts
+    await this.templateService.writeRenderedTemplate(
+      path.join(__dirname, 'templates', 'global-setup.ts.template'),
+      path.join(project.path, 'src/api/global-setup.ts'),
+      templateVariables,
+    );
+
+    // Generate global-teardown.ts
+    await this.templateService.writeRenderedTemplate(
+      path.join(__dirname, 'templates', 'global-teardown.ts.template'),
+      path.join(project.path, 'src/api/global-teardown.ts'),
       templateVariables,
     );
 
@@ -107,6 +129,13 @@ export class GenerationService {
       templateVariables,
     );
 
+    // Generate common.ts
+    await this.templateService.writeRenderedTemplate(
+      path.join(__dirname, 'templates', 'common.ts.template'),
+      path.join(project.path, 'src/types/common.ts'),
+      templateVariables,
+    );
+
     // Modify existing README.md
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.README,
@@ -115,7 +144,10 @@ export class GenerationService {
     );
   }
 
-  private async updateProjectStatus(id: string, status: ProjectStatus): Promise<void> {
+  private async updateProjectStatus(
+    id: string,
+    status: ProjectStatus,
+  ): Promise<void> {
     await this.projectRepo.update(id, { status });
   }
-} 
+}

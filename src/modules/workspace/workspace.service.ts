@@ -13,7 +13,9 @@ export class WorkspaceService {
   constructor() {
     const envPath = process.env.PLAYWRIGHT_WORKSPACES_PATH;
     if (!envPath) {
-      throw new Error('PLAYWRIGHT_WORKSPACES_PATH must be defined as an absolute or relative path OUTSIDE the backend central.');
+      throw new Error(
+        'PLAYWRIGHT_WORKSPACES_PATH must be defined as an absolute or relative path OUTSIDE the backend central.',
+      );
     }
     let dir = envPath;
     if (!path.isAbsolute(dir)) {
@@ -22,7 +24,9 @@ export class WorkspaceService {
     // Detecta si la ruta está dentro del backend central
     const backendRoot = path.resolve(__dirname, '../../..');
     if (dir.startsWith(backendRoot)) {
-      throw new Error('PLAYWRIGHT_WORKSPACES_PATH no puede estar dentro del backend central.');
+      throw new Error(
+        'PLAYWRIGHT_WORKSPACES_PATH no puede estar dentro del backend central.',
+      );
     }
     this.workspacesDir = dir;
     this.init();
@@ -33,14 +37,16 @@ export class WorkspaceService {
       await fs.access(this.workspacesDir);
       this.logger.log(`Using workspaces directory: ${this.workspacesDir}`);
     } catch {
-      this.logger.warn(`Workspaces directory not found, creating: ${this.workspacesDir}`);
+      this.logger.warn(
+        `Workspaces directory not found, creating: ${this.workspacesDir}`,
+      );
       await fs.mkdir(this.workspacesDir, { recursive: true });
     }
   }
 
   async createWorkspace(name: string): Promise<string> {
     const workspacePath = path.join(this.workspacesDir, name);
-    
+
     try {
       await fs.access(workspacePath);
       throw new ConflictException(`Workspace ${name} already exists`);
@@ -55,30 +61,38 @@ export class WorkspaceService {
   }
 
   async listWorkspaces(): Promise<string[]> {
-    const entries = await fs.readdir(this.workspacesDir, { withFileTypes: true });
+    const entries = await fs.readdir(this.workspacesDir, {
+      withFileTypes: true,
+    });
     return entries
-      .filter(entry => entry.isDirectory())
-      .map(entry => entry.name);
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
   }
 
   async deleteWorkspace(name: string): Promise<void> {
     const workspacePath = path.join(this.workspacesDir, name);
-    
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         // Check if there are blocked files
         const blockedFiles = await this.findBlockedFiles(workspacePath);
         if (blockedFiles.length > 0) {
-          this.logger.warn(`Attempt ${attempt}: Blocked files found:`, blockedFiles);
+          this.logger.warn(
+            `Attempt ${attempt}: Blocked files found:`,
+            blockedFiles,
+          );
           if (attempt === MAX_RETRIES) {
             throw new ConflictException({
-              message: 'Cannot delete workspace because there are files in use.',
+              message:
+                'Cannot delete workspace because there are files in use.',
               code: 'RESOURCE_BUSY',
               details: {
                 workspace: name,
-                blockedFiles: blockedFiles.map(file => path.relative(workspacePath, file)),
-                suggestion: 'Please close all open files and try again.'
-              }
+                blockedFiles: blockedFiles.map((file) =>
+                  path.relative(workspacePath, file),
+                ),
+                suggestion: 'Please close all open files and try again.',
+              },
             });
           }
           await this.sleep(RETRY_DELAY);
@@ -92,11 +106,11 @@ export class WorkspaceService {
         if (error.code === 'ENOENT') {
           return; // Directory no longer exists
         }
-        
+
         if (error instanceof ConflictException) {
           throw error; // Re-throw conflict errors
         }
-        
+
         if (attempt === MAX_RETRIES) {
           if (error.code === 'EBUSY') {
             throw new ConflictException({
@@ -104,15 +118,20 @@ export class WorkspaceService {
               code: 'RESOURCE_BUSY',
               details: {
                 workspace: name,
-                suggestion: 'Please close all open files and try again.'
-              }
+                suggestion: 'Please close all open files and try again.',
+              },
             });
           }
-          this.logger.error(`Could not delete workspace after ${MAX_RETRIES} attempts`);
+          this.logger.error(
+            `Could not delete workspace after ${MAX_RETRIES} attempts`,
+          );
           throw error;
         }
-        
-        this.logger.warn(`Attempt ${attempt}: Error deleting workspace:`, error.message);
+
+        this.logger.warn(
+          `Attempt ${attempt}: Error deleting workspace:`,
+          error.message,
+        );
         await this.sleep(RETRY_DELAY);
       }
     }
@@ -120,13 +139,13 @@ export class WorkspaceService {
 
   private async findBlockedFiles(dirPath: string): Promise<string[]> {
     const blockedFiles: string[] = [];
-    
+
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name);
-        
+
         try {
           if (entry.isDirectory()) {
             const subDirBlocked = await this.findBlockedFiles(fullPath);
@@ -145,12 +164,12 @@ export class WorkspaceService {
     } catch (error) {
       this.logger.error(`Error searching for blocked files: ${error.message}`);
     }
-    
+
     return blockedFiles;
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async workspaceExists(name: string): Promise<boolean> {
@@ -165,4 +184,4 @@ export class WorkspaceService {
   getWorkspacePath(name: string): string {
     return path.join(this.workspacesDir, name);
   }
-} 
+}

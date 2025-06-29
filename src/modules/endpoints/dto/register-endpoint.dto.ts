@@ -1,13 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsUUID,
+  IsString,
+  IsEnum,
+  IsOptional,
+  ValidateNested,
+  IsArray,
+  IsNumber,
+  IsBoolean,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsString, IsUUID, IsEnum, IsOptional, ValidateNested, IsNumber } from 'class-validator';
 
 class PathParameter {
   @ApiProperty()
   @IsString()
   name: string;
-  
+
   @ApiProperty()
+  @IsString()
   value: string | number;
 }
 
@@ -24,15 +34,50 @@ class FieldDefinition {
   @IsOptional()
   example?: any;
 
-  @ApiPropertyOptional({ description: 'Validation rules like minLength, minimum, etc.' })
+  @ApiPropertyOptional({
+    description: 'Validation rules like minLength, minimum, etc.',
+  })
   @IsOptional()
   validations?: Record<string, any>;
 }
 
+class EndpointMethod {
+  @ApiProperty({ enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] })
+  @IsEnum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+  @ApiPropertyOptional({
+    type: [FieldDefinition],
+    description: 'Request body definition for POST/PUT/PATCH',
+  })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => FieldDefinition)
+  requestBodyDefinition?: FieldDefinition[];
+
+  @ApiPropertyOptional({ description: 'Method description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'If authentication is required' })
+  @IsOptional()
+  @IsBoolean()
+  requiresAuth?: boolean;
+}
+
 export class RegisterEndpointDto {
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Project ID (automatically injected from URL)',
+  })
+  @IsOptional()
   @IsUUID()
-  projectId: string;
+  projectId?: string;
+
+  @ApiPropertyOptional({ description: 'Endpoint ID (descriptive identifier)' })
+  @IsOptional()
+  @IsString()
+  endpointId?: string;
 
   @ApiProperty({ example: 'ecommerce' })
   @IsString()
@@ -46,19 +91,30 @@ export class RegisterEndpointDto {
   @IsString()
   path: string;
 
-  @ApiProperty({ enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] })
-  @IsEnum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-
   @ApiPropertyOptional({ type: [PathParameter] })
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => PathParameter)
   pathParameters?: PathParameter[];
 
-  @ApiPropertyOptional({ type: [FieldDefinition], description: 'Detailed request body definition for POST/PUT/PATCH' })
-  @IsOptional()
+  @ApiProperty({
+    type: [EndpointMethod],
+    description: 'HTTP methods supported by this endpoint',
+  })
+  @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => FieldDefinition)
-  requestBodyDefinition?: FieldDefinition[];
-} 
+  @Type(() => EndpointMethod)
+  methods: EndpointMethod[];
+
+  @ApiPropertyOptional({
+    description: 'Descriptive name for the endpoint (e.g., "products-crud")',
+  })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'General description of the endpoint' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}

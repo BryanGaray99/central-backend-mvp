@@ -28,7 +28,7 @@ export class TransformInterceptor<T>
     const request = ctx.getRequest();
 
     return next.handle().pipe(
-      map(data => ({
+      map((data) => ({
         success: true,
         data,
         metadata: {
@@ -38,4 +38,4 @@ export class TransformInterceptor<T>
       })),
     );
   }
-} 
+}

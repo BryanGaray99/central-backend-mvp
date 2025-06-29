@@ -27,25 +27,29 @@ async function isPortAvailable(port: number): Promise<boolean> {
 
 async function findAvailablePort(): Promise<number> {
   const ports = [3000, 3001, 3002];
-  
+
   for (const port of ports) {
     if (await isPortAvailable(port)) {
       return port;
     }
   }
-  
-  throw new Error('No se encontró un puerto disponible. Puertos 3000, 3001 y 3002 están ocupados.');
+
+  throw new Error(
+    'No se encontró un puerto disponible. Puertos 3000, 3001 y 3002 están ocupados.',
+  );
 }
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Validación global de DTOs
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  // Global DTO validation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   // Filtros e interceptores globales
   app.useGlobalFilters(new HttpExceptionFilter());
@@ -54,7 +58,9 @@ async function bootstrap() {
   // Configuración de Swagger
   const config = new DocumentBuilder()
     .setTitle('Central Backend MVP')
-    .setDescription('API central para generación y orquestación de proyectos de testing')
+    .setDescription(
+      'API central para generación y orquestación de proyectos de testing',
+    )
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);

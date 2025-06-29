@@ -6,6 +6,7 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Project } from './modules/projects/project.entity';
+import { Endpoint } from './modules/endpoints/endpoint.entity';
 import { EndpointsModule } from './modules/endpoints/endpoints.module';
 
 @Module({
@@ -18,12 +19,14 @@ import { EndpointsModule } from './modules/endpoints/endpoints.module';
       useFactory: (configService: ConfigService) => {
         const dbPath = configService.get('DATABASE_PATH');
         if (!dbPath) {
-          throw new Error('DATABASE_PATH must be defined as an absolute or relative path.');
+          throw new Error(
+            'DATABASE_PATH must be defined as an absolute or relative path.',
+          );
         }
         return {
           type: 'sqlite',
           database: dbPath,
-          entities: [Project],
+          entities: [Project, Endpoint],
           synchronize: true,
         };
       },

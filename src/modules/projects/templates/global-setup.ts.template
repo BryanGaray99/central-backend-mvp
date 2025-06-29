@@ -1,0 +1,40 @@
+import dotenv from 'dotenv';
+
+async function globalSetup() {
+  // Load environment variables
+  dotenv.config();
+  
+  console.log('🚀 Starting API test suite...');
+  console.log(`📡 API URL: ${process.env.API_URL || '{{baseUrl}}'}`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'test'}`);
+  
+  // Validate required environment variables
+  const requiredEnvVars = ['API_URL'];
+  const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  
+  if (missingEnvVars.length > 0) {
+    console.error('❌ Missing required environment variables:', missingEnvVars);
+    process.exit(1);
+  }
+  
+  // Additional setup if needed (database connections, auth tokens, etc.)
+  try {
+    // Example: Validate API is accessible
+    const response = await fetch(`${process.env.API_URL}/health`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn('⚠️  API health check failed, but continuing with tests...');
+    } else {
+      console.log('✅ API health check passed');
+    }
+  } catch (error: any) {
+    console.warn('⚠️  Could not perform API health check:', error.message);
+  }
+}
+
+export default globalSetup; 

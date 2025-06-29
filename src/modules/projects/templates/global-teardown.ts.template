@@ -1,0 +1,12 @@
+async function globalTeardown() {
+  console.log('🧹 Cleaning up after test suite...');
+  
+  // Cleanup operations if needed
+  // - Close database connections
+  // - Clean up test data
+  // - Release resources
+  
+  console.log('✅ Cleanup completed');
+}
+
+export default globalTeardown; 
