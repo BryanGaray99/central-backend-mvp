@@ -41,12 +41,7 @@ export class ApiConfigUpdaterService {
         order: { entityName: 'ASC' },
       });
 
-      if (endpoints.length === 0) {
-        this.logger.warn(`No hay endpoints registrados para el proyecto ${projectId}`);
-        return;
-      }
-
-      // Preparar datos para el template
+      // Preparar datos para el template (incluso si no hay endpoints)
       const templateData = this.prepareTemplateData(project, endpoints);
 
       // Generar el contenido del archivo
@@ -64,7 +59,11 @@ export class ApiConfigUpdaterService {
       // Escribir el archivo
       fs.writeFileSync(apiConfigPath, apiConfigContent, 'utf8');
 
-      this.logger.log(`api.config.ts actualizado exitosamente en ${apiConfigPath}`);
+      if (endpoints.length === 0) {
+        this.logger.log(`api.config.ts actualizado (sin endpoints) en ${apiConfigPath}`);
+      } else {
+        this.logger.log(`api.config.ts actualizado con ${endpoints.length} endpoints en ${apiConfigPath}`);
+      }
     } catch (error) {
       this.logger.error(`Error actualizando api.config.ts: ${error.message}`, error.stack);
       // No lanzar el error para evitar que falle todo el proceso
@@ -108,21 +107,26 @@ export class ApiConfigUpdaterService {
       };
     });
 
-    // Detectar características especiales
-    const hasAddress = endpoints.some(endpoint => {
-      const analysis = endpoint.analysisResults;
-      if (!analysis || typeof analysis !== 'object') return false;
-      return analysis?.POST?.inferredResponseSchema?.properties?.data?.properties?.address ||
-             analysis?.GET?.inferredResponseSchema?.properties?.data?.properties?.address;
-    });
+    // Detectar características especiales solo si hay endpoints
+    let hasAddress = false;
+    let hasOrderStatus = false;
 
-    const hasOrderStatus = endpoints.some(endpoint => {
-      const analysis = endpoint.analysisResults;
-      if (!analysis || typeof analysis !== 'object') return false;
-      return endpoint.entityName.toLowerCase().includes('order') ||
-             analysis?.POST?.inferredResponseSchema?.properties?.data?.properties?.status ||
-             analysis?.GET?.inferredResponseSchema?.properties?.data?.properties?.status;
-    });
+    if (endpoints.length > 0) {
+      hasAddress = endpoints.some(endpoint => {
+        const analysis = endpoint.analysisResults;
+        if (!analysis || typeof analysis !== 'object') return false;
+        return analysis?.POST?.inferredResponseSchema?.properties?.data?.properties?.address ||
+               analysis?.GET?.inferredResponseSchema?.properties?.data?.properties?.address;
+      });
+
+      hasOrderStatus = endpoints.some(endpoint => {
+        const analysis = endpoint.analysisResults;
+        if (!analysis || typeof analysis !== 'object') return false;
+        return endpoint.entityName.toLowerCase().includes('order') ||
+               analysis?.POST?.inferredResponseSchema?.properties?.data?.properties?.status ||
+               analysis?.GET?.inferredResponseSchema?.properties?.data?.properties?.status;
+      });
+    }
 
     const result = {
       baseUrl: project.baseUrl,

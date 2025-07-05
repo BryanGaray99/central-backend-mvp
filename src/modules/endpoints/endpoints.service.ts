@@ -14,6 +14,7 @@ import { AnalysisService } from './services/analysis.service';
 import { ArtifactsGenerationService } from './services/artifacts-generation.service';
 import { HooksUpdaterService } from './services/hooks-updater.service';
 import { ApiConfigUpdaterService } from './services/api-config-updater.service';
+import { CleanupService } from './services/cleanup.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -31,6 +32,7 @@ export class EndpointsService {
     private readonly artifactsGenerationService: ArtifactsGenerationService,
     private readonly hooksUpdaterService: HooksUpdaterService,
     private readonly apiConfigUpdaterService: ApiConfigUpdaterService,
+    private readonly cleanupService: CleanupService,
   ) {}
 
   async registerAndAnalyze(dto: RegisterEndpointDto) {
@@ -167,10 +169,6 @@ export class EndpointsService {
   }
 
   async deleteEndpoint(id: string, projectId: string): Promise<void> {
-    // this.logger.log(
-    //   `[SERVICE] Eliminando endpoint con ID: ${id} del proyecto: ${projectId}`,
-    // );
-
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
@@ -185,9 +183,13 @@ export class EndpointsService {
       throw new NotFoundException(`Endpoint with ID ${id} not found`);
     }
 
-    // Delete artifact files if they exist
-    if (endpoint.generatedArtifacts) {
-      await this.deleteArtifactFiles(project.path, endpoint.generatedArtifacts);
+    // Store section info before deletion
+    const section = endpoint.section;
+    const artifacts = endpoint.generatedArtifacts;
+
+    // Delete artifact files and cleanup empty directories
+    if (artifacts) {
+      await this.cleanupService.cleanupEndpointArtifacts(project.path, artifacts, section);
     }
 
     // Update project-meta.json to remove the endpoint entry
@@ -198,6 +200,9 @@ export class EndpointsService {
 
     // Delete endpoint record
     await this.endpointRepository.remove(endpoint);
+
+    // Check if section is now empty and remove it if necessary
+    await this.cleanupService.removeEmptySection(project.path, section);
 
     // Update api.config.ts after endpoint deletion
     await this.apiConfigUpdaterService.updateApiConfigOnEndpointDeletion(project.id);
@@ -532,33 +537,6 @@ export class EndpointsService {
       .replace(/[^a-z0-9-]/g, '');
   }
 
-  private async deleteArtifactFiles(
-    projectPath: string,
-    artifacts: any,
-  ): Promise<void> {
-    const filesToDelete = [
-      artifacts.feature,
-      artifacts.steps,
-      artifacts.fixture,
-      artifacts.schema,
-      artifacts.types,
-      artifacts.client,
-    ];
-
-    for (const file of filesToDelete) {
-      if (file) {
-        const filePath = path.join(projectPath, file);
-        try {
-          await fs.unlink(filePath);
-        } catch (error: any) {
-          if (error.code !== 'ENOENT') {
-            // this.logger.warn(`Could not delete ${filePath}: ${error.message}`);
-          }
-        }
-      }
-    }
-  }
-
   private async removeFromProjectMeta(
     projectPath: string,
     endpoint: Endpoint,
@@ -572,9 +550,6 @@ export class EndpointsService {
         const metaFile = await fs.readFile(metaPath, 'utf8');
         metaContent = JSON.parse(metaFile);
       } catch (error) {
-        // this.logger.warn(
-        //   `[SERVICE] Could not read project-meta.json: ${error.message}`,
-        // );
         return;
       }
 
@@ -596,20 +571,9 @@ export class EndpointsService {
           JSON.stringify(metaContent, null, 2),
           'utf8',
         );
-
-        // this.logger.log(
-        //   `[SERVICE] Removed endpoint ${endpoint.entityName} (${endpoint.path}) from project meta`,
-        // );
-      } else {
-        // this.logger.warn(
-        //   `[SERVICE] Endpoint ${endpoint.entityName} (${endpoint.path}) not found in project meta`,
-        // );
       }
     } catch (error) {
-      // this.logger.error(
-      //   `[SERVICE] Error removing endpoint from project meta:`,
-      //   error.message,
-      // );
+      // Silently handle errors
     }
   }
 }
