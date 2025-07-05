@@ -52,15 +52,7 @@ export class HooksUpdaterService {
       if (!hooksContent.includes(afterAllDispose)) {
         hooksContent = hooksContent.replace('console.log(\'✅ Test environment cleaned up successfully\');', `await ${entityName.toLowerCase()}Client?.dispose();\n  console.log('✅ Test environment cleaned up successfully');`);
       }
-      // 7. Import the entity step file (if exists)
-      const stepImport = `import '../${section}/${entityName.toLowerCase()}.steps';`;
-      if (!hooksContent.includes(stepImport)) {
-        // Insert at the end of imports
-        const importLines = hooksContent.split('\n');
-        let lastImport = importLines.reduce((acc, line, idx) => line.startsWith('import') ? idx : acc, 0);
-        importLines.splice(lastImport + 1, 0, stepImport);
-        hooksContent = importLines.join('\n');
-      }
+
       // Save the updated file
       fs.writeFileSync(hooksPath, hooksContent, 'utf8');
       this.logger.debug(`✅ hooks.ts updated for entity ${entityName}`);

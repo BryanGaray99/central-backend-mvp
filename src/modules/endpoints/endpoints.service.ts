@@ -13,6 +13,7 @@ import { UpdateEndpointDto } from './dto/update-endpoint.dto';
 import { AnalysisService } from './services/analysis.service';
 import { ArtifactsGenerationService } from './services/artifacts-generation.service';
 import { HooksUpdaterService } from './services/hooks-updater.service';
+import { ApiConfigUpdaterService } from './services/api-config-updater.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -29,6 +30,7 @@ export class EndpointsService {
     private readonly analysisService: AnalysisService,
     private readonly artifactsGenerationService: ArtifactsGenerationService,
     private readonly hooksUpdaterService: HooksUpdaterService,
+    private readonly apiConfigUpdaterService: ApiConfigUpdaterService,
   ) {}
 
   async registerAndAnalyze(dto: RegisterEndpointDto) {
@@ -196,6 +198,9 @@ export class EndpointsService {
 
     // Delete endpoint record
     await this.endpointRepository.remove(endpoint);
+
+    // Update api.config.ts after endpoint deletion
+    await this.apiConfigUpdaterService.updateApiConfigOnEndpointDeletion(project.id);
   }
 
   private async processEndpointAsync(
@@ -244,6 +249,16 @@ export class EndpointsService {
 
       // Update project-meta.json
       await this.updateProjectMeta(project.path, endpoint, dto, analysisResult);
+
+      // Update api.config.ts with all endpoints - only if endpoint is ready
+      if (endpoint.status === 'ready' && endpoint.analysisResults) {
+        try {
+          await this.apiConfigUpdaterService.updateApiConfigOnEndpointRegistration(project.id);
+        } catch (error) {
+          this.logger.warn(`Failed to update api.config.ts: ${error.message}`);
+          // Don't fail the entire process if api.config.ts update fails
+        }
+      }
 
       // this.logger.log(
       //   `[SERVICE] Endpoint ${endpoint.name} procesado exitosamente`,

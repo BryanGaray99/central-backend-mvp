@@ -11,6 +11,7 @@ import { TemplateVariablesService } from './services/template-variables.service'
 import { ArtifactsFileGeneratorService } from './services/artifacts-file-generator.service';
 import { ProjectMetaService } from './services/project-meta.service';
 import { HooksUpdaterService } from './services/hooks-updater.service';
+import { ApiConfigUpdaterService } from './services/api-config-updater.service';
 import { FileSystemService } from '../projects/services/file-system.service';
 import { TemplateService } from '../projects/services/template.service';
 
@@ -25,9 +26,10 @@ import { TemplateService } from '../projects/services/template.service';
     ArtifactsFileGeneratorService,
     ProjectMetaService,
     HooksUpdaterService,
+    ApiConfigUpdaterService,
     FileSystemService,
     TemplateService,
   ],
-  exports: [EndpointsService],
+  exports: [EndpointsService, ApiConfigUpdaterService],
 })
 export class EndpointsModule {} 

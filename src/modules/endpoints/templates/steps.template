@@ -1,10 +1,10 @@
 import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from '@playwright/test';
-import { {{entityName}}Client, handleApiResponse, getLastResponse, getLastError, storeCreatedEntity } from '../hooks';
+import { {{entityLower}}Client, handleApiResponse, getLastResponse, getLastError, storeCreatedEntity } from '../hooks';
 import { {{entityName}}Fixture } from '../../fixtures/{{section}}/{{entityLower}}.fixture';
 import { isValid{{entityName}}, isValid{{entityName}}List, get{{entityName}}ValidationErrors } from '../../schemas/{{section}}/{{entityLower}}.schema';
 
-// Given steps
+// Given steps for data preparation
 Given('I have valid {{entityName}} data', function () {
   this.{{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
 });
@@ -40,48 +40,53 @@ Given('I have invalid update data for {string}', function (field: string) {
   }
 });
 
-Given('a {{entityName}} exists in the system', async function () {
-  this.existing{{entityName}} = {{entityName}}Fixture.create{{entityName}}Dto();
+// Given steps for entity creation (inside methods loop to access expectedStatusCode)
+{{#each methods}}
+{{#if (eq method "POST")}}
+Given('a {{../entityName}} exists in the system', async function () {
+  this.existing{{../entityName}} = {{../entityName}}Fixture.create{{../entityName}}Dto();
   
   try {
-    const response = await {{entityName}}Client.create{{entityName}}(this.existing{{entityName}});
+    const response = await {{../entityLower}}Client.create{{../entityName}}(this.existing{{../entityName}});
     expect(response.status).toBe({{expectedStatusCode}});
     
-    const {{entityLower}}Data = (response.data as any)?.data?.data || response.data;
-    this.{{entityLower}}Id = {{entityLower}}Data.id;
-    storeCreatedEntity('{{entityName}}', this.{{entityLower}}Id, response.data);
+    const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+    this.{{../entityLower}}Id = {{../entityLower}}Data.id;
+    storeCreatedEntity('{{../entityName}}', this.{{../entityLower}}Id, response.data);
   } catch (error: any) {
-    console.log(`❌ Error creating {{entityName}}:`, error.status || 'Unknown error');
+    console.log(`❌ Error creating {{../entityName}}:`, error.status || 'Unknown error');
     throw error;
   }
 });
 
-Given('multiple {{entityNamePlural}} exist in the system', async function () {
-  this.created{{entityNamePlural}} = [];
+Given('multiple {{../entityNamePlural}} exist in the system', async function () {
+  this.created{{../entityNamePlural}} = [];
   
   for (let i = 0; i < 3; i++) {
-    const {{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
+    const {{../entityLower}}Data = {{../entityName}}Fixture.create{{../entityName}}Dto();
     
     try {
-      const response = await {{entityName}}Client.create{{entityName}}({{entityLower}}Data);
+      const response = await {{../entityLower}}Client.create{{../entityName}}({{../entityLower}}Data);
       expect(response.status).toBe({{expectedStatusCode}});
       
-      const {{entityLower}}DataResponse = (response.data as any)?.data?.data || response.data;
-      this.created{{entityNamePlural}}.push({{entityLower}}DataResponse);
-      storeCreatedEntity('{{entityName}}', {{entityLower}}DataResponse.id, response.data);
+      const {{../entityLower}}DataResponse = (response.data as any)?.data?.data || response.data;
+      this.created{{../entityNamePlural}}.push({{../entityLower}}DataResponse);
+      storeCreatedEntity('{{../entityName}}', {{../entityLower}}DataResponse.id, response.data);
     } catch (error: any) {
-      console.log(`❌ Error creating {{entityName}} ${i}:`, error.status || 'Unknown error');
+      console.log(`❌ Error creating {{../entityName}} ${i}:`, error.status || 'Unknown error');
       throw error;
     }
   }
 });
+{{/if}}
+{{/each}}
 
 // When steps
 {{#each methods}}
 {{#if (eq method "POST")}}
 When('I create a {{../entityName}}', async function () {
   try {
-    const response = await {{../entityName}}Client.create{{../entityName}}(this.{{../entityLower}}Data);
+    const response = await {{../entityLower}}Client.create{{../entityName}}(this.{{../entityLower}}Data);
     handleApiResponse(response);
     
     if (response.status === {{expectedStatusCode}} && response.data) {
@@ -102,7 +107,7 @@ When('I create a {{../entityName}}', async function () {
 {{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
 When('I get all {{../entityNamePlural}}', async function () {
   try {
-    const response = await {{../entityName}}Client.getAll{{../entityNamePlural}}();
+    const response = await {{../entityLower}}Client.getAll{{../entityNamePlural}}();
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`❌ Error getting all {{../entityNamePlural}}:`, error.status || 'Unknown error');
@@ -112,7 +117,7 @@ When('I get all {{../entityNamePlural}}', async function () {
 {{else}}
 When('I get the {{../entityName}} by ID', async function () {
   try {
-    const response = await {{../entityName}}Client.get{{../entityName}}ById(this.{{../entityLower}}Id);
+    const response = await {{../entityLower}}Client.get{{../entityName}}ById(this.{{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`❌ Error getting {{../entityName}} by ID:`, error.status || 'Unknown error');
@@ -122,7 +127,7 @@ When('I get the {{../entityName}} by ID', async function () {
 
 When('I get a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
   try {
-    const response = await {{../entityName}}Client.get{{../entityName}}ById({{../entityLower}}Id);
+    const response = await {{../entityLower}}Client.get{{../entityName}}ById({{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`❌ Error getting {{../entityName}} with ID ${ {{../entityLower}}Id}:`, error.status || 'Unknown error');
@@ -137,7 +142,7 @@ When('I update the {{../entityName}}', async function () {
   this.updateData = {{../entityName}}Fixture.update{{../entityName}}Dto();
   
   try {
-    const response = await {{../entityName}}Client.update{{../entityName}}(this.{{../entityLower}}Id, this.updateData);
+    const response = await {{../entityLower}}Client.update{{../entityName}}(this.{{../entityLower}}Id, this.updateData);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`❌ Error updating {{../entityName}}:`, error.status || 'Unknown error');
@@ -151,7 +156,7 @@ When('I replace the {{../entityName}}', async function () {
   this.replaceData = {{../entityName}}Fixture.create{{../entityName}}Dto();
   
   try {
-    const response = await {{../entityName}}Client.replace{{../entityName}}(this.{{../entityLower}}Id, this.replaceData);
+    const response = await {{../entityLower}}Client.replace{{../entityName}}(this.{{../entityLower}}Id, this.replaceData);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`❌ Error replacing {{../entityName}}:`, error.status || 'Unknown error');
@@ -163,7 +168,7 @@ When('I replace the {{../entityName}}', async function () {
 {{#if (eq method "DELETE")}}
 When('I delete the {{../entityName}}', async function () {
   try {
-    const response = await {{../entityName}}Client.delete{{../entityName}}(this.{{../entityLower}}Id);
+    const response = await {{../entityLower}}Client.delete{{../entityName}}(this.{{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`❌ Error deleting {{../entityName}}:`, error.status || 'Unknown error');
@@ -173,7 +178,7 @@ When('I delete the {{../entityName}}', async function () {
 
 When('I delete a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
   try {
-    const response = await {{../entityName}}Client.delete{{../entityName}}({{../entityLower}}Id);
+    const response = await {{../entityLower}}Client.delete{{../entityName}}({{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`❌ Error deleting {{../entityName}} with ID ${ {{../entityLower}}Id}:`, error.status || 'Unknown error');

@@ -30,6 +30,15 @@ export class CreateProjectDto {
   baseUrl: string;
 
   @ApiPropertyOptional({
+    description: 'Base path for API endpoints',
+    example: '/v1/api',
+    default: '/v1/api',
+  })
+  @IsString()
+  @IsOptional()
+  basePath?: string;
+
+  @ApiPropertyOptional({
     description: 'Type of project',
     enum: ProjectType,
     default: ProjectType.PLAYWRIGHT_BDD,

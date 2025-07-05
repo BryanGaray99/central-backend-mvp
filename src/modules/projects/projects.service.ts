@@ -47,6 +47,7 @@ export class ProjectsService {
     const project = this.projectRepo.create({
       ...createDto,
       displayName: createDto.displayName || createDto.name,
+      basePath: createDto.basePath || '/v1/api',
       status: ProjectStatus.PENDING,
       type: createDto.type || ProjectType.PLAYWRIGHT_BDD,
       path: workspacePath,
@@ -81,6 +82,7 @@ export class ProjectsService {
     if (updateDto.displayName !== undefined)
       project.displayName = updateDto.displayName;
     if (updateDto.baseUrl !== undefined) project.baseUrl = updateDto.baseUrl;
+    if (updateDto.basePath !== undefined) project.basePath = updateDto.basePath;
     if (updateDto.metadata !== undefined) project.metadata = updateDto.metadata;
 
     const updatedProject = await this.projectRepo.save(project);
@@ -103,6 +105,7 @@ export class ProjectsService {
       name: project.name,
       displayName: project.displayName,
       baseUrl: project.baseUrl,
+      basePath: project.basePath || '/v1/api',
       type: project.type,
       status: project.status,
       metadata: project.metadata || {},

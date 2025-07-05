@@ -31,6 +31,9 @@ export class Project {
   @Column()
   baseUrl: string;
 
+  @Column({ nullable: true, default: '/v1/api' })
+  basePath: string;
+
   @Column({ type: 'varchar', default: ProjectStatus.PENDING })
   status: ProjectStatus;
 

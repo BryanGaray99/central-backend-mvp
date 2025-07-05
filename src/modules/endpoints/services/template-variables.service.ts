@@ -92,6 +92,7 @@ export class TemplateVariablesService {
       // Project information
       projectName: project.name,
       baseUrl: project.baseUrl,
+      basePath: project.basePath || '/v1/api',
       description: (project as any).description || '',
       author: (project as any).author || 'Auto-generated',
 
@@ -107,6 +108,7 @@ export class TemplateVariablesService {
       requiredFields: fields.filter((f) => f.required),
       requiredCreateFields: createFields.filter((f) => f.required),
       numericFields: fields.filter((f) => f.type === 'number' || f.type === 'integer'),
+      fieldValidations: this.generateFieldValidations(createFields),
 
       // Flags
       hasCreate: successfulMethods.includes('POST'),
@@ -115,11 +117,21 @@ export class TemplateVariablesService {
       hasDelete: successfulMethods.includes('DELETE'),
       hasAddress: fields.some((f) => f.name.toLowerCase().includes('address')),
       hasOrderStatus: fields.some((f) => f.name.toLowerCase().includes('status')),
-      hasSearchParams: false, // TODO: Implement search params detection
+      hasSearchParams: this.detectSearchParams(dto.path, fields),
       hasValidation: fields.some((f) => f.validations && Object.keys(f.validations).length > 0),
-      hasFilters: false, // TODO: Implement filters detection
-      requiresUser: false, // TODO: Implement auth detection
+      hasFilters: this.detectFilters(dto.path, fields),
+      requiresUser: this.detectAuthRequirements(dto.methods),
       businessPurpose: this.generateBusinessPurpose(entityName, dto.section),
+
+      // Methods for API client
+      methods: (dto.methods || []).map((methodConfig) => {
+        const method = methodConfig.method;
+        const analysis = analysisResult.analysisResults?.[method] || {};
+        return {
+          ...(methodConfig as any),
+          expectedStatusCode: analysis.inferredStatusCode ?? (methodConfig as any).expectedStatusCode ?? this.defaultStatus(method),
+        };
+      }),
     };
 
     // console.log('🔧 === FINAL buildTemplateVariables ===');
@@ -659,8 +671,56 @@ export class TemplateVariablesService {
   }
 
   private generateBusinessPurpose(entityName: string, section: string): string {
-    // Genera un propósito de negocio genérico para la entidad
+    // Generate a generic business purpose for the entity
     return `Manage ${entityName.toLowerCase()}s in the ${section} section.`;
+  }
+
+  private detectSearchParams(path: string, fields: any[]): boolean {
+    // Detect if the endpoint has search parameters
+    const searchPatterns = ['search', 'query', 'q', 'filter', 'find'];
+    const pathLower = path.toLowerCase();
+    
+    // Check if the path contains search patterns
+    if (searchPatterns.some(pattern => pathLower.includes(pattern))) {
+      return true;
+    }
+    
+    // Check if there are fields that suggest search functionality
+    const searchFields = fields.filter(field => 
+      field.name.toLowerCase().includes('search') ||
+      field.name.toLowerCase().includes('query') ||
+      field.name.toLowerCase().includes('filter') ||
+      field.name.toLowerCase().includes('keyword')
+    );
+    
+    return searchFields.length > 0;
+  }
+
+  private detectFilters(path: string, fields: any[]): boolean {
+    // Detect if the endpoint has filtering capabilities
+    const filterPatterns = ['filter', 'where', 'by', 'category', 'status', 'type'];
+    const pathLower = path.toLowerCase();
+    
+    // Check if the path contains filtering patterns
+    if (filterPatterns.some(pattern => pathLower.includes(pattern))) {
+      return true;
+    }
+    
+    // Check if there are fields that suggest filtering functionality
+    const filterFields = fields.filter(field => 
+      field.name.toLowerCase().includes('category') ||
+      field.name.toLowerCase().includes('status') ||
+      field.name.toLowerCase().includes('type') ||
+      field.name.toLowerCase().includes('tag') ||
+      field.name.toLowerCase().includes('group')
+    );
+    
+    return filterFields.length > 0;
+  }
+
+  private detectAuthRequirements(methods: any[]): boolean {
+    // Detect if any method requires authentication
+    return methods.some(method => method.requiresAuth === true);
   }
 }
  
