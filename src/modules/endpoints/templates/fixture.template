@@ -57,45 +57,6 @@ export class {{entityName}}Fixture {
     return Array.from({ length: count }, () => this.create{{entityName}}(overrides));
   }
 
-  {{#if hasCategoryField}}
-  /**
-   * Generate {{entityName}} with specific category
-   */
-  static create{{entityName}}WithCategory(categoryId: string, overrides: Partial<{{entityName}}> = {}): {{entityName}} {
-    return this.create{{entityName}}({ categoryId, ...overrides });
-  }
-  {{/if}}
-
-  {{#if hasStockField}}
-  /**
-   * Generate out of stock {{entityName}}
-   */
-  static createOutOfStock{{entityName}}(overrides: Partial<{{entityName}}> = {}): {{entityName}} {
-    return this.create{{entityName}}({ stock: 0, ...overrides });
-  }
-  {{/if}}
-
-  {{#if hasPriceField}}
-  /**
-   * Generate high-value {{entityName}}
-   */
-  static createHighValue{{entityName}}(overrides: Partial<{{entityName}}> = {}): {{entityName}} {
-    return this.create{{entityName}}({
-      price: faker.number.float({ min: 1000, max: 5000, multipleOf: 0.01 }),
-      ...overrides
-    });
-  }
-  {{/if}}
-
-  {{#if hasActiveField}}
-  /**
-   * Generate inactive {{entityName}}
-   */
-  static createInactive{{entityName}}(overrides: Partial<{{entityName}}> = {}): {{entityName}} {
-    return this.create{{entityName}}({ isActive: false, ...overrides });
-  }
-  {{/if}}
-
   {{#if hasCreate}}
   /**
    * Generate invalid {{entityName}} data for negative testing
@@ -105,9 +66,9 @@ export class {{entityName}}Fixture {
       {{#each createFields}}
       {{#if required}}
       without{{capitalize name}}: this.create{{../entityName}}Dto({ {{name}}: undefined as any }),
-      {{#if (eq type "number")}}withNegative{{capitalize name}}: this.create{{../entityName}}Dto({ {{name}}: -10 }),{{/if}}
       {{#if (eq type "string")}}withEmpty{{capitalize name}}: this.create{{../entityName}}Dto({ {{name}}: '' }),{{/if}}
       {{#if (eq type "string")}}withShort{{capitalize name}}: this.create{{../entityName}}Dto({ {{name}}: 'A' }),{{/if}}
+      {{#if (eq type "number")}}withNegative{{capitalize name}}: this.create{{../entityName}}Dto({ {{name}}: -10 }),{{/if}}
       {{/if}}
       {{/each}}
     };
@@ -125,8 +86,18 @@ export class {{entityName}}Fixture {
 
     switch (field) {
       {{#each createFields}}
+      {{#if required}}
       case '{{name}}':
+        {{#if (eq type "string")}}
+        return { ...baseData, {{name}}: '' }; // Empty string
+        {{else if (eq type "number")}}
+        return { ...baseData, {{name}}: -100 }; // Negative value
+        {{else if (eq type "boolean")}}
+        return { ...baseData, {{name}}: null as any }; // null instead of boolean
+        {{else}}
         return { ...baseData, {{name}}: {{{invalidValue}}} };
+        {{/if}}
+      {{/if}}
       {{/each}}
       default:
         return baseData;
@@ -145,13 +116,19 @@ export class {{entityName}}Fixture {
 
     switch (field) {
       {{#each createFields}}
-      {{#if (eq type "number")}}
-      case '{{name}}':
-        return { ...baseData, {{name}}: -100 };
-      {{/if}}
+      {{#if required}}
       {{#if (eq type "string")}}
       case '{{name}}':
-        return { ...baseData, {{name}}: 'a' }; // Too short
+        return { ...baseData, {{name}}: '' }; // Empty string
+      {{/if}}
+      {{#if (eq type "number")}}
+      case '{{name}}':
+        return { ...baseData, {{name}}: -100 }; // Negative value
+      {{/if}}
+      {{#if (eq type "boolean")}}
+      case '{{name}}':
+        return { ...baseData, {{name}}: null as any }; // null instead of boolean
+      {{/if}}
       {{/if}}
       {{/each}}
       default:

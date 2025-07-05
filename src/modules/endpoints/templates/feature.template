@@ -42,7 +42,7 @@ Feature: {{entityName}} API
 
     Examples:
       {{#each ../createFields}}
-      {{#if validations}}
+      {{#if required}}
       | field |
       | {{name}} |
       {{/if}}
@@ -94,7 +94,7 @@ Feature: {{entityName}} API
 
     Examples:
       {{#each ../updateFields}}
-      {{#if validations}}
+      {{#if required}}
       | field |
       | {{name}} |
       {{/if}}
@@ -135,6 +135,8 @@ Feature: {{entityName}} API
     When I create a {{../entityName}}
     Then the {{../entityName}} should be created successfully
     {{/if}}
+    {{/each}}
+    {{#each methods}}
     {{#if (eq method "GET")}}
     {{#unless (eq ../endpointPath (concat "/" ../entityNamePlural))}}
     When I get the {{../entityName}} by ID

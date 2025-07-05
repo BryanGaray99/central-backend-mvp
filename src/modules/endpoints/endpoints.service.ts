@@ -195,14 +195,19 @@ export class EndpointsService {
     // Update project-meta.json to remove the endpoint entry
     await this.removeFromProjectMeta(project.path, endpoint);
 
-    // Clean up hooks file
-    await this.hooksUpdaterService.removeFromHooksFile(project.path, endpoint.entityName, endpoint.section);
-
     // Delete endpoint record
     await this.endpointRepository.remove(endpoint);
 
     // Check if section is now empty and remove it if necessary
     await this.cleanupService.removeEmptySection(project.path, section);
+
+    // Regenerate hooks.ts with remaining endpoints
+    try {
+      await this.hooksUpdaterService.regenerateHooksFile(project.id);
+    } catch (error) {
+      this.logger.warn(`Failed to update hooks.ts: ${error.message}`);
+      // Don't fail the entire process if hooks.ts update fails
+    }
 
     // Update api.config.ts after endpoint deletion
     await this.apiConfigUpdaterService.updateApiConfigOnEndpointDeletion(project.id);
@@ -254,6 +259,16 @@ export class EndpointsService {
 
       // Update project-meta.json
       await this.updateProjectMeta(project.path, endpoint, dto, analysisResult);
+
+      // Update hooks.ts with all endpoints - only if endpoint is ready
+      if (endpoint.status === 'ready' && endpoint.analysisResults) {
+        try {
+          await this.hooksUpdaterService.regenerateHooksFile(project.id);
+        } catch (error) {
+          this.logger.warn(`Failed to update hooks.ts: ${error.message}`);
+          // Don't fail the entire process if hooks.ts update fails
+        }
+      }
 
       // Update api.config.ts with all endpoints - only if endpoint is ready
       if (endpoint.status === 'ready' && endpoint.analysisResults) {
@@ -576,4 +591,4 @@ export class EndpointsService {
       // Silently handle errors
     }
   }
-}
+} 

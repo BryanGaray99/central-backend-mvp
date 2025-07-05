@@ -352,15 +352,16 @@ export class TemplateVariablesService {
     
     switch (type) {
       case 'string':
-        if (key.includes('name')) return "''";
-        if (key.includes('email')) return "'invalid-email'";
-        if (key.includes('url')) return "'invalid-url'";
-        return "''";
+        if (key.includes('name')) return "'a'"; // Too short
+        if (key.includes('email')) return "'invalid-email-format'";
+        if (key.includes('url')) return "'not-a-valid-url'";
+        if (key.includes('description')) return "'a'"; // Too short
+        return "'a'"; // Too short for most string fields
       case 'number':
-        if (key.includes('price') || key.includes('cost')) return '-10';
-        if (key.includes('stock') || key.includes('quantity')) return '-5';
-        return '-1';
-      case 'boolean': return 'undefined';
+        if (key.includes('price') || key.includes('cost')) return '-100'; // More negative
+        if (key.includes('stock') || key.includes('quantity')) return '-50'; // More negative
+        return '-999'; // Very negative number
+      case 'boolean': return 'undefined'; // undefined instead of null for boolean fields
       case 'array': return 'null';
       case 'object': return 'null';
       default: return 'null';

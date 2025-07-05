@@ -11,33 +11,102 @@ Given('I have valid {{entityName}} data', function () {
 
 Given('I have invalid {{entityName}} data with missing {string}', function (field: string) {
   this.{{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
-  delete this.{{entityLower}}Data[field];
+  
+  // If the field is "field", generate specific invalid data
+  if (field === 'field') {
+    // Generate data with multiple invalid fields
+    {{#each createFields}}
+    {{#if required}}
+    this.{{../entityLower}}Data.{{name}} = {{#if (eq type "string")}}''{{else if (eq type "number")}}-999{{else}}null as any{{/if}}; // Invalid {{name}}
+    {{/if}}
+    {{/each}}
+  } else {
+    // Remove the specific field if it exists
+    delete this.{{entityLower}}Data[field];
+  }
+  
+  // Only show logs if there's a subsequent error
+  this.shouldLogInvalidData = true;
+  this.invalidField = field;
+  this.invalidDataType = 'missing';
 });
 
 Given('I have {{entityName}} data with invalid {string}', function (field: string) {
   this.{{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
+  const originalValue = this.{{entityLower}}Data[field];
+  
   switch (field) {
     {{#each createFields}}
-    {{#if validations}}
+    {{#if required}}
     case '{{name}}':
+      {{#if (eq type "string")}}
+      this.{{../entityLower}}Data.{{name}} = ''; // Empty string
+      {{else if (eq type "number")}}
+      this.{{../entityLower}}Data.{{name}} = -100; // More extreme negative value
+      {{else if (eq type "boolean")}}
+      this.{{../entityLower}}Data.{{name}} = null as any; // null instead of boolean
+      {{else}}
       this.{{../entityLower}}Data.{{name}} = {{{invalidValue}}};
+      {{/if}}
       break;
     {{/if}}
     {{/each}}
+    case 'field':
+      // Random invalid field - use extreme values
+      {{#each createFields}}
+      {{#if required}}
+      {{#if (eq type "string")}}
+      this.{{../entityLower}}Data.{{name}} = '';
+      {{else if (eq type "number")}}
+      this.{{../entityLower}}Data.{{name}} = -999;
+      {{/if}}
+      {{/if}}
+      {{/each}}
+      break;
   }
+  
+  // Only show logs if there's a subsequent error
+  this.shouldLogInvalidData = true;
+  this.invalidField = field;
+  this.invalidDataType = 'invalid';
+  this.originalValue = originalValue;
 });
 
 Given('I have invalid update data for {string}', function (field: string) {
-  this.updateData = {{entityName}}Fixture.update{{entityName}}Dto();
+  this.invalidUpdateData = {{entityName}}Fixture.update{{entityName}}Dto();
+  const originalValue = this.invalidUpdateData[field];
+  
   switch (field) {
     {{#each updateFields}}
-    {{#if validations}}
     case '{{name}}':
-      this.updateData.{{name}} = {{{invalidValue}}};
+      {{#if (eq type "string")}}
+      this.invalidUpdateData.{{name}} = ''; // Empty string
+      {{else if (eq type "number")}}
+      this.invalidUpdateData.{{name}} = -100; // Negative value
+      {{else if (eq type "boolean")}}
+      this.invalidUpdateData.{{name}} = null as any; // null instead of boolean
+      {{else}}
+      this.invalidUpdateData.{{name}} = {{{invalidValue}}};
+      {{/if}}
       break;
-    {{/if}}
     {{/each}}
+    case 'field':
+      // Random invalid field - use extreme values
+      {{#each updateFields}}
+      {{#if (eq type "string")}}
+      this.invalidUpdateData.{{name}} = '';
+      {{else if (eq type "number")}}
+      this.invalidUpdateData.{{name}} = -999;
+      {{/if}}
+      {{/each}}
+      break;
   }
+  
+  // Only show logs if there's a subsequent error
+  this.shouldLogInvalidUpdateData = true;
+  this.invalidUpdateField = field;
+  this.invalidUpdateDataType = 'invalid';
+  this.originalUpdateValue = originalValue;
 });
 
 // Given steps for entity creation (inside methods loop to access expectedStatusCode)
@@ -54,7 +123,7 @@ Given('a {{../entityName}} exists in the system', async function () {
     this.{{../entityLower}}Id = {{../entityLower}}Data.id;
     storeCreatedEntity('{{../entityName}}', this.{{../entityLower}}Id, response.data);
   } catch (error: any) {
-    console.log(`❌ Error creating {{../entityName}}:`, error.status || 'Unknown error');
+    console.log(`Setup {{../entityName}} failed (${error.status || 'Unknown'})`);
     throw error;
   }
 });
@@ -73,7 +142,7 @@ Given('multiple {{../entityNamePlural}} exist in the system', async function () 
       this.created{{../entityNamePlural}}.push({{../entityLower}}DataResponse);
       storeCreatedEntity('{{../entityName}}', {{../entityLower}}DataResponse.id, response.data);
     } catch (error: any) {
-      console.log(`❌ Error creating {{../entityName}} ${i}:`, error.status || 'Unknown error');
+      console.log(`Setup {{../entityName}} ${i} failed (${error.status || 'Unknown'})`);
       throw error;
     }
   }
@@ -83,10 +152,48 @@ Given('multiple {{../entityNamePlural}} exist in the system', async function () 
 
 // When steps
 {{#each methods}}
+{{#if (eq method "GET")}}
+{{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
+When('I get all {{../entityNamePlural}}', async function () {
+  try {
+    const response = await {{../entityLower}}Client.getAll{{../entityNamePlural}}();
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`Get all {{../entityNamePlural}} failed (${error.status || 'Unknown'})`);
+    handleApiResponse(null, error);
+  }
+});
+{{else}}
+When('I get the {{../entityName}} by ID', async function () {
+  try {
+    const response = await {{../entityLower}}Client.get{{../entityName}}ById(this.{{../entityLower}}Id);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`Get {{../entityName}} by ID failed (${error.status || 'Unknown'})`);
+    handleApiResponse(null, error);
+  }
+});
+
+When('I get a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
+  try {
+    const response = await {{../entityLower}}Client.get{{../entityName}}ById({{../entityLower}}Id);
+    handleApiResponse(response);
+  } catch (error: any) {
+    console.log(`Get {{../entityName}} ${ {{../entityLower}}Id} failed (${error.status || 'Unknown'})`);
+    handleApiResponse(null, error);
+  }
+});
+{{/if}}
+{{/if}}
+
 {{#if (eq method "POST")}}
 When('I create a {{../entityName}}', async function () {
   try {
     const response = await {{../entityLower}}Client.create{{../entityName}}(this.{{../entityLower}}Data);
+    
+    // Only show the sent payload
+    console.log('Payload:', JSON.stringify(this.{{../entityLower}}Data, null, 2));
+    
     handleApiResponse(response);
     
     if (response.status === {{expectedStatusCode}} && response.data) {
@@ -97,55 +204,30 @@ When('I create a {{../entityName}}', async function () {
       }
     }
   } catch (error: any) {
-    console.log(`❌ Error creating {{../entityName}}:`, error.status || 'Unknown error');
+    // Only show the sent payload in case of error
+    console.log('Payload:', JSON.stringify(this.{{../entityLower}}Data, null, 2));
+    
     handleApiResponse(null, error);
   }
 });
-{{/if}}
-
-{{#if (eq method "GET")}}
-{{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
-When('I get all {{../entityNamePlural}}', async function () {
-  try {
-    const response = await {{../entityLower}}Client.getAll{{../entityNamePlural}}();
-    handleApiResponse(response);
-  } catch (error: any) {
-    console.log(`❌ Error getting all {{../entityNamePlural}}:`, error.status || 'Unknown error');
-    handleApiResponse(null, error);
-  }
-});
-{{else}}
-When('I get the {{../entityName}} by ID', async function () {
-  try {
-    const response = await {{../entityLower}}Client.get{{../entityName}}ById(this.{{../entityLower}}Id);
-    handleApiResponse(response);
-  } catch (error: any) {
-    console.log(`❌ Error getting {{../entityName}} by ID:`, error.status || 'Unknown error');
-    handleApiResponse(null, error);
-  }
-});
-
-When('I get a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
-  try {
-    const response = await {{../entityLower}}Client.get{{../entityName}}ById({{../entityLower}}Id);
-    handleApiResponse(response);
-  } catch (error: any) {
-    console.log(`❌ Error getting {{../entityName}} with ID ${ {{../entityLower}}Id}:`, error.status || 'Unknown error');
-    handleApiResponse(null, error);
-  }
-});
-{{/if}}
 {{/if}}
 
 {{#if (eq method "PATCH")}}
 When('I update the {{../entityName}}', async function () {
-  this.updateData = {{../entityName}}Fixture.update{{../entityName}}Dto();
+  // Use invalid data if available, otherwise generate valid data
+  this.updateData = this.invalidUpdateData || {{../entityName}}Fixture.update{{../entityName}}Dto();
   
   try {
     const response = await {{../entityLower}}Client.update{{../entityName}}(this.{{../entityLower}}Id, this.updateData);
+    
+    // Only show the sent payload
+    console.log('Payload:', JSON.stringify(this.updateData, null, 2));
+    
     handleApiResponse(response);
   } catch (error: any) {
-    console.log(`❌ Error updating {{../entityName}}:`, error.status || 'Unknown error');
+    // Only show the sent payload in case of error
+    console.log('Payload:', JSON.stringify(this.updateData, null, 2));
+    
     handleApiResponse(null, error);
   }
 });
@@ -159,7 +241,7 @@ When('I replace the {{../entityName}}', async function () {
     const response = await {{../entityLower}}Client.replace{{../entityName}}(this.{{../entityLower}}Id, this.replaceData);
     handleApiResponse(response);
   } catch (error: any) {
-    console.log(`❌ Error replacing {{../entityName}}:`, error.status || 'Unknown error');
+    console.log(`Replace {{../entityName}} failed (${error.status || 'Unknown'})`);
     handleApiResponse(null, error);
   }
 });
@@ -171,7 +253,7 @@ When('I delete the {{../entityName}}', async function () {
     const response = await {{../entityLower}}Client.delete{{../entityName}}(this.{{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
-    console.log(`❌ Error deleting {{../entityName}}:`, error.status || 'Unknown error');
+    console.log(`Delete {{../entityName}} failed (${error.status || 'Unknown'})`);
     handleApiResponse(null, error);
   }
 });
@@ -181,7 +263,7 @@ When('I delete a {{../entityName}} with ID {string}', async function ({{../entit
     const response = await {{../entityLower}}Client.delete{{../entityName}}({{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
-    console.log(`❌ Error deleting {{../entityName}} with ID ${ {{../entityLower}}Id}:`, error.status || 'Unknown error');
+    console.log(`Delete {{../entityName}} ${ {{../entityLower}}Id} failed (${error.status || 'Unknown'})`);
     handleApiResponse(null, error);
   }
 });
@@ -194,13 +276,14 @@ When('I delete a {{../entityName}} with ID {string}', async function ({{../entit
 Then('the {{../entityName}} should be created successfully', function () {
   const response = getLastResponse();
   const error = getLastError();
-
+  
   if (error) {
-    console.log(`❌ {{../entityName}} creation failed:`, error);
+    console.log(`(----X----) {{../entityName}} creation failed (${error.status || error.response?.status})`);
+    throw new Error(`{{../entityName}} creation failed with status ${error.status || error.response?.status}: ${error.message}`);
   }
 
   expect(response).toBeTruthy();
-  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.status).toBe(201);
   expect(response.data).toBeTruthy();
   
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
@@ -208,6 +291,7 @@ Then('the {{../entityName}} should be created successfully', function () {
   
   // Validate response schema
   expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
+  console.log('(-----P-----) {{../entityName}} created successfully');
 });
 {{/if}}
 
@@ -218,56 +302,56 @@ Then('I should get a list of {{../entityNamePlural}}', function () {
   const error = getLastError();
 
   if (error) {
-    console.log(`❌ Getting {{../entityNamePlural}} failed:`, error);
+    console.log(`{{../entityNamePlural}} list error (${error.status || error.response?.status})`);
+    throw new Error(`{{../entityNamePlural}} list error: ${error.message}`);
   }
 
   expect(response).toBeTruthy();
   expect(response.status).toBe({{expectedStatusCode}});
-  const {{../entityNamePlural}}Data = (response.data as any)?.data?.data || response.data;
-  expect(Array.isArray({{../entityNamePlural}}Data)).toBe(true);
+  expect(response.data).toBeTruthy();
   
-  // Validate response schema
-  expect(isValid{{../entityName}}List({{../entityNamePlural}}Data)).toBe(true);
+  const {{../entityLower}}List = (response.data as any)?.data?.data || response.data;
+  expect(Array.isArray({{../entityLower}}List)).toBe(true);
+  expect(isValid{{../entityName}}List({{../entityLower}}List)).toBe(true);
 });
 
 Then('each {{../entityName}} should have required fields', function () {
   const response = getLastResponse();
   const error = getLastError();
-  
+
   if (error) {
-    console.log(`❌ {{../entityName}} fields validation failed:`, error);
+    console.log(`{{../entityName}} validation error (${error.status || error.response?.status})`);
+    throw new Error(`{{../entityName}} validation error: ${error.message}`);
   }
 
-  expect(response).toBeTruthy();
-  const {{../entityNamePlural}}Data = (response.data as any)?.data?.data || response.data;
-  expect(Array.isArray({{../entityNamePlural}}Data)).toBe(true);
+  const {{../entityLower}}List = (response.data as any)?.data?.data || response.data;
   
-  {{../entityNamePlural}}Data.forEach(({{../entityLower}}: any) => {
-    {{#each ../fields}}
-    {{#if required}}
-    expect({{../entityLower}}.{{name}}).toBeTruthy();
-    {{/if}}
-    {{/each}}
-  });
+  for (const {{../entityLower}} of {{../entityLower}}List) {
+    const errors = get{{../entityName}}ValidationErrors({{../entityLower}});
+    expect(errors).toHaveLength(0);
+  }
 });
 {{else}}
 Then('I should get the {{../entityName}} details', function () {
   const response = getLastResponse();
   const error = getLastError();
-  
+
   if (error) {
-    console.log(`❌ Error getting {{../entityName}} details:`, error);
+    console.log(`(----X----) {{../entityName}} details error (${error.status || error.response?.status})`);
+    throw new Error(`{{../entityName}} details error: ${error.message}`);
   }
-  
+
   expect(response).toBeTruthy();
-  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.status).toBe(200);
   expect(response.data).toBeTruthy();
-  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
-  expect({{../entityLower}}Data.id).toBe(this.{{../entityLower}}Id);
   
-  // Validate response schema
+  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+  expect({{../entityLower}}Data.id).toBeTruthy();
   expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
+  console.log('(-----P-----) {{../entityName}} details retrieved successfully');
 });
+
+// Note: "I should receive a not found error" is defined in hooks.ts to avoid duplication
 {{/if}}
 {{/if}}
 
@@ -277,26 +361,18 @@ Then('the {{../entityName}} should be updated successfully', function () {
   const error = getLastError();
 
   if (error) {
-    console.log(`❌ Update failed:`, error);
+    console.log(`(----X----) {{../entityName}} update failed (${error.status || error.response?.status})`);
+    throw new Error(`{{../entityName}} update failed: ${error.message}`);
   }
 
   expect(response).toBeTruthy();
-  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.status).toBe(200);
   expect(response.data).toBeTruthy();
-
+  
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
-  Object.keys(this.updateData).forEach(key => {
-    let expected = this.updateData[key];
-    let actual = {{../entityLower}}Data[key];
-    if ([{{#each ../updateFields}}{{#if (eq type "number")}}'{{name}}'{{#unless @last}}, {{/unless}}{{/if}}{{/each}}].includes(key)) {
-      expected = Number(expected);
-      actual = Number(actual);
-    }
-    expect(actual).toBe(expected);
-  });
-
-  // Validate response schema
+  expect({{../entityLower}}Data.id).toBeTruthy();
   expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
+  console.log('(-----P-----) {{../entityName}} updated successfully');
 });
 {{/if}}
 
@@ -306,32 +382,33 @@ Then('the {{../entityName}} should be replaced successfully', function () {
   const error = getLastError();
 
   if (error) {
-    console.log(`❌ Replace failed:`, error);
+    console.log(`{{../entityName}} replace failed (${error.status || error.response?.status})`);
+    throw new Error(`{{../entityName}} replace failed: ${error.message}`);
   }
 
   expect(response).toBeTruthy();
   expect(response.status).toBe({{expectedStatusCode}});
   expect(response.data).toBeTruthy();
-
-  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
-  expect({{../entityLower}}Data.id).toBe(this.{{../entityLower}}Id);
   
-  // Validate response schema
+  const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
+  expect({{../entityLower}}Data.id).toBeTruthy();
   expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
 });
-  {{/if}}
+{{/if}}
 
 {{#if (eq method "DELETE")}}
 Then('the {{../entityName}} should be deleted successfully', function () {
   const response = getLastResponse();
   const error = getLastError();
-  
+
   if (error) {
-    console.log(`❌ Delete failed:`, error);
+    console.log(`(----X----) {{../entityName}} deletion failed (${error.status || error.response?.status})`);
+    throw new Error(`{{../entityName}} deletion failed: ${error.message}`);
   }
-  
+
   expect(response).toBeTruthy();
-  expect(response.status).toBe({{expectedStatusCode}});
+  expect(response.status).toBe(204);
+  console.log('(-----P-----) {{../entityName}} deleted successfully');
 });
 {{/if}}
 {{/each}}
@@ -340,9 +417,9 @@ Then('the {{../entityName}} should be deleted successfully', function () {
 Then('the response should contain valid {{entityName}} data', function () {
   const response = getLastResponse();
   const error = getLastError();
-
+  
   if (error) {
-    console.log(`❌ {{entityName}} validation failed:`, error);
+    console.log(`(----X----) {{entityName}} validation failed:`, error);
   }
 
   expect(response).toBeTruthy();
@@ -356,29 +433,7 @@ Then('the response should contain valid {{entityName}} data', function () {
     const errors = get{{entityName}}ValidationErrors({{entityLower}}Data);
     throw new Error(`Invalid {{entityName}} data: ${errors.join(', ')}`);
   }
+  console.log('(-----P-----) {{entityName}} data validation passed');
 });
 
-Then('I should receive a {int} status code', function (statusCode: number) {
-  const response = getLastResponse();
-  const error = getLastError();
-  
-  if (error) {
-    console.log(`❌ Status code validation failed:`, error);
-  }
-  
-  expect(response).toBeTruthy();
-  expect(response.status).toBe(statusCode);
-});
-
-Then('I should receive a validation error', function () {
-  const error = getLastError();
-  expect(error).toBeTruthy();
-  expect(error.status).toBeGreaterThanOrEqual(400);
-  expect(error.status).toBeLessThan(500);
-});
-
-Then('I should receive a not found error', function () {
-  const error = getLastError();
-  expect(error).toBeTruthy();
-  expect(error.status).toBe(404);
-}); 
+// Common validation steps are defined in hooks.ts

@@ -1,0 +1,32 @@
+// Dynamic endpoint imports - added by HooksUpdaterService
+import { {{entityName}}Client } from '../api/{{section}}/{{entityNameLower}}.client';
+
+// Dynamic client declaration - added by HooksUpdaterService
+export let {{entityNameLower}}Client: {{entityName}}Client;
+
+// Dynamic entity storage - added by HooksUpdaterService
+// created{{entityName}}s: new Map<string, any>(),
+
+// Dynamic client initialization - added by HooksUpdaterService
+// {{entityNameLower}}Client = new {{entityName}}Client();
+// await {{entityNameLower}}Client.init();
+
+// Dynamic cleanup - added by HooksUpdaterService
+// testData.created{{entityName}}s.clear();
+
+// Dynamic disposal - added by HooksUpdaterService
+// await {{entityNameLower}}Client?.dispose();
+
+// Dynamic client verification - added by HooksUpdaterService
+// if (!{{entityNameLower}}Client) {
+//   throw new Error('API clients are not properly initialized');
+// }
+
+// Dynamic entity storage in storeCreatedEntity - added by HooksUpdaterService
+// case '{{entityNameLower}}':
+//   testData.created{{entityName}}s.set(id, data);
+//   break;
+
+// Dynamic entity retrieval in getCreatedEntity - added by HooksUpdaterService
+// case '{{entityNameLower}}':
+//   return testData.created{{entityName}}s.get(id); 
