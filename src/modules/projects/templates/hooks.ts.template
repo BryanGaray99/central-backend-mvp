@@ -199,24 +199,24 @@ Then('I should receive a validation error', function () {
   if (error) {
     const statusCode = error.status || error.response?.status;
     if (statusCode === 422) {
-      console.log('(-----P-----) Validation error (422) detected');
+      console.log('(P) Validation error (422) detected');
       return;
     } else {
-      console.log(`(----X----) Error ${statusCode} received, expected 422`);
+      console.log(`(F) Error ${statusCode} received, expected 422`);
       return;
     }
   } else if (response && response.status >= 400) {
     if (response.status === 422) {
-      console.log('(-----P-----) Validation error (422) detected');
+      console.log('(P) Validation error (422) detected');
       return;
     } else {
-      console.log(`(----X----) Response ${response.status} received, expected 422`);
+      console.log(`(F) Error ${response.status} received, expected 422`);
       return;
     }
-  } else {
-    console.log('(----X----) No validation error - API accepted invalid data');
-    return;
   }
+  
+  console.log('(F) No validation error detected, expected 422');
+  throw new Error('Expected validation error (422) but none was received');
 });
 
 /**
@@ -229,20 +229,20 @@ Then('I should receive a {int} status code', function (statusCode: number) {
   if (error) {
     const actualStatus = error.status || error.response?.status;
     if (actualStatus === statusCode) {
-      console.log(`(-----P-----) Expected status code ${statusCode} received`);
+      console.log(`(P) Expected status code ${statusCode} received`);
     } else {
-      console.log(`(----X----) Expected status code ${statusCode}, got ${actualStatus}`);
+      console.log(`(F) Expected status code ${statusCode}, got ${actualStatus}`);
     }
     expect(actualStatus).toBe(statusCode);
   } else if (response) {
     if (response.status === statusCode) {
-      console.log(`(-----P-----) Expected status code ${statusCode} received`);
+      console.log(`(P) Expected status code ${statusCode} received`);
     } else {
-      console.log(`(----X----) Expected status code ${statusCode}, got ${response.status}`);
+      console.log(`(F) Expected status code ${statusCode}, got ${response.status}`);
     }
     expect(response.status).toBe(statusCode);
   } else {
-    console.log(`(----X----) Expected status code ${statusCode} but no response or error was found`);
+    console.log(`(F) Expected status code ${statusCode} but no response or error was found`);
     throw new Error(`Expected status code ${statusCode} but no response or error was found`);
   }
 });
@@ -252,16 +252,41 @@ Then('I should receive a {int} status code', function (statusCode: number) {
  */
 Then('I should receive a not found error', function () {
   const error = getLastError();
+  const response = getLastResponse();
+  
   if (error) {
     const statusCode = error.status || error.response?.status;
     if (statusCode === 404) {
-      console.log('(-----P-----) Not found error (404) detected');
+      console.log('(P) Not found error (404) detected');
+      return;
     } else {
-      console.log(`(----X----) Expected 404, got ${statusCode}`);
+      console.log(`(F) Error ${statusCode} received, expected 404`);
+      return;
     }
+  } else if (response && response.status === 404) {
+    console.log('(P) Not found error (404) detected');
+    return;
   } else {
-    console.log('(----X----) Expected not found error but no error was found');
+    console.log('(F) No not found error detected, expected 404');
+    throw new Error('Expected not found error (404) but none was received');
   }
-  expect(error).toBeTruthy();
-  expect(error.status || error.response?.status).toBe(404);
+});
+
+/**
+ * Scenario result indicators
+ */
+Before(function (scenario) {
+  console.log(`\n🚀 Starting scenario: ${scenario.pickle.name}`);
+});
+
+After(function (scenario) {
+  if (scenario.result?.status === 'PASSED') {
+    console.log(`\n✅ **************PASSED**************`);
+    console.log(`✅ Scenario: ${scenario.pickle.name}`);
+    console.log(`✅ ************************************\n`);
+  } else {
+    console.log(`\n❌ **************FAILED**************`);
+    console.log(`❌ Scenario: ${scenario.pickle.name}`);
+    console.log(`❌ ************************************\n`);
+  }
 });

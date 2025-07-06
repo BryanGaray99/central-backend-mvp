@@ -278,7 +278,7 @@ Then('the {{../entityName}} should be created successfully', function () {
   const error = getLastError();
   
   if (error) {
-    console.log(`(----X----) {{../entityName}} creation failed (${error.status || error.response?.status})`);
+    console.log(`(F) {{../entityName}} creation failed (${error.status || error.response?.status})`);
     throw new Error(`{{../entityName}} creation failed with status ${error.status || error.response?.status}: ${error.message}`);
   }
 
@@ -291,7 +291,7 @@ Then('the {{../entityName}} should be created successfully', function () {
   
   // Validate response schema
   expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
-  console.log('(-----P-----) {{../entityName}} created successfully');
+  console.log('(P) {{../entityName}} created successfully');
 });
 {{/if}}
 
@@ -337,7 +337,7 @@ Then('I should get the {{../entityName}} details', function () {
   const error = getLastError();
 
   if (error) {
-    console.log(`(----X----) {{../entityName}} details error (${error.status || error.response?.status})`);
+    console.log(`(F) {{../entityName}} details error (${error.status || error.response?.status})`);
     throw new Error(`{{../entityName}} details error: ${error.message}`);
   }
 
@@ -348,7 +348,7 @@ Then('I should get the {{../entityName}} details', function () {
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
   expect({{../entityLower}}Data.id).toBeTruthy();
   expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
-  console.log('(-----P-----) {{../entityName}} details retrieved successfully');
+  console.log('(P) {{../entityName}} details retrieved successfully');
 });
 
 // Note: "I should receive a not found error" is defined in hooks.ts to avoid duplication
@@ -361,7 +361,7 @@ Then('the {{../entityName}} should be updated successfully', function () {
   const error = getLastError();
 
   if (error) {
-    console.log(`(----X----) {{../entityName}} update failed (${error.status || error.response?.status})`);
+    console.log(`(F) {{../entityName}} update failed (${error.status || error.response?.status})`);
     throw new Error(`{{../entityName}} update failed: ${error.message}`);
   }
 
@@ -372,7 +372,7 @@ Then('the {{../entityName}} should be updated successfully', function () {
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
   expect({{../entityLower}}Data.id).toBeTruthy();
   expect(isValid{{../entityName}}({{../entityLower}}Data)).toBe(true);
-  console.log('(-----P-----) {{../entityName}} updated successfully');
+  console.log('(P) {{../entityName}} updated successfully');
 });
 {{/if}}
 
@@ -402,13 +402,13 @@ Then('the {{../entityName}} should be deleted successfully', function () {
   const error = getLastError();
 
   if (error) {
-    console.log(`(----X----) {{../entityName}} deletion failed (${error.status || error.response?.status})`);
+    console.log(`(F) {{../entityName}} deletion failed (${error.status || error.response?.status})`);
     throw new Error(`{{../entityName}} deletion failed: ${error.message}`);
   }
 
   expect(response).toBeTruthy();
   expect(response.status).toBe(204);
-  console.log('(-----P-----) {{../entityName}} deleted successfully');
+  console.log('(P) {{../entityName}} deleted successfully');
 });
 {{/if}}
 {{/each}}
@@ -419,7 +419,7 @@ Then('the response should contain valid {{entityName}} data', function () {
   const error = getLastError();
   
   if (error) {
-    console.log(`(----X----) {{entityName}} validation failed:`, error);
+    console.log(`(F) {{entityName}} validation failed:`, error);
   }
 
   expect(response).toBeTruthy();
@@ -433,7 +433,9 @@ Then('the response should contain valid {{entityName}} data', function () {
     const errors = get{{entityName}}ValidationErrors({{entityLower}}Data);
     throw new Error(`Invalid {{entityName}} data: ${errors.join(', ')}`);
   }
-  console.log('(-----P-----) {{entityName}} data validation passed');
+  console.log('(P) {{entityName}} data validation passed');
 });
+
+// Note: Status code steps (200, 201, 204, 422, 404) are defined in hooks.ts to avoid duplication
 
 // Common validation steps are defined in hooks.ts
