@@ -25,20 +25,68 @@ Este es el **motor de generación** del sistema completo. Se enfoca en crear pro
 
 Este es el método recomendado para este MVP del motor de generación.
 
-#### 1. Instalar Dependencias
+#### 1. Clonar el Repositorio
+```bash
+git clone https://github.com/BryanGaray99/central-backend-mvp.git
+cd central-backend-mvp
+```
+
+#### 2. Configurar Variables de Entorno
+```bash
+# Copiar el archivo de ejemplo
+cp .env.example .env
+
+# Editar las variables según tu configuración
+# Especialmente importante:
+# - PORT: Puerto del servidor (default: 3000)
+# - DATABASE_PATH: Ruta de la base de datos SQLite
+# - PLAYWRIGHT_WORKSPACES_PATH: Ruta para los workspaces generados
+```
+
+#### 3. Instalar Dependencias
 ```bash
 npm install
 ```
 
-#### 2. Ejecutar el Servidor
+#### 4. Ejecutar el Servidor
 ```bash
 npm run start:dev
 ```
 
-#### 3. Verificar que Funciona
+#### 5. Verificar que Funciona
 - **API**: http://localhost:3000
-- **Documentación**: http://localhost:3000/api
-- **Health Check**: http://localhost:3000/health
+- **Documentación**: http://localhost:3000/docs
+- **Health Check**: http://localhost:3000/v1/api/health
+
+### ⚠️ Configuración del Archivo .env
+
+Asegúrate de que tu archivo `.env` contenga las siguientes variables según el ejemplo `.env.example`:
+
+```env
+# Puerto del servidor
+PORT=3000
+
+# Ruta de la base de datos SQLite
+DATABASE_PATH=central-backend.sqlite
+
+# Ruta donde se crearán los workspaces de Playwright
+PLAYWRIGHT_WORKSPACES_PATH=../playwright-workspaces
+
+# Nivel de logging
+LOG_LEVEL=debug
+
+# Clave secreta JWT (para futuras integraciones)
+JWT_SECRET=your-secret-key
+
+# API Key (para futuras integraciones de seguridad)
+API_KEY=your-api-key
+
+# Configuración de generación
+OVERRIDE_EXISTING=false
+
+# Ruta al directorio de plantillas base
+TEMPLATE_DIR=../e-commerce.playwright-testing-model
+```
 
 ### Método 2: Con Docker (Solo para desarrollo/pruebas)
 
@@ -179,6 +227,26 @@ rm central-backend.sqlite
 npm run start:dev
 ```
 
+### Archivo .env no configurado
+Si el servidor no inicia o da errores de configuración:
+```bash
+# Verificar que existe el archivo .env
+ls -la .env
+
+# Si no existe, copiarlo del ejemplo
+cp .env.example .env
+
+# Editar las variables necesarias
+nano .env  # o usar tu editor preferido
+```
+
+### Variables de entorno faltantes
+Asegúrate de que todas las variables del `.env.example` estén presentes en tu `.env`:
+- `PORT`: Puerto del servidor
+- `DATABASE_PATH`: Ruta de la base de datos
+- `PLAYWRIGHT_WORKSPACES_PATH`: Ruta para workspaces
+- `LOG_LEVEL`: Nivel de logging
+
 ## 📁 Estructura
 
 ```
@@ -194,10 +262,11 @@ src/
 ## 📝 Notas Importantes
 
 - **Ejecución Local**: Este MVP está diseñado para ejecutarse localmente donde se generarán los proyectos
-- **Base de datos**: SQLite se crea automáticamente
-- **Workspaces**: Se generan en `playwright-workspaces/` (fuera del backend)
-- **Documentación**: Swagger UI disponible en `/api`
-- **Sin configuración adicional**: Funciona inmediatamente después de `npm install`
+- **Base de datos**: SQLite se crea automáticamente en la ruta especificada en `DATABASE_PATH`
+- **Workspaces**: Se generan en la ruta especificada en `PLAYWRIGHT_WORKSPACES_PATH`
+- **Documentación**: Swagger UI disponible en `/docs`
+- **Configuración**: Requiere archivo `.env` configurado según `.env.example`
+- **Variables críticas**: `PORT`, `DATABASE_PATH`, `PLAYWRIGHT_WORKSPACES_PATH` son obligatorias
 
 ## 🔮 Arquitectura Futura
 
