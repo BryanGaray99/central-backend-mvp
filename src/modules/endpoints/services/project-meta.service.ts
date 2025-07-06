@@ -3,6 +3,7 @@ import { FileSystemService } from '../../projects/services/file-system.service';
 import { Project } from '../../projects/project.entity';
 import { RegisterEndpointDto } from '../dto/register-endpoint.dto';
 import * as path from 'path';
+import * as fs from 'fs/promises';
 
 @Injectable()
 export class ProjectMetaService {
@@ -395,14 +396,43 @@ export class ProjectMetaService {
   }
 
   /**
-   * Get project by ID (placeholder - implement based on your project structure)
+   * Get project by ID using the same logic as WorkspaceService
    */
   private async getProjectById(projectId: string) {
-    // This should be implemented based on your project repository structure
-    // For now, return a mock project
-    return {
-      id: projectId,
-      path: `./playwright-workspaces/project-${projectId}`,
-    };
+    // Usar la misma lógica que WorkspaceService para obtener la ruta correcta
+    const envPath = process.env.PLAYWRIGHT_WORKSPACES_PATH;
+    if (!envPath) {
+      this.logger.error('PLAYWRIGHT_WORKSPACES_PATH no está definida');
+      return null;
+    }
+    
+    let workspacePath = envPath;
+    if (!path.isAbsolute(workspacePath)) {
+      workspacePath = path.resolve(process.cwd(), workspacePath);
+    }
+    
+    try {
+      const workspaces = await fs.readdir(workspacePath);
+      for (const workspace of workspaces) {
+        const workspaceMetaPath = path.join(workspacePath, workspace, 'project-meta.json');
+        try {
+          const metaContent = await fs.readFile(workspaceMetaPath, 'utf8');
+          const meta = JSON.parse(metaContent);
+          if (meta.id === projectId) {
+            return {
+              id: projectId,
+              path: path.join(workspacePath, workspace),
+            };
+          }
+        } catch (error) {
+          // Continuar buscando
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error buscando proyecto: ${error.message}`);
+    }
+    
+    this.logger.warn(`No se pudo encontrar la ruta del proyecto ${projectId}`);
+    return null;
   }
 } 

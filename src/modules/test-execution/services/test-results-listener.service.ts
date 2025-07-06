@@ -33,8 +33,6 @@ export class TestResultsListenerService {
       startTime: new Date(),
       steps: [],
       errorMessage: undefined,
-      screenshots: [],
-      videoPath: undefined,
       metadata: {
         tags,
         startTime: new Date(),
@@ -58,8 +56,7 @@ export class TestResultsListenerService {
       scenarioData.endTime = new Date();
       scenarioData.duration = result.duration || 0;
       scenarioData.errorMessage = result.errorMessage;
-      scenarioData.screenshots = result.screenshots || [];
-      scenarioData.videoPath = result.videoPath;
+      // Los screenshots y videos ya no se almacenan en la estructura simplificada
       scenarioData.steps = this.stepResults.get(scenarioKey) || [];
       
       this.scenarioResults.set(scenarioKey, scenarioData);
@@ -71,7 +68,7 @@ export class TestResultsListenerService {
   /**
    * Captura el inicio de un paso
    */
-  captureStepStart(stepName: string, stepDefinition: string): void {
+  captureStepStart(stepName: string): void {
     if (!this.currentScenario) {
       this.logger.warn('Intento de capturar step sin escenario activo');
       return;
@@ -80,11 +77,9 @@ export class TestResultsListenerService {
     const scenarioKey = this.getScenarioKey(this.currentScenario);
     const stepResult: StepResult = {
       stepName,
-      stepDefinition,
       status: StepStatus.PASSED, // Por defecto, se actualizará al final
       duration: 0,
       timestamp: new Date(),
-      data: {},
     };
 
     const steps = this.stepResults.get(scenarioKey) || [];
@@ -112,11 +107,6 @@ export class TestResultsListenerService {
       step.status = result.status || StepStatus.PASSED;
       step.duration = result.duration || 0;
       step.errorMessage = result.errorMessage;
-      step.data = { ...step.data, ...result.data };
-      
-      if (result.screenshot) {
-        step.data.screenshot = result.screenshot;
-      }
       
       steps[stepIndex] = step;
       this.stepResults.set(scenarioKey, steps);
@@ -126,21 +116,16 @@ export class TestResultsListenerService {
   }
 
   /**
-   * Captura datos adicionales de un paso
+   * Captura datos adicionales de un paso (deprecated - mantenido por compatibilidad)
    */
   captureStepData(stepName: string, data: any): void {
     if (!this.currentScenario) {
       return;
     }
 
-    const scenarioKey = this.getScenarioKey(this.currentScenario);
-    const steps = this.stepResults.get(scenarioKey) || [];
-    const stepIndex = steps.findIndex(step => step.stepName === stepName);
-    
-    if (stepIndex >= 0) {
-      steps[stepIndex].data = { ...steps[stepIndex].data, ...data };
-      this.stepResults.set(scenarioKey, steps);
-    }
+    // Los datos ya no se almacenan en la estructura simplificada
+    // Solo se registra en el log para debugging
+    this.logger.debug(`Datos capturados para step ${stepName}: ${JSON.stringify(data)}`);
   }
 
   /**

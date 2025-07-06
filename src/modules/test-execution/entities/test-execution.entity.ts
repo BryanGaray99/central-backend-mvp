@@ -89,10 +89,10 @@ export class TestExecution {
 
   @Column('json', { nullable: true })
   metadata?: {
-    browser?: string;
-    headless?: boolean;
-    video?: boolean;
-    screenshots?: boolean;
+    environment?: string;
+    verbose?: boolean;
+    saveLogs?: boolean;
+    savePayloads?: boolean;
     parallel?: boolean;
     timeout?: number;
     retries?: number;

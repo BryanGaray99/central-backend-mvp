@@ -1,13 +1,12 @@
 export interface ExecutionMetadata {
-  browser?: string;
-  headless?: boolean;
-  video?: boolean;
-  screenshots?: boolean;
+  environment?: string;
+  verbose?: boolean;
+  saveLogs?: boolean;
+  savePayloads?: boolean;
   parallel?: boolean;
   timeout?: number;
   retries?: number;
   workers?: number;
-  environment?: string;
   tags?: string[];
   customConfig?: Record<string, any>;
 }

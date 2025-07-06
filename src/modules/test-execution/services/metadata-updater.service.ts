@@ -259,9 +259,17 @@ export class MetadataUpdaterService {
    * Obtiene la ruta del proyecto
    */
   private async getProjectPath(projectId: string): Promise<string | null> {
-    // Esta función debería obtener la ruta del proyecto desde la base de datos
-    // Por ahora, asumimos que está en playwright-workspaces
-    const workspacePath = path.join(process.cwd(), 'playwright-workspaces');
+    // Usar la misma lógica que WorkspaceService para obtener la ruta correcta
+    const envPath = process.env.PLAYWRIGHT_WORKSPACES_PATH;
+    if (!envPath) {
+      this.logger.error('PLAYWRIGHT_WORKSPACES_PATH no está definida');
+      return null;
+    }
+    
+    let workspacePath = envPath;
+    if (!path.isAbsolute(workspacePath)) {
+      workspacePath = path.resolve(process.cwd(), workspacePath);
+    }
     
     try {
       const workspaces = await fs.readdir(workspacePath);
@@ -281,6 +289,7 @@ export class MetadataUpdaterService {
       this.logger.error(`Error buscando proyecto: ${error.message}`);
     }
     
+    this.logger.warn(`No se pudo encontrar la ruta del proyecto ${projectId}`);
     return null;
   }
 } 

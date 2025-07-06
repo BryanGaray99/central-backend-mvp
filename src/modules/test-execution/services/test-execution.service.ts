@@ -60,10 +60,10 @@ export class TestExecutionService {
       specificScenario: dto.specificScenario,
       status: ExecutionStatus.PENDING,
       metadata: {
-        browser: dto.browser,
-        headless: dto.headless,
-        video: dto.video,
-        screenshots: dto.screenshots,
+        environment: dto.environment,
+        verbose: dto.verbose,
+        saveLogs: dto.saveLogs,
+        savePayloads: dto.savePayloads,
         parallel: dto.parallel,
         timeout: dto.timeout,
         retries: dto.retries,
@@ -96,6 +96,34 @@ export class TestExecutionService {
 
     const summary = this.calculateSummary(execution);
 
+    // Enriquecer los resultados con información adicional
+    const enrichedResults = execution.results.map(result => ({
+      id: result.id,
+      scenarioName: result.scenarioName,
+      scenarioTags: result.scenarioTags,
+      status: result.status,
+      duration: result.duration,
+      steps: result.steps || [],
+      errorMessage: result.errorMessage,
+      metadata: result.metadata || {},
+      createdAt: result.createdAt,
+      // Información adicional calculada
+      stepCount: result.steps?.length || 0,
+      passedSteps: result.steps?.filter(step => step.status === 'passed').length || 0,
+      failedSteps: result.steps?.filter(step => step.status === 'failed').length || 0,
+      skippedSteps: result.steps?.filter(step => step.status === 'skipped').length || 0,
+      // Estadísticas excluyendo hooks
+      actualStepCount: result.steps?.filter(step => !step.isHook).length || 0,
+      passedActualSteps: result.steps?.filter(step => !step.isHook && step.status === 'passed').length || 0,
+      failedActualSteps: result.steps?.filter(step => !step.isHook && step.status === 'failed').length || 0,
+      successRate: result.steps?.length > 0 
+        ? (result.steps.filter(step => step.status === 'passed').length / result.steps.length) * 100 
+        : 0,
+      actualSuccessRate: result.steps?.filter(step => !step.isHook).length > 0 
+        ? (result.steps.filter(step => !step.isHook && step.status === 'passed').length / result.steps.filter(step => !step.isHook).length) * 100 
+        : 0,
+    }));
+
     return {
       executionId: execution.executionId,
       status: execution.status,
@@ -103,9 +131,20 @@ export class TestExecutionService {
       completedAt: execution.completedAt,
       executionTime: execution.executionTime,
       summary,
-      results: execution.results,
+      results: enrichedResults,
       metadata: execution.metadata,
       errorMessage: execution.errorMessage,
+      // Información adicional de la ejecución
+      entityName: execution.entityName,
+      method: execution.method,
+      testType: execution.testType,
+      tags: execution.tags,
+      specificScenario: execution.specificScenario,
+      totalScenarios: execution.totalScenarios,
+      passedScenarios: execution.passedScenarios,
+      failedScenarios: execution.failedScenarios,
+      createdAt: execution.createdAt,
+      updatedAt: execution.updatedAt,
     };
   }
 
@@ -279,8 +318,6 @@ export class TestExecutionService {
           duration: result.duration,
           steps: result.steps,
           errorMessage: result.errorMessage,
-          screenshots: result.screenshots,
-          videoPath: result.videoPath,
           metadata: result.metadata,
         });
         await this.testResultRepository.save(testResult);

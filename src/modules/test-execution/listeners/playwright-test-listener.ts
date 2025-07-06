@@ -21,7 +21,6 @@ interface TestStepResult {
   status: 'passed' | 'failed' | 'skipped';
   duration: number;
   error?: Error;
-  data?: any;
 }
 
 export class PlaywrightTestListener {
@@ -70,8 +69,7 @@ export class PlaywrightTestListener {
     this.currentStepName = step.title;
     
     this.listenerService.captureStepStart(
-      this.currentStepName,
-      step.title
+      this.currentStepName
     );
   }
 
@@ -85,8 +83,7 @@ export class PlaywrightTestListener {
       {
         status,
         duration,
-        errorMessage,
-        data: result.data
+        errorMessage
       }
     );
   }

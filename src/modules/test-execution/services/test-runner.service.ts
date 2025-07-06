@@ -28,10 +28,10 @@ export class TestRunnerService {
         TEST_TYPE: dto.testType,
         TEST_TAGS: dto.tags?.join(',') || '',
         TEST_SCENARIO: dto.specificScenario || '',
-        TEST_BROWSER: dto.browser,
-        TEST_HEADLESS: dto.headless?.toString(),
-        TEST_VIDEO: dto.video?.toString(),
-        TEST_SCREENSHOTS: dto.screenshots?.toString(),
+        TEST_ENVIRONMENT: dto.environment,
+        TEST_VERBOSE: dto.verbose?.toString(),
+        TEST_SAVE_LOGS: dto.saveLogs?.toString(),
+        TEST_SAVE_PAYLOADS: dto.savePayloads?.toString(),
         TEST_TIMEOUT: dto.timeout?.toString(),
         TEST_RETRIES: dto.retries?.toString(),
         TEST_WORKERS: dto.workers?.toString(),
@@ -44,7 +44,7 @@ export class TestRunnerService {
       const testResults = await this.executePlaywrightCommand(projectPath, command, env);
       
       // Parsear resultados
-      const parsedResults = this.parseCucumberOutput(testResults);
+      const parsedResults = await this.parseCucumberOutput(projectPath);
       
       // Calcular estadísticas
       const totalScenarios = parsedResults.length;
@@ -151,42 +151,45 @@ export class TestRunnerService {
     });
   }
 
-  private parseCucumberOutput(output: string): any[] {
+  private async parseCucumberOutput(projectPath: string): Promise<any[]> {
     try {
-      // Buscar la salida JSON en el output
-      const jsonMatch = output.match(/\[{.*}\]/s);
-      if (!jsonMatch) {
-        this.logger.warn('No se encontró salida JSON en el resultado de Cucumber');
-        return [];
-      }
+      // Leer el archivo JSON generado por Cucumber
+      const jsonReportPath = path.join(projectPath, 'test-results', 'cucumber-report.json');
+      
+      try {
+        const jsonContent = await fs.readFile(jsonReportPath, 'utf8');
+        const jsonOutput = JSON.parse(jsonContent);
+        const results: any[] = [];
 
-      const jsonOutput = JSON.parse(jsonMatch[0]);
-      const results: any[] = [];
+        for (const feature of jsonOutput) {
+          for (const element of feature.elements || []) {
+            if (element.type === 'scenario') {
+              const scenarioResult = {
+                scenarioName: element.name,
+                scenarioTags: element.tags?.map((tag: any) => tag.name) || [],
+                status: this.determineScenarioStatus(element.steps),
+                duration: this.calculateScenarioDuration(element.steps),
+                steps: this.parseScenarioSteps(element.steps),
+                errorMessage: this.extractErrorMessage(element.steps),
+                metadata: {
+                  feature: feature.name,
+                  tags: feature.tags?.map((tag: any) => tag.name) || [],
+                  scenarioId: element.id,
+                  line: element.line,
+                },
+              };
 
-      for (const feature of jsonOutput) {
-        for (const element of feature.elements || []) {
-          if (element.type === 'scenario') {
-            const scenarioResult = {
-              scenarioName: element.name,
-              scenarioTags: element.tags?.map((tag: any) => tag.name) || [],
-              status: this.determineScenarioStatus(element.steps),
-              duration: this.calculateScenarioDuration(element.steps),
-              steps: this.parseScenarioSteps(element.steps),
-              errorMessage: this.extractErrorMessage(element.steps),
-              screenshots: this.extractScreenshots(element.steps),
-              videoPath: this.extractVideoPath(element.steps),
-              metadata: {
-                feature: feature.name,
-                tags: feature.tags?.map((tag: any) => tag.name) || [],
-              },
-            };
-
-            results.push(scenarioResult);
+              results.push(scenarioResult);
+            }
           }
         }
-      }
 
-      return results;
+        this.logger.log(`Parseados ${results.length} escenarios del reporte JSON`);
+        return results;
+      } catch (fileError) {
+        this.logger.warn(`No se pudo leer el archivo JSON de Cucumber: ${fileError.message}`);
+        return [];
+      }
     } catch (error) {
       this.logger.error(`Error parseando salida de Cucumber: ${error.message}`);
       return [];
@@ -212,77 +215,42 @@ export class TestRunnerService {
   }
 
   private parseScenarioSteps(steps: any[]): any[] {
-    return steps.map(step => ({
-      stepName: step.name,
-      stepDefinition: step.keyword + step.name,
-      status: step.result?.status || 'skipped',
-      duration: step.result?.duration || 0,
-      errorMessage: step.result?.error_message,
-      data: this.extractStepData(step),
-      timestamp: new Date(),
-    }));
-  }
-
-  private extractStepData(step: any): any {
-    // Extraer datos relevantes del step (payload, response, etc.)
-    const data: any = {};
-
-    if (step.doc_string) {
-      data.docString = step.doc_string.content;
-    }
-
-    if (step.dataTable) {
-      data.dataTable = step.dataTable.rows;
-    }
-
-    // Buscar datos en el output del step
-    if (step.result?.output) {
-      for (const output of step.result.output) {
-        if (output.includes('Payload:')) {
-          data.payload = output.replace('Payload:', '').trim();
-        }
-        if (output.includes('Response:')) {
-          data.response = output.replace('Response:', '').trim();
+    return steps.map(step => {
+      // Determinar el nombre del step
+      let stepName = step.name;
+      
+      // Si no hay nombre explícito, usar el keyword para identificar el tipo de step
+      if (!stepName || stepName.trim() === '') {
+        if (step.keyword === 'Before') {
+          stepName = 'Before Hook';
+        } else if (step.keyword === 'After') {
+          stepName = 'After Hook';
+        } else if (step.keyword === 'BeforeStep') {
+          stepName = 'Before Step Hook';
+        } else if (step.keyword === 'AfterStep') {
+          stepName = 'After Step Hook';
+        } else {
+          stepName = `${step.keyword} Step`;
         }
       }
-    }
 
-    return data;
+      // Determinar si es un hook
+      const isHook = ['Before', 'After', 'BeforeStep', 'AfterStep'].includes(step.keyword);
+      
+      return {
+        stepName,
+        status: step.result?.status || 'skipped',
+        duration: step.result?.duration || 0,
+        errorMessage: step.result?.error_message,
+        timestamp: new Date(),
+        isHook, // Identificar si es un hook
+        hookType: isHook ? step.keyword : null, // Tipo de hook si aplica
+      };
+    });
   }
 
   private extractErrorMessage(steps: any[]): string | undefined {
     const failedStep = steps.find(step => step.result?.status === 'failed');
     return failedStep?.result?.error_message;
-  }
-
-  private extractScreenshots(steps: any[]): string[] {
-    const screenshots: string[] = [];
-    
-    for (const step of steps) {
-      if (step.result?.output) {
-        for (const output of step.result.output) {
-          if (output.includes('Screenshot saved:')) {
-            const screenshotPath = output.replace('Screenshot saved:', '').trim();
-            screenshots.push(screenshotPath);
-          }
-        }
-      }
-    }
-
-    return screenshots;
-  }
-
-  private extractVideoPath(steps: any[]): string | undefined {
-    // Buscar información de video en el output
-    for (const step of steps) {
-      if (step.result?.output) {
-        for (const output of step.result.output) {
-          if (output.includes('Video saved:')) {
-            return output.replace('Video saved:', '').trim();
-          }
-        }
-      }
-    }
-    return undefined;
   }
 } 

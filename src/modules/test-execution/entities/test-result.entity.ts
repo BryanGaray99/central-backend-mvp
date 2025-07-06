@@ -45,30 +45,23 @@ export class TestResult {
   @Column('json', { nullable: true })
   steps: {
     stepName: string;
-    stepDefinition: string;
     status: TestResultStatus;
     duration: number;
     errorMessage?: string;
-    data?: any;
     timestamp: Date;
+    isHook?: boolean;
+    hookType?: string;
   }[];
 
   @Column({ nullable: true })
   errorMessage?: string;
 
-  @Column('simple-array', { nullable: true })
-  screenshots?: string[]; // paths to screenshot files
-
-  @Column({ nullable: true })
-  videoPath?: string; // path to video file
-
   @Column('json', { nullable: true })
   metadata?: {
-    browser?: string;
-    viewport?: { width: number; height: number };
-    userAgent?: string;
-    retryCount?: number;
+    feature?: string;
     tags?: string[];
+    scenarioId?: string;
+    line?: number;
   };
 
   @CreateDateColumn()

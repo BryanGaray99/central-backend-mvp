@@ -17,11 +17,10 @@ export enum TestType {
   ALL = 'all',
 }
 
-export enum BrowserType {
-  CHROMIUM = 'chromium',
-  FIREFOX = 'firefox',
-  WEBKIT = 'webkit',
-  ALL = 'all',
+export enum TestEnvironment {
+  LOCAL = 'local',
+  STAGING = 'staging',
+  PRODUCTION = 'production',
 }
 
 export class ExecuteTestsDto {
@@ -99,37 +98,37 @@ export class ExecuteTestsDto {
   retries?: number = 0;
 
   @ApiPropertyOptional({
-    description: 'Navegador a usar para las pruebas',
-    enum: BrowserType,
-    default: BrowserType.CHROMIUM,
+    description: 'Entorno de pruebas',
+    enum: TestEnvironment,
+    default: TestEnvironment.LOCAL,
   })
   @IsOptional()
-  @IsEnum(BrowserType)
-  browser?: BrowserType = BrowserType.CHROMIUM;
+  @IsEnum(TestEnvironment)
+  environment?: TestEnvironment = TestEnvironment.LOCAL;
 
   @ApiPropertyOptional({
-    description: 'Ejecutar en modo headless',
-    default: true,
-  })
-  @IsOptional()
-  @IsBoolean()
-  headless?: boolean = true;
-
-  @ApiPropertyOptional({
-    description: 'Grabar video de las pruebas',
+    description: 'Mostrar logs detallados',
     default: false,
   })
   @IsOptional()
   @IsBoolean()
-  video?: boolean = false;
+  verbose?: boolean = false;
 
   @ApiPropertyOptional({
-    description: 'Tomar screenshots en caso de fallo',
+    description: 'Guardar logs de requests/responses',
     default: true,
   })
   @IsOptional()
   @IsBoolean()
-  screenshots?: boolean = true;
+  saveLogs?: boolean = true;
+
+  @ApiPropertyOptional({
+    description: 'Guardar payloads de requests/responses',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  savePayloads?: boolean = true;
 
   @ApiPropertyOptional({
     description: 'Número de workers para ejecución paralela',

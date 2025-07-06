@@ -64,7 +64,6 @@ BeforeStep(async function(step) {
   const stepName = `Step-${Date.now()}`;
   
   listenerService.captureStepStart(
-    stepName,
     stepName
   );
 });
