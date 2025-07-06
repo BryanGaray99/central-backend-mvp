@@ -8,6 +8,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Project } from './modules/projects/project.entity';
 import { Endpoint } from './modules/endpoints/endpoint.entity';
 import { EndpointsModule } from './modules/endpoints/endpoints.module';
+import { TestExecution } from './modules/test-execution/entities/test-execution.entity';
+import { TestResult } from './modules/test-execution/entities/test-result.entity';
+import { TestExecutionModule } from './modules/test-execution/test-execution.module';
 
 @Module({
   imports: [
@@ -26,7 +29,7 @@ import { EndpointsModule } from './modules/endpoints/endpoints.module';
         return {
           type: 'sqlite',
           database: dbPath,
-          entities: [Project, Endpoint],
+          entities: [Project, Endpoint, TestExecution, TestResult],
           synchronize: true,
         };
       },
@@ -35,6 +38,7 @@ import { EndpointsModule } from './modules/endpoints/endpoints.module';
     WorkspaceModule,
     ProjectsModule,
     EndpointsModule,
+    TestExecutionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

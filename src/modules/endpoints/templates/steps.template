@@ -353,7 +353,7 @@ Then('I should get the {{../entityName}} details', function () {
 
 // Note: "I should receive a not found error" is defined in hooks.ts to avoid duplication
 {{/if}}
-{{/if}}
+  {{/if}}
 
 {{#if (eq method "PATCH")}}
 Then('the {{../entityName}} should be updated successfully', function () {
