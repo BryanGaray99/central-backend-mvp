@@ -35,6 +35,6 @@ import { TemplateService } from '../projects/services/template.service';
     FileSystemService,
     TemplateService,
   ],
-  exports: [EndpointsService, ApiConfigUpdaterService],
+  exports: [EndpointsService, ApiConfigUpdaterService, ProjectMetaService],
 })
 export class EndpointsModule {} 

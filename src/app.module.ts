@@ -11,6 +11,9 @@ import { EndpointsModule } from './modules/endpoints/endpoints.module';
 import { TestExecution } from './modules/test-execution/entities/test-execution.entity';
 import { TestResult } from './modules/test-execution/entities/test-result.entity';
 import { TestExecutionModule } from './modules/test-execution/test-execution.module';
+import { TestCase } from './modules/test-cases/entities/test-case.entity';
+import { TestStep } from './modules/test-cases/entities/test-step.entity';
+import { TestCasesModule } from './modules/test-cases/test-cases.module';
 
 @Module({
   imports: [
@@ -29,7 +32,7 @@ import { TestExecutionModule } from './modules/test-execution/test-execution.mod
         return {
           type: 'sqlite',
           database: dbPath,
-          entities: [Project, Endpoint, TestExecution, TestResult],
+          entities: [Project, Endpoint, TestExecution, TestResult, TestCase, TestStep],
           synchronize: true,
         };
       },
@@ -39,6 +42,7 @@ import { TestExecutionModule } from './modules/test-execution/test-execution.mod
     ProjectsModule,
     EndpointsModule,
     TestExecutionModule,
+    TestCasesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
