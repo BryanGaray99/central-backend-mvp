@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TestCase } from './entities/test-case.entity';
 import { TestStep } from './entities/test-step.entity';
+import { Project } from '../projects/project.entity';
 import { TestCasesController } from './controllers/test-cases.controller';
 import { TestCasesService } from './services/test-cases.service';
 import { StepTemplatesService } from './services/step-templates.service';
@@ -16,7 +17,7 @@ import { TemplateService } from '../projects/services/template.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TestCase, TestStep]),
+    TypeOrmModule.forFeature([TestCase, TestStep, Project]),
     forwardRef(() => EndpointsModule),
     ProjectsModule,
   ],

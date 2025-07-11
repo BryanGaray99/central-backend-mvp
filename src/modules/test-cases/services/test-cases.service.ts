@@ -44,13 +44,13 @@ export class TestCasesService {
       
       const savedTestCase = await this.testCaseRepository.save(testCase);
       
-      // 4. Actualizar archivos de feature
-      await this.featureFileManagerService.addTestCaseToFeature(
-        projectId,
-        dto.section,
-        dto.entityName,
-        savedTestCase
-      );
+      // 4. Actualizar archivos de feature - DESHABILITADO para evitar duplicación
+      // await this.featureFileManagerService.addTestCaseToFeature(
+      //   projectId,
+      //   dto.section,
+      //   dto.entityName,
+      //   savedTestCase
+      // );
       
       // 5. Actualizar metadata del proyecto
       await this.updateProjectMetadata(projectId, savedTestCase);
@@ -79,13 +79,13 @@ export class TestCasesService {
       Object.assign(testCase, dto);
       const updatedTestCase = await this.testCaseRepository.save(testCase);
       
-      // 4. Actualizar archivos de feature
-      await this.featureFileManagerService.updateTestCaseInFeature(
-        testCase.projectId,
-        testCase.section,
-        testCase.entityName,
-        updatedTestCase
-      );
+      // 4. Actualizar archivos de feature - DESHABILITADO para evitar duplicación
+      // await this.featureFileManagerService.updateTestCaseInFeature(
+      //   testCase.projectId,
+      //   testCase.section,
+      //   testCase.entityName,
+      //   updatedTestCase
+      // );
       
       // 5. Actualizar metadata
       await this.updateProjectMetadata(testCase.projectId, updatedTestCase);
@@ -108,13 +108,13 @@ export class TestCasesService {
       // 2. Eliminar de BD
       await this.testCaseRepository.remove(testCase);
       
-      // 3. Actualizar archivos de feature
-      await this.featureFileManagerService.removeTestCaseFromFeature(
-        testCase.projectId,
-        testCase.section,
-        testCase.entityName,
-        testCase
-      );
+      // 3. Actualizar archivos de feature - DESHABILITADO para evitar duplicación
+      // await this.featureFileManagerService.removeTestCaseFromFeature(
+      //   testCase.projectId,
+      //   testCase.section,
+      //   testCase.entityName,
+      //   testCase
+      // );
       
       // 4. Actualizar metadata
       await this.removeFromProjectMetadata(testCase.projectId, testCase);

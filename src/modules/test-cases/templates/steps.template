@@ -30,11 +30,11 @@ Given('I have {{entityName}} data with invalid {string}', function (field: strin
     {{#if required}}
     case '{{name}}':
       {{#if (eq type "string")}}
-      this.{{../entityLower}}Data.{{name}} = ''; // Empty string
+      this.{{../entityLower}}Data.{{name}} = 123; // Number instead of string
       {{else if (eq type "number")}}
-      this.{{../entityLower}}Data.{{name}} = -100; // More extreme negative value
+      this.{{../entityLower}}Data.{{name}} = 'invalid-number'; // String instead of number
       {{else if (eq type "boolean")}}
-      this.{{../entityLower}}Data.{{name}} = null as any; // null instead of boolean
+      this.{{../entityLower}}Data.{{name}} = 'not-a-boolean'; // String instead of boolean
       {{else}}
       this.{{../entityLower}}Data.{{name}} = {{{invalidValue}}};
       {{/if}}
@@ -43,7 +43,7 @@ Given('I have {{entityName}} data with invalid {string}', function (field: strin
     {{/each}}
     default:
       // For any other field, use a generic invalid value
-      this.{{entityLower}}Data[field] = '';
+      this.{{entityLower}}Data[field] = 'invalid-value';
       break;
   }
   
@@ -62,11 +62,11 @@ Given('I have invalid update data for {string}', function (field: string) {
     {{#each updateFields}}
     case '{{name}}':
       {{#if (eq type "string")}}
-      this.invalidUpdateData.{{name}} = ''; // Empty string
+      this.invalidUpdateData.{{name}} = 123; // Number instead of string
       {{else if (eq type "number")}}
-      this.invalidUpdateData.{{name}} = -100; // Negative value
+      this.invalidUpdateData.{{name}} = 'invalid-number'; // String instead of number
       {{else if (eq type "boolean")}}
-      this.invalidUpdateData.{{name}} = null as any; // null instead of boolean
+      this.invalidUpdateData.{{name}} = 'not-a-boolean'; // String instead of boolean
       {{else}}
       this.invalidUpdateData.{{name}} = {{{invalidValue}}};
       {{/if}}
@@ -74,7 +74,7 @@ Given('I have invalid update data for {string}', function (field: string) {
     {{/each}}
     default:
       // For any other field, use a generic invalid value
-      this.invalidUpdateData[field] = '';
+      this.invalidUpdateData[field] = 'invalid-value';
       break;
   }
   

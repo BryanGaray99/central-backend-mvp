@@ -25,30 +25,6 @@ export class ArtifactsFileGeneratorService {
     this.logger.log(`Schema file generated at: ${filePath}`);
   }
 
-  async generateFeatureFile(dir: string, fileName: string, variables: any) {
-    const filePath = path.join(dir, `${fileName}.feature`);
-    const templatePath = path.join(this.templatesPath, 'feature.template');
-
-    await this.templateService.writeRenderedTemplate(
-      templatePath,
-      filePath,
-      variables,
-    );
-    this.logger.log(`Feature file generated at: ${filePath}`);
-  }
-
-  async generateStepsFile(dir: string, fileName: string, variables: any) {
-    const filePath = path.join(dir, `${fileName}.steps.ts`);
-    const templatePath = path.join(this.templatesPath, 'steps.template');
-
-    await this.templateService.writeRenderedTemplate(
-      templatePath,
-      filePath,
-      variables,
-    );
-    this.logger.log(`Steps file generated at: ${filePath}`);
-  }
-
   async generateFixtureFile(dir: string, fileName: string, variables: any) {
     const filePath = path.join(dir, `${fileName}.fixture.ts`);
     const templatePath = path.join(this.templatesPath, 'fixture.template');
@@ -86,50 +62,6 @@ export class ArtifactsFileGeneratorService {
       variables,
     );
     this.logger.log(`API Client file generated at: ${filePath}`);
-  }
-
-  async generateAllArtifacts(projectPath: string, section: string, entityName: string, variables: any) {
-    const entityLower = entityName.toLowerCase();
-    
-    // Create necessary directories
-    const fixturesDir = path.join(projectPath, 'src', 'fixtures', section);
-    await this.fileSystemService.createDirectory(fixturesDir);
-    
-    const schemasDir = path.join(projectPath, 'src', 'schemas', section);
-    await this.fileSystemService.createDirectory(schemasDir);
-    
-    const featuresDir = path.join(projectPath, 'src', 'features', section);
-    await this.fileSystemService.createDirectory(featuresDir);
-    
-    const stepsDir = path.join(projectPath, 'src', 'steps', section);
-    await this.fileSystemService.createDirectory(stepsDir);
-    
-    const typesDir = path.join(projectPath, 'src', 'types', section);
-    await this.fileSystemService.createDirectory(typesDir);
-    
-    const apiDir = path.join(projectPath, 'src', 'api', section);
-    await this.fileSystemService.createDirectory(apiDir);
-
-    // Generate each artifact
-    await this.generateSchemaFile(schemasDir, entityLower, variables);
-    await this.generateFeatureFile(featuresDir, entityLower, variables);
-    await this.generateStepsFile(stepsDir, entityLower, variables);
-    await this.generateFixtureFile(fixturesDir, entityLower, variables);
-    await this.generateTypesFile(typesDir, entityLower, variables);
-    await this.generateApiClientFile(apiDir, entityLower, variables);
-
-    return {
-      success: true,
-      message: `Artifacts generated successfully for ${entityName}`,
-      generatedFiles: [
-        `src/types/${section}/${entityLower}.ts`,
-        `src/schemas/${section}/${entityLower}.schema.ts`,
-        `src/fixtures/${section}/${entityLower}.fixture.ts`,
-        `src/api/${section}/${entityLower}.client.ts`,
-        `src/features/${section}/${entityLower}.feature`,
-        `src/steps/${section}/${entityLower}.steps.ts`,
-      ],
-    };
   }
 
   async generateArtifactsOnly(projectPath: string, section: string, entityName: string, variables: any) {

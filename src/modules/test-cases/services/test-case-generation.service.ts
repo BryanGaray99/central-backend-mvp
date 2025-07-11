@@ -59,6 +59,16 @@ export class TestCaseGenerationService {
     const createFields = this.extractCreateFields(analysisResult, dto.entityName);
     const updateFields = this.extractUpdateFields(analysisResult, dto.entityName);
 
+    // Debug logs
+    this.logger.debug(`Extracted fields for ${dto.entityName}:`, {
+      fieldsCount: fields.length,
+      createFieldsCount: createFields.length,
+      updateFieldsCount: updateFields.length,
+      createFields: createFields.map(f => ({ name: f.name, required: f.required })),
+      updateFields: updateFields.map(f => ({ name: f.name, required: f.required })),
+      analysisMethods: Object.keys(analysisResult.analysisResults || {}),
+    });
+
     return {
       entityName: dto.entityName,
       entityNameLower: dto.entityName.toLowerCase(),
@@ -158,8 +168,22 @@ export class TestCaseGenerationService {
     }> = [];
     const analysisResults = analysisResult.analysisResults || {};
 
-    if (analysisResults.PUT?.requestBodyDefinition) {
-      for (const field of analysisResults.PUT.requestBodyDefinition) {
+    // Debug logs
+    this.logger.debug(`Extracting update fields for ${entityName}:`, {
+      availableMethods: Object.keys(analysisResults),
+      hasPUT: !!analysisResults.PUT,
+      hasPATCH: !!analysisResults.PATCH,
+      putRequestBody: analysisResults.PUT?.requestBodyDefinition?.length || 0,
+      patchRequestBody: analysisResults.PATCH?.requestBodyDefinition?.length || 0,
+    });
+
+    // Check both PUT and PATCH for update fields
+    const updateMethod = analysisResults.PUT || analysisResults.PATCH;
+    
+    if (updateMethod?.requestBodyDefinition) {
+      this.logger.debug(`Found update method with ${updateMethod.requestBodyDefinition.length} fields`);
+      for (const field of updateMethod.requestBodyDefinition) {
+        this.logger.debug(`Processing update field: ${field.name} (required: ${field.validations?.required})`);
         updateFields.push({
           name: field.name,
           type: this.mapJsonTypeToTypeScript(field.type),
@@ -167,8 +191,11 @@ export class TestCaseGenerationService {
           example: field.example,
         });
       }
+    } else {
+      this.logger.debug(`No update method found or no requestBodyDefinition`);
     }
 
+    this.logger.debug(`Extracted ${updateFields.length} update fields:`, updateFields.map(f => f.name));
     return updateFields;
   }
 

@@ -19,7 +19,7 @@ Feature: {{entityName}} API
     And the response should contain valid {{../entityName}} data
 
   @create @negative
-  Scenario Outline: Create {{../entityName}} with invalid data
+  Scenario Outline: Create {{../entityName}} with missing required fields
     Given I have invalid {{../entityName}} data with missing "<field>"
     When I create a {{../entityName}}
     Then I should receive a validation error
@@ -95,9 +95,7 @@ Feature: {{entityName}} API
     Examples:
       | field |
       {{#each ../updateFields}}
-      {{#if required}}
       | {{name}} |
-      {{/if}}
       {{/each}}
   {{/if}}
 

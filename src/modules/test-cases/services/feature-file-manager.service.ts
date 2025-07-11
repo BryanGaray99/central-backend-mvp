@@ -1,11 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TestCase } from '../entities/test-case.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Project } from '../../projects/project.entity';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 @Injectable()
 export class FeatureFileManagerService {
   private readonly logger = new Logger(FeatureFileManagerService.name);
+
+  constructor(
+    @InjectRepository(Project)
+    private readonly projectRepository: Repository<Project>,
+  ) {}
 
   async addTestCaseToFeature(
     projectId: string,
@@ -14,7 +22,7 @@ export class FeatureFileManagerService {
     testCase: TestCase,
   ): Promise<void> {
     try {
-      const featurePath = this.getFeatureFilePath(projectId, section, entityName);
+      const featurePath = await this.getFeatureFilePath(projectId, section, entityName);
       const featureContent = await this.readFeatureFile(featurePath);
       
       const newScenario = this.generateScenarioFromTestCase(testCase);
@@ -36,7 +44,7 @@ export class FeatureFileManagerService {
     testCase: TestCase,
   ): Promise<void> {
     try {
-      const featurePath = this.getFeatureFilePath(projectId, section, entityName);
+      const featurePath = await this.getFeatureFilePath(projectId, section, entityName);
       const featureContent = await this.readFeatureFile(featurePath);
       
       const updatedScenario = this.generateScenarioFromTestCase(testCase);
@@ -58,7 +66,7 @@ export class FeatureFileManagerService {
     testCase: TestCase,
   ): Promise<void> {
     try {
-      const featurePath = this.getFeatureFilePath(projectId, section, entityName);
+      const featurePath = await this.getFeatureFilePath(projectId, section, entityName);
       const featureContent = await this.readFeatureFile(featurePath);
       
       const updatedContent = this.removeScenarioFromFeature(featureContent, testCase.testCaseId);
@@ -72,8 +80,18 @@ export class FeatureFileManagerService {
     }
   }
 
-  private getFeatureFilePath(projectId: string, section: string, entityName: string): string {
-    return path.join(process.cwd(), 'projects', projectId, 'features', section, `${entityName.toLowerCase()}.feature`);
+  private async getFeatureFilePath(projectId: string, section: string, entityName: string): Promise<string> {
+    // Get project from database to get the correct path
+    const project = await this.projectRepository.findOne({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      throw new Error(`Project with ID ${projectId} not found`);
+    }
+
+    // Use project.path instead of process.cwd()
+    return path.join(project.path, 'src', 'features', section, `${entityName.toLowerCase()}.feature`);
   }
 
   private async readFeatureFile(filePath: string): Promise<string> {
