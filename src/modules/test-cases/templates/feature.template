@@ -26,10 +26,10 @@ Feature: {{entityName}} API
     And I should receive a 422 status code
 
     Examples:
+      | field |
       {{#each ../createFields}}
       {{#if required}}
-      | field       |
-      | {{name}}    |
+      | {{name}} |
       {{/if}}
       {{/each}}
 
@@ -41,9 +41,9 @@ Feature: {{entityName}} API
     And I should receive a 422 status code
 
     Examples:
+      | field |
       {{#each ../createFields}}
       {{#if required}}
-      | field |
       | {{name}} |
       {{/if}}
       {{/each}}
@@ -93,9 +93,9 @@ Feature: {{entityName}} API
     And I should receive a 422 status code
 
     Examples:
+      | field |
       {{#each ../updateFields}}
       {{#if required}}
-      | field |
       | {{name}} |
       {{/if}}
       {{/each}}

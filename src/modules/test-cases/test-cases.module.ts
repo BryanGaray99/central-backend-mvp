@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TestCase } from './entities/test-case.entity';
 import { TestStep } from './entities/test-step.entity';
@@ -8,12 +8,15 @@ import { StepTemplatesService } from './services/step-templates.service';
 import { FeatureFileManagerService } from './services/feature-file-manager.service';
 import { StepsFileManagerService } from './services/steps-file-manager.service';
 import { TestCaseValidationService } from './services/test-case-validation.service';
+import { TestCaseGenerationService } from './services/test-case-generation.service';
 import { EndpointsModule } from '../endpoints/endpoints.module';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([TestCase, TestStep]),
-    EndpointsModule,
+    forwardRef(() => EndpointsModule),
+    ProjectsModule,
   ],
   controllers: [TestCasesController],
   providers: [
@@ -22,6 +25,7 @@ import { EndpointsModule } from '../endpoints/endpoints.module';
     FeatureFileManagerService,
     StepsFileManagerService,
     TestCaseValidationService,
+    TestCaseGenerationService,
   ],
   exports: [
     TestCasesService,
@@ -29,6 +33,7 @@ import { EndpointsModule } from '../endpoints/endpoints.module';
     FeatureFileManagerService,
     StepsFileManagerService,
     TestCaseValidationService,
+    TestCaseGenerationService,
   ],
 })
 export class TestCasesModule {} 

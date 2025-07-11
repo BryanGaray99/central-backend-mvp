@@ -15,6 +15,7 @@ import { ArtifactsGenerationService } from './services/artifacts-generation.serv
 import { HooksUpdaterService } from './services/hooks-updater.service';
 import { ApiConfigUpdaterService } from './services/api-config-updater.service';
 import { CleanupService } from './services/cleanup.service';
+import { TestCaseGenerationService } from '../test-cases/services/test-case-generation.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -33,6 +34,7 @@ export class EndpointsService {
     private readonly hooksUpdaterService: HooksUpdaterService,
     private readonly apiConfigUpdaterService: ApiConfigUpdaterService,
     private readonly cleanupService: CleanupService,
+    private readonly testCaseGenerationService: TestCaseGenerationService,
   ) {}
 
   async registerAndAnalyze(dto: RegisterEndpointDto) {
@@ -238,8 +240,15 @@ export class EndpointsService {
       endpoint.status = 'generating';
       await this.endpointRepository.save(endpoint);
 
-      // Generate artifacts
+      // Generate artifacts (types, schemas, fixtures, clients)
       await this.artifactsGenerationService.generate(
+        project,
+        dto,
+        analysisResult,
+      );
+
+      // Generate test cases (features and steps)
+      await this.testCaseGenerationService.generateTestCasesFromEndpoint(
         project,
         dto,
         analysisResult,

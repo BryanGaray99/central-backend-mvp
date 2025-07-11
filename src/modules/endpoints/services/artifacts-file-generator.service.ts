@@ -131,4 +131,38 @@ export class ArtifactsFileGeneratorService {
       ],
     };
   }
+
+  async generateArtifactsOnly(projectPath: string, section: string, entityName: string, variables: any) {
+    const entityLower = entityName.toLowerCase();
+    
+    // Create necessary directories
+    const fixturesDir = path.join(projectPath, 'src', 'fixtures', section);
+    await this.fileSystemService.createDirectory(fixturesDir);
+    
+    const schemasDir = path.join(projectPath, 'src', 'schemas', section);
+    await this.fileSystemService.createDirectory(schemasDir);
+    
+    const typesDir = path.join(projectPath, 'src', 'types', section);
+    await this.fileSystemService.createDirectory(typesDir);
+    
+    const apiDir = path.join(projectPath, 'src', 'api', section);
+    await this.fileSystemService.createDirectory(apiDir);
+
+    // Generate artifacts only (types, schemas, fixtures, clients) - excluding feature and steps
+    await this.generateSchemaFile(schemasDir, entityLower, variables);
+    await this.generateFixtureFile(fixturesDir, entityLower, variables);
+    await this.generateTypesFile(typesDir, entityLower, variables);
+    await this.generateApiClientFile(apiDir, entityLower, variables);
+
+    return {
+      success: true,
+      message: `Artifacts generated successfully for ${entityName}`,
+      generatedFiles: [
+        `src/types/${section}/${entityLower}.ts`,
+        `src/schemas/${section}/${entityLower}.schema.ts`,
+        `src/fixtures/${section}/${entityLower}.fixture.ts`,
+        `src/api/${section}/${entityLower}.client.ts`,
+      ],
+    };
+  }
 } 

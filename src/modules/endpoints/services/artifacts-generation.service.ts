@@ -38,8 +38,8 @@ export class ArtifactsGenerationService {
         project,
       );
 
-      // Generate all artifacts using specialized service
-      const result = await this.artifactsFileGeneratorService.generateAllArtifacts(
+      // Generate artifacts (types, schemas, fixtures, clients) - excluding feature and steps
+      const result = await this.artifactsFileGeneratorService.generateArtifactsOnly(
         project.path,
         dto.section,
         dto.entityName,
@@ -120,8 +120,8 @@ export class ArtifactsGenerationService {
           .map((f) => f.name),
       });
 
-      // Generate all artifacts using specialized service
-      const result = await this.artifactsFileGeneratorService.generateAllArtifacts(
+      // Generate artifacts (types, schemas, fixtures, clients) - excluding feature and steps
+      const result = await this.artifactsFileGeneratorService.generateArtifactsOnly(
         project.path,
         dto.section,
         dto.entityName,
