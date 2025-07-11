@@ -298,18 +298,11 @@ export class StepTemplatesService {
   }
 
   private async generateStepId(projectId: string, stepName: string | undefined): Promise<string> {
-    const existingSteps = await this.testStepRepository.find({
-      where: { projectId },
-      order: { stepId: 'DESC' },
-    });
-
-    const lastNumber = existingSteps.length > 0 
-      ? parseInt(existingSteps[0].stepId.split('-').pop() || '0') 
-      : 0;
-    
-    const nextNumber = lastNumber + 1;
-    const stepType = this.extractStepType(stepName);
-    return `ST-${stepType.toUpperCase()}-${nextNumber.toString().padStart(2, '0')}`;
+    // Use simple ID based on step name and timestamp
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const stepNameClean = stepName?.replace(/\s+/g, '-').toLowerCase() || 'step';
+    return `step-${stepNameClean}-${timestamp}-${randomSuffix}`;
   }
 
   private extractStepType(stepName: string | undefined): string {

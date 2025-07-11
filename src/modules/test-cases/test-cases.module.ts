@@ -11,6 +11,8 @@ import { TestCaseValidationService } from './services/test-case-validation.servi
 import { TestCaseGenerationService } from './services/test-case-generation.service';
 import { EndpointsModule } from '../endpoints/endpoints.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { FileSystemService } from '../projects/services/file-system.service';
+import { TemplateService } from '../projects/services/template.service';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { ProjectsModule } from '../projects/projects.module';
     StepsFileManagerService,
     TestCaseValidationService,
     TestCaseGenerationService,
+    FileSystemService,
+    TemplateService,
   ],
   exports: [
     TestCasesService,

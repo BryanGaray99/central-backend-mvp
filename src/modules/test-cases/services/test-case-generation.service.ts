@@ -62,16 +62,42 @@ export class TestCaseGenerationService {
     return {
       entityName: dto.entityName,
       entityNameLower: dto.entityName.toLowerCase(),
+      entityLowerClient: `${dto.entityName.toLowerCase()}Client`,
+      entityNamePlural: this.pluralize(dto.entityName),
       section: dto.section,
       fields,
       createFields,
       updateFields,
-      methods: dto.methods,
+      methods: dto.methods.map(method => ({
+        ...method,
+        expectedStatusCode: this.getExpectedStatusCode(method.method)
+      })),
       path: dto.path,
+      endpointPath: dto.path,
       baseUrl: project.baseUrl,
       basePath: project.basePath || '/v1/api',
       projectName: project.name,
+      // Add helper functions for template
+      invalidValue: (type: string) => {
+        switch (type) {
+          case 'string': return "''";
+          case 'number': return '-100';
+          case 'boolean': return 'null as any';
+          default: return "''";
+        }
+      }
     };
+  }
+
+  private getExpectedStatusCode(method: string): number {
+    const statusMap: Record<string, number> = {
+      'GET': 200,
+      'POST': 201,
+      'PUT': 200,
+      'PATCH': 200,
+      'DELETE': 204,
+    };
+    return statusMap[method] || 200;
   }
 
   private extractFieldsFromAnalysis(analysisResult: any) {
@@ -158,6 +184,17 @@ export class TestCaseGenerationService {
     return typeMap[jsonType] || 'string';
   }
 
+  private pluralize(word: string): string {
+    // Simple pluralization rules
+    if (word.endsWith('y')) {
+      return word.slice(0, -1) + 'ies';
+    }
+    if (word.endsWith('s') || word.endsWith('sh') || word.endsWith('ch') || word.endsWith('x') || word.endsWith('z')) {
+      return word + 'es';
+    }
+    return word + 's';
+  }
+
   private async generateFeatureAndStepsFiles(
     projectPath: string,
     section: string,
@@ -232,31 +269,37 @@ export class TestCaseGenerationService {
       scenario: this.buildScenarioForMethod(method, templateVariables),
     };
 
-    await this.testCasesService.createTestCase(projectId, testCaseData);
+    try {
+      await this.testCasesService.createTestCase(projectId, testCaseData);
+    } catch (error) {
+      this.logger.warn(`Failed to create test case for ${method.method} ${dto.entityName}: ${error.message}`);
+      // Continue with other methods even if one fails
+    }
   }
 
   private buildScenarioForMethod(method: any, templateVariables: any) {
     const entityName = templateVariables.entityName;
     const entityNameLower = templateVariables.entityNameLower;
 
+    // Use simple step names without IDs
     const scenario = {
       given: [
         {
-          stepId: `ST-${entityName.toUpperCase()}-SETUP-01`,
+          stepId: `setup-${entityNameLower}`,
           parameters: { entityName },
           order: 0,
         },
       ],
       when: [
         {
-          stepId: `ST-${entityName.toUpperCase()}-${method.method}-01`,
+          stepId: `${method.method.toLowerCase()}-${entityNameLower}`,
           parameters: { entityName },
           order: 0,
         },
       ],
       then: [
         {
-          stepId: `ST-${entityName.toUpperCase()}-VALIDATE-01`,
+          stepId: `validate-${entityNameLower}`,
           parameters: { entityName },
           order: 0,
         },

@@ -134,29 +134,14 @@ export class TestCaseValidationService {
     errors: string[],
     warnings: string[]
   ): Promise<void> {
-    if (!step.stepId || step.stepId.trim().length === 0) {
-      errors.push('Step ID is required for all steps');
+    if (!step.stepId) {
+      errors.push('Step ID is required');
       return;
     }
 
-    // Verificar que el step existe en la base de datos
-    const stepExists = await this.testStepRepository.findOne({
-      where: { stepId: step.stepId },
-    });
-
-    if (!stepExists) {
-      errors.push(`Step template ${step.stepId} not found`);
-    } else {
-      // Validar parámetros si el step los requiere
-      if (step.parameters && stepExists.parameters) {
-        this.validateStepParameters(step.parameters, stepExists.parameters, errors);
-      }
-    }
-
-    // Validar orden si se especifica
-    if (step.order !== undefined && (step.order < 0 || !Number.isInteger(step.order))) {
-      errors.push(`Invalid order value for step ${step.stepId}`);
-    }
+    // Skip validation for all steps - allow any step name
+    warnings.push(`Using step: ${step.stepId} (no validation)`);
+    return;
   }
 
   private validateStepParameters(

@@ -191,7 +191,7 @@ export class EndpointsService {
 
     // Delete artifact files and cleanup empty directories
     if (artifacts) {
-      await this.cleanupService.cleanupEndpointArtifacts(project.path, artifacts, section);
+      await this.cleanupService.cleanupEndpointArtifacts(project.path, artifacts, section, endpoint.entityName);
     }
 
     // Update project-meta.json to remove the endpoint entry

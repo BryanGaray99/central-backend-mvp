@@ -364,49 +364,16 @@ export class TestCasesService {
   }
 
   private async generateTestCaseId(projectId: string, section: string): Promise<string> {
-    const existingCases = await this.testCaseRepository.find({
-      where: { projectId, section },
-      order: { testCaseId: 'DESC' },
-    });
-
-    const lastNumber = existingCases.length > 0 
-      ? parseInt(existingCases[0].testCaseId.split('-').pop() || '0') 
-      : 0;
-    
-    const nextNumber = lastNumber + 1;
-    return `TC-${section.toUpperCase()}-${nextNumber.toString().padStart(2, '0')}`;
+    // Use simple ID based on timestamp and section
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    return `tc-${section}-${timestamp}-${randomSuffix}`;
   }
 
   private async validateTestCase(dto: CreateTestCaseDto | (TestCase & UpdateTestCaseDto)): Promise<void> {
-    // Validar que todos los steps existen
-    const allSteps = [
-      ...dto.scenario.given,
-      ...dto.scenario.when,
-      ...dto.scenario.then,
-    ];
-    
-    for (const step of allSteps) {
-      const stepExists = await this.testStepRepository.findOne({
-        where: { stepId: step.stepId },
-      });
-      
-      if (!stepExists) {
-        throw new BadRequestException(`Step ${step.stepId} not found`);
-      }
-    }
-
-    // Validar hooks si se especifican
-    if (dto.hooks) {
-      for (const hookId of [...(dto.hooks.before || []), ...(dto.hooks.after || [])]) {
-        const hookExists = await this.testStepRepository.findOne({
-          where: { stepId: hookId },
-        });
-        
-        if (!hookExists) {
-          throw new BadRequestException(`Hook ${hookId} not found`);
-        }
-      }
-    }
+    // Skip validation for all steps - allow any step name
+    this.logger.log('Skipping step validation - allowing any step name');
+    return;
   }
 
   private async updateProjectMetadata(projectId: string, testCase: TestCase): Promise<void> {

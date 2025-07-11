@@ -13,15 +13,21 @@ export class CleanupService {
     projectPath: string,
     artifacts: any,
     section: string,
+    entityName?: string,
   ): Promise<void> {
     try {
-      // Eliminar archivos de artefactos
+      // Eliminar archivos de artefactos específicos
       await this.deleteArtifactFiles(projectPath, artifacts);
+
+      // Si se proporciona entityName, también eliminar archivos de features y steps
+      if (entityName) {
+        await this.deleteFeatureAndStepsFiles(projectPath, section, entityName);
+      }
 
       // Limpiar directorios vacíos de la sección
       await this.cleanupEmptySectionDirectories(projectPath, section);
 
-      this.logger.log(`Limpieza completada para sección: ${section}`);
+      this.logger.log(`Limpieza completada para sección: ${section}, entidad: ${entityName || 'N/A'}`);
     } catch (error) {
       this.logger.error(`Error durante la limpieza: ${error.message}`);
       throw error;
@@ -54,6 +60,33 @@ export class CleanupService {
           if (error.code !== 'ENOENT') {
             this.logger.warn(`No se pudo eliminar ${filePath}: ${error.message}`);
           }
+        }
+      }
+    }
+  }
+
+  /**
+   * Elimina archivos de features y steps específicos de una entidad
+   */
+  private async deleteFeatureAndStepsFiles(
+    projectPath: string,
+    section: string,
+    entityName: string,
+  ): Promise<void> {
+    const entityLower = entityName.toLowerCase();
+    const filesToDelete = [
+      `src/features/${section}/${entityLower}.feature`,
+      `src/steps/${section}/${entityLower}.steps.ts`,
+    ];
+
+    for (const file of filesToDelete) {
+      const filePath = path.join(projectPath, file);
+      try {
+        await fs.unlink(filePath);
+        this.logger.log(`Archivo eliminado: ${file}`);
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') {
+          this.logger.warn(`No se pudo eliminar ${filePath}: ${error.message}`);
         }
       }
     }

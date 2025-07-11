@@ -1,8 +1,8 @@
 import { Given, When, Then } from '@cucumber/cucumber';
 import { expect } from '@playwright/test';
-import { {{entityLower}}Client, handleApiResponse, getLastResponse, getLastError, storeCreatedEntity } from '../hooks';
-import { {{entityName}}Fixture } from '../../fixtures/{{section}}/{{entityLower}}.fixture';
-import { isValid{{entityName}}, isValid{{entityName}}List, get{{entityName}}ValidationErrors } from '../../schemas/{{section}}/{{entityLower}}.schema';
+import { {{entityLowerClient}}, handleApiResponse, getLastResponse, getLastError, storeCreatedEntity } from '../hooks';
+import { {{entityName}}Fixture } from '../../fixtures/{{section}}/{{entityNameLower}}.fixture';
+import { isValid{{entityName}}, isValid{{entityName}}List, get{{entityName}}ValidationErrors } from '../../schemas/{{section}}/{{entityNameLower}}.schema';
 
 // Given steps for data preparation
 Given('I have valid {{entityName}} data', function () {
@@ -92,7 +92,7 @@ Given('a {{../entityName}} exists in the system', async function () {
   this.existing{{../entityName}} = {{../entityName}}Fixture.create{{../entityName}}Dto();
   
   try {
-    const response = await {{../entityLower}}Client.create{{../entityName}}(this.existing{{../entityName}});
+    const response = await {{../entityLowerClient}}.create{{../entityName}}(this.existing{{../entityName}});
     expect(response.status).toBe({{expectedStatusCode}});
     
     const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
@@ -111,7 +111,7 @@ Given('multiple {{../entityNamePlural}} exist in the system', async function () 
     const {{../entityLower}}Data = {{../entityName}}Fixture.create{{../entityName}}Dto();
     
     try {
-      const response = await {{../entityLower}}Client.create{{../entityName}}({{../entityLower}}Data);
+      const response = await {{../entityLowerClient}}.create{{../entityName}}({{../entityLower}}Data);
       expect(response.status).toBe({{expectedStatusCode}});
       
       const {{../entityLower}}DataResponse = (response.data as any)?.data?.data || response.data;
@@ -132,7 +132,7 @@ Given('multiple {{../entityNamePlural}} exist in the system', async function () 
 {{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
 When('I get all {{../entityNamePlural}}', async function () {
   try {
-    const response = await {{../entityLower}}Client.getAll{{../entityNamePlural}}();
+    const response = await {{../entityLowerClient}}.getAll{{../entityNamePlural}}();
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`Get all {{../entityNamePlural}} failed (${error.status || 'Unknown'})`);
@@ -142,7 +142,7 @@ When('I get all {{../entityNamePlural}}', async function () {
 {{else}}
 When('I get the {{../entityName}} by ID', async function () {
   try {
-    const response = await {{../entityLower}}Client.get{{../entityName}}ById(this.{{../entityLower}}Id);
+    const response = await {{../entityLowerClient}}.get{{../entityName}}ById(this.{{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`Get {{../entityName}} by ID failed (${error.status || 'Unknown'})`);
@@ -152,7 +152,7 @@ When('I get the {{../entityName}} by ID', async function () {
 
 When('I get a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
   try {
-    const response = await {{../entityLower}}Client.get{{../entityName}}ById({{../entityLower}}Id);
+    const response = await {{../entityLowerClient}}.get{{../entityName}}ById({{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`Get {{../entityName}} ${ {{../entityLower}}Id} failed (${error.status || 'Unknown'})`);
@@ -165,7 +165,7 @@ When('I get a {{../entityName}} with ID {string}', async function ({{../entityLo
 {{#if (eq method "POST")}}
 When('I create a {{../entityName}}', async function () {
   try {
-    const response = await {{../entityLower}}Client.create{{../entityName}}(this.{{../entityLower}}Data);
+    const response = await {{../entityLowerClient}}.create{{../entityName}}(this.{{../entityLower}}Data);
     
     // Only show the sent payload
     console.log('Payload:', JSON.stringify(this.{{../entityLower}}Data, null, 2));
@@ -194,7 +194,7 @@ When('I update the {{../entityName}}', async function () {
   this.updateData = this.invalidUpdateData || {{../entityName}}Fixture.update{{../entityName}}Dto();
   
   try {
-    const response = await {{../entityLower}}Client.update{{../entityName}}(this.{{../entityLower}}Id, this.updateData);
+    const response = await {{../entityLowerClient}}.update{{../entityName}}(this.{{../entityLower}}Id, this.updateData);
     
     // Only show the sent payload
     console.log('Payload:', JSON.stringify(this.updateData, null, 2));
@@ -214,7 +214,7 @@ When('I replace the {{../entityName}}', async function () {
   this.replaceData = {{../entityName}}Fixture.create{{../entityName}}Dto();
   
   try {
-    const response = await {{../entityLower}}Client.replace{{../entityName}}(this.{{../entityLower}}Id, this.replaceData);
+    const response = await {{../entityLowerClient}}.replace{{../entityName}}(this.{{../entityLower}}Id, this.replaceData);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`Replace {{../entityName}} failed (${error.status || 'Unknown'})`);
@@ -226,7 +226,7 @@ When('I replace the {{../entityName}}', async function () {
 {{#if (eq method "DELETE")}}
 When('I delete the {{../entityName}}', async function () {
   try {
-    const response = await {{../entityLower}}Client.delete{{../entityName}}(this.{{../entityLower}}Id);
+    const response = await {{../entityLowerClient}}.delete{{../entityName}}(this.{{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`Delete {{../entityName}} failed (${error.status || 'Unknown'})`);
@@ -236,7 +236,7 @@ When('I delete the {{../entityName}}', async function () {
 
 When('I delete a {{../entityName}} with ID {string}', async function ({{../entityLower}}Id: string) {
   try {
-    const response = await {{../entityLower}}Client.delete{{../entityName}}({{../entityLower}}Id);
+    const response = await {{../entityLowerClient}}.delete{{../entityName}}({{../entityLower}}Id);
     handleApiResponse(response);
   } catch (error: any) {
     console.log(`Delete {{../entityName}} ${ {{../entityLower}}Id} failed (${error.status || 'Unknown'})`);
@@ -259,7 +259,7 @@ Then('the {{../entityName}} should be created successfully', function () {
   }
 
   expect(response).toBeTruthy();
-  expect(response.status).toBe(201);
+  expect(response.status).toBe({{expectedStatusCode}});
   expect(response.data).toBeTruthy();
   
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
@@ -283,7 +283,7 @@ Then('I should get the {{../entityName}} details', function () {
   }
 
   expect(response).toBeTruthy();
-  expect(response.status).toBe(200);
+  expect(response.status).toBe({{expectedStatusCode}});
   expect(response.data).toBeTruthy();
   
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
@@ -301,7 +301,7 @@ Then('I should get a list of {{../entityNamePlural}}', function () {
   }
 
   expect(response).toBeTruthy();
-  expect(response.status).toBe(200);
+  expect(response.status).toBe({{expectedStatusCode}});
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
   expect(Array.isArray({{../entityLower}}Data)).toBe(true);
   
@@ -344,7 +344,7 @@ Then('the {{../entityName}} should be updated successfully', function () {
   }
 
   expect(response).toBeTruthy();
-  expect(response.status).toBe(200);
+  expect(response.status).toBe({{expectedStatusCode}});
   expect(response.data).toBeTruthy();
   
   const {{../entityLower}}Data = (response.data as any)?.data?.data || response.data;
@@ -385,7 +385,7 @@ Then('the {{../entityName}} should be deleted successfully', function () {
   }
 
   expect(response).toBeTruthy();
-  expect(response.status).toBe(204);
+  expect(response.status).toBe({{expectedStatusCode}});
   console.log('(P) {{../entityName}} deleted successfully');
 });
 {{/if}}
