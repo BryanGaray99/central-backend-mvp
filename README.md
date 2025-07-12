@@ -4,6 +4,58 @@
 
 Este es el **motor de generación** de un sistema completo de testing automatizado. Su propósito es crear automáticamente proyectos de testing Playwright + BDD en TypeScript a partir de una configuración simple.
 
+## 🏗️ Arquitectura del MVP
+
+![Arquitectura del MVP](arquitectura.png)
+
+### Componentes del diagrama
+
+- **Public Frontend**
+  - *Tecnologías*: Landing Page (React + TypeScript, AWS Amplify)
+  - *Descripción*: Portal web que reúne documentación, descargas y recursos de soporte, facilitando el acceso y la adopción de la solución desde cualquier entorno.
+
+- **Admin Dashboard**
+  - *Tecnologías*: Dashboard privado (React + TypeScript, AWS Amplify, Cognito)
+  - *Descripción*: Panel exclusivo para administración y monitoreo, con acceso restringido para el owner, permitiendo ajustes operativos y control centralizado del sistema.
+
+- **Local User Environment**
+  - *Tecnologías*: Dashboard local (React + TypeScript), Backend local (NestJS + TypeScript), Repositorio Git
+  - *Descripción*: Entorno ejecutado en la máquina del usuario para gestionar pruebas, configuraciones y versionado, manteniendo privacidad y control total de los datos.
+
+- **AI Service**
+  - *Tecnologías*: OpenAI API (modelo fine-tuned)
+  - *Descripción*: Servicio externo que genera y edita casos de prueba a partir de lenguaje natural, integrando capacidades avanzadas de automatización sin exponer datos sensibles.
+
+- **Cloud Backend**
+  - *Tecnologías*: API REST (AWS Lambda + NestJS + TypeScript), RDS (PostgreSQL), Secrets Manager, CloudWatch, S3
+  - *Descripción*: Núcleo serverless que procesa solicitudes de IA, gestiona usuarios, almacena métricas y logs, protege credenciales y administra archivos grandes de manera segura y escalable.
+
+### Herramientas, versiones y librerías principales
+
+- **Frontend (React + TypeScript)**
+  - Librerías: React 18+, TypeScript 4+, AWS Amplify para despliegue y hosting, integración con AWS Cognito para autenticación.
+  - Herramientas de documentación y descarga integradas en la landing page.
+
+- **Admin Dashboard**
+  - React 18+, TypeScript, AWS Amplify, AWS Cognito para autenticación y control de acceso.
+
+- **Backend Local (NestJS + TypeScript)**
+  - NestJS 9+, TypeScript 4+, TypeORM para persistencia local (SQLite en MVP), middlewares de validación y logging.
+  - Autenticación JWT (planificada para futuras fases), gestión de proyectos y endpoints vía API REST.
+
+- **Repositorio Git**
+  - Git local/remoto para versionado y control de cambios de los proyectos generados.
+
+- **AI Service**
+  - OpenAI API (modelos fine-tuned, integración vía REST), sin almacenamiento de datos sensibles en la nube.
+
+- **Cloud Backend (Serverless)**
+  - AWS Lambda (Node.js 18+), NestJS, PostgreSQL (AWS RDS), AWS Secrets Manager para gestión de credenciales, AWS CloudWatch para logs y métricas, AWS S3 para almacenamiento de archivos grandes.
+  - Middlewares de seguridad, validación y logging.
+  - Autenticación y autorización mediante API Keys y AWS Cognito.
+
+---
+
 ## 📋 Requisitos
 
 - **Node.js** (versión 18 o superior)
