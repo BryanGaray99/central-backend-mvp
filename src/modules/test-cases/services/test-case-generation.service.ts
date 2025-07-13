@@ -5,6 +5,7 @@ import { TestCasesService } from './test-cases.service';
 import { StepTemplatesService } from './step-templates.service';
 import { FeatureFileManagerService } from './feature-file-manager.service';
 import { StepsFileManagerService } from './steps-file-manager.service';
+import { TestCaseRegistrationService } from './test-case-registration.service';
 import { Project } from '../../projects/project.entity';
 import { RegisterEndpointDto } from '../../endpoints/dto/register-endpoint.dto';
 import * as path from 'path';
@@ -21,8 +22,10 @@ export class TestCaseGenerationService {
     private readonly stepTemplatesService: StepTemplatesService,
     private readonly featureFileManagerService: FeatureFileManagerService,
     private readonly stepsFileManagerService: StepsFileManagerService,
+    private readonly testCaseRegistrationService: TestCaseRegistrationService,
   ) {}
 
+  // ✅ MÉTODO EN USO - Se llama desde endpoints para generar features y steps
   async generateTestCasesFromEndpoint(
     project: Project,
     dto: RegisterEndpointDto,
@@ -39,8 +42,13 @@ export class TestCaseGenerationService {
       // Generate feature and steps files
       await this.generateFeatureAndStepsFiles(project.path, dto.section, dto.entityName, templateVariables);
 
-      // Create test cases in database
-      await this.createTestCasesFromEndpoint(project.id, dto, templateVariables);
+      // ✅ HABILITADO: Registrar test cases en la base de datos
+      await this.testCaseRegistrationService.processFeatureFileAndRegisterTestCases(
+        project.id,
+        dto.section,
+        dto.entityName,
+        dto
+      );
 
       this.logger.log('Test cases generation completed successfully.');
       return {
@@ -53,6 +61,7 @@ export class TestCaseGenerationService {
     }
   }
 
+  // ✅ MÉTODOS DE SOPORTE EN USO - Para generar archivos feature y steps
   private buildTemplateVariables(dto: RegisterEndpointDto, analysisResult: any, project: Project) {
     // Extract fields from analysis result
     const fields = this.extractFieldsFromAnalysis(analysisResult);
@@ -268,72 +277,40 @@ export class TestCaseGenerationService {
     this.logger.log(`Steps file generated at: ${filePath}`);
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Crear test cases en base de datos
   private async createTestCasesFromEndpoint(
     projectId: string,
     dto: RegisterEndpointDto,
     templateVariables: any,
   ) {
-    // DISABLED: Create test cases for each method
-    // This was generating duplicate scenarios in .feature files
-    // for (const method of dto.methods) {
-    //   await this.createTestCaseForMethod(projectId, dto, method, templateVariables);
-    // }
+    // TODO: Implementar con IA para generar test cases inteligentes
+    // - Analizar patrones de uso
+    // - Generar casos edge case
+    // - Crear casos de prueba negativos
+    // - Optimizar cobertura de testing
+    throw new Error('TODO: Implementar con IA - createTestCasesFromEndpoint');
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Crear test case para método específico
   private async createTestCaseForMethod(
     projectId: string,
     dto: RegisterEndpointDto,
     method: any,
     templateVariables: any,
   ) {
-    const testCaseData = {
-      name: `${method.method} ${dto.entityName} with valid data`,
-      description: `Test ${method.method} operation for ${dto.entityName}`,
-      entityName: dto.entityName,
-      section: dto.section,
-      method: method.method,
-      testType: 'positive' as any,
-      tags: ['@smoke', `@${method.method.toLowerCase()}`],
-      scenario: this.buildScenarioForMethod(method, templateVariables),
-    };
-
-    try {
-      await this.testCasesService.createTestCase(projectId, testCaseData);
-    } catch (error) {
-      this.logger.warn(`Failed to create test case for ${method.method} ${dto.entityName}: ${error.message}`);
-      // Continue with other methods even if one fails
-    }
+    // TODO: Implementar con IA para generar test cases específicos por método
+    // - Análisis de parámetros del método
+    // - Generación de casos de prueba específicos
+    // - Validación de respuestas esperadas
+    throw new Error('TODO: Implementar con IA - createTestCaseForMethod');
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Construir escenario para método
   private buildScenarioForMethod(method: any, templateVariables: any) {
-    const entityName = templateVariables.entityName;
-    const entityNameLower = templateVariables.entityNameLower;
-
-    // Use simple step names without IDs
-    const scenario = {
-      given: [
-        {
-          stepId: `setup-${entityNameLower}`,
-          parameters: { entityName },
-          order: 0,
-        },
-      ],
-      when: [
-        {
-          stepId: `${method.method.toLowerCase()}-${entityNameLower}`,
-          parameters: { entityName },
-          order: 0,
-        },
-      ],
-      then: [
-        {
-          stepId: `validate-${entityNameLower}`,
-          parameters: { entityName },
-          order: 0,
-        },
-      ],
-    };
-
-    return scenario;
+    // TODO: Implementar con IA para generar escenarios inteligentes
+    // - Análisis de flujo de datos
+    // - Generación de steps contextuales
+    // - Optimización de cobertura
+    throw new Error('TODO: Implementar con IA - buildScenarioForMethod');
   }
 } 

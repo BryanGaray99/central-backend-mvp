@@ -6,10 +6,46 @@ import { TestStep } from '../entities/test-step.entity';
 import { CreateTestCaseDto } from '../dto/create-test-case.dto';
 import { UpdateTestCaseDto } from '../dto/update-test-case.dto';
 import { TestCaseFiltersDto } from '../dto/test-case-filters.dto';
-import { TestCaseListResponse, TestCaseStatistics, TestCaseExport, DuplicateTestCaseDto } from '../interfaces/test-case.interface';
+import { TestCaseListResponse, TestCaseStatistics, TestCaseExport } from '../interfaces/test-case.interface';
 import { FeatureFileManagerService } from './feature-file-manager.service';
 import { TestCaseResponseDto } from '../dto/test-case-response.dto';
-import { TestCaseListResponseDto, TestCaseStatisticsDto, TestCaseExportDto } from '../dto/test-case-statistics.dto';
+import { TestCaseStatisticsDto } from '../dto/test-case-statistics.dto';
+
+// Interfaces temporales para los métodos TODO
+interface TestCaseListResponseDto {
+  testCases: TestCaseResponseDto[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  filters: TestCaseFiltersDto;
+}
+
+interface TestCaseExportDto {
+  testCaseId: string;
+  name: string;
+  description: string;
+  tags: string[];
+  gherkin: string;
+  metadata: {
+    entityName: string;
+    method: string;
+    testType: string;
+    priority?: string;
+    complexity?: string;
+  };
+}
+
+interface DuplicateTestCaseDto {
+  newName: string;
+  modifications?: {
+    tags?: string[];
+    metadata?: any;
+    scenario?: any;
+  };
+}
 
 @Injectable()
 export class TestCasesService {
@@ -23,37 +59,38 @@ export class TestCasesService {
     private readonly featureFileManagerService: FeatureFileManagerService,
   ) {}
 
+  // ✅ MÉTODOS CRUD BÁSICOS EN USO
   async createTestCase(projectId: string, dto: CreateTestCaseDto): Promise<TestCaseResponseDto> {
-    this.logger.log(`Creating test case for project ${projectId}: ${dto.name}`);
+    this.logger.log(`Creating test case for project ${projectId}`);
 
     try {
-      // 1. Generar ID único del test case
-      const testCaseId = await this.generateTestCaseId(projectId, dto.section);
-      
-      // 2. Validar steps y hooks
+      // 1. Validar datos de entrada
       await this.validateTestCase(dto);
-      
-      // 3. Crear entidad en BD
+
+      // 2. Generar ID único
+      const testCaseId = await this.generateTestCaseId(projectId, dto.section);
+
+      // 3. Crear test case en BD
       const testCase = this.testCaseRepository.create({
-        ...dto,
         testCaseId,
         projectId,
+        ...dto,
       });
-      
+
       const savedTestCase = await this.testCaseRepository.save(testCase);
-      
-      // 4. Actualizar archivos de feature
-      await this.featureFileManagerService.addTestCaseToFeature(
-        projectId,
-        dto.section,
-        dto.entityName,
-        savedTestCase
-      );
-      
+
+      // 4. Actualizar archivos de feature - DISABLED
+      // await this.featureFileManagerService.addTestCaseToFeature(
+      //   projectId,
+      //   dto.section,
+      //   dto.entityName,
+      //   savedTestCase
+      // );
+
       this.logger.log(`Test case created successfully: ${testCaseId}`);
       return this.toTestCaseResponseDto(savedTestCase);
     } catch (error) {
-      this.logger.error(`Error creating test case: ${error.message}`, error.stack);
+      this.logger.error('Error creating test case:', error);
       throw error;
     }
   }
@@ -62,30 +99,29 @@ export class TestCasesService {
     this.logger.log(`Updating test case: ${testCaseId}`);
 
     try {
-      // 1. Obtener test case existente (método interno que devuelve entidad)
       const testCase = await this.findTestCaseEntityById(testCaseId);
       
-      // 2. Validar steps si se actualiza el escenario
-      if (dto.scenario) {
-        await this.validateTestCase({ ...testCase, ...dto });
-      }
-      
-      // 3. Actualizar en BD
-      Object.assign(testCase, dto);
-      const updatedTestCase = await this.testCaseRepository.save(testCase);
-      
-      // 4. Actualizar archivos de feature
-      await this.featureFileManagerService.updateTestCaseInFeature(
-        testCase.projectId,
-        testCase.section,
-        testCase.entityName,
-        updatedTestCase
-      );
-      
+      // 1. Validar datos de entrada
+      await this.validateTestCase({ ...testCase, ...dto });
+
+      // 2. Actualizar en BD
+      const updatedTestCase = await this.testCaseRepository.save({
+        ...testCase,
+        ...dto,
+      });
+
+      // 3. Actualizar archivos de feature - DISABLED
+      // await this.featureFileManagerService.updateTestCaseInFeature(
+      //   testCase.projectId,
+      //   testCase.section,
+      //   testCase.entityName,
+      //   updatedTestCase
+      // );
+
       this.logger.log(`Test case updated successfully: ${testCaseId}`);
       return this.toTestCaseResponseDto(updatedTestCase);
     } catch (error) {
-      this.logger.error(`Error updating test case: ${error.message}`, error.stack);
+      this.logger.error('Error updating test case:', error);
       throw error;
     }
   }
@@ -94,23 +130,22 @@ export class TestCasesService {
     this.logger.log(`Deleting test case: ${testCaseId}`);
 
     try {
-      // 1. Obtener test case (método interno que devuelve entidad)
       const testCase = await this.findTestCaseEntityById(testCaseId);
-      
-      // 2. Eliminar de BD
+
+      // 1. Eliminar de BD
       await this.testCaseRepository.remove(testCase);
-      
-      // 3. Actualizar archivos de feature
-      await this.featureFileManagerService.removeTestCaseFromFeature(
-        testCase.projectId,
-        testCase.section,
-        testCase.entityName,
-        testCase
-      );
-      
+
+      // 2. Actualizar archivos de feature - DISABLED
+      // await this.featureFileManagerService.removeTestCaseFromFeature(
+      //   testCase.projectId,
+      //   testCase.section,
+      //   testCase.entityName,
+      //   testCase
+      // );
+
       this.logger.log(`Test case deleted successfully: ${testCaseId}`);
     } catch (error) {
-      this.logger.error(`Error deleting test case: ${error.message}`, error.stack);
+      this.logger.error('Error deleting test case:', error);
       throw error;
     }
   }
@@ -121,9 +156,10 @@ export class TestCasesService {
   }
 
   async listTestCases(projectId: string, filters: TestCaseFiltersDto): Promise<TestCaseListResponseDto> {
-    this.logger.log(`Listing test cases for project ${projectId} with filters`);
+    this.logger.log(`Listing test cases for project ${projectId}`);
 
     try {
+      // Construir query base
       const queryBuilder = this.testCaseRepository
         .createQueryBuilder('testCase')
         .where('testCase.projectId = :projectId', { projectId });
@@ -145,64 +181,48 @@ export class TestCasesService {
         queryBuilder.andWhere('testCase.testType = :testType', { testType: filters.testType });
       }
 
-      if (filters.tags && filters.tags.length > 0) {
-        queryBuilder.andWhere('testCase.tags @> :tags', { tags: filters.tags });
-      }
-
-      if (filters.priority) {
-        queryBuilder.andWhere("testCase.metadata->>'priority' = :priority", { priority: filters.priority });
-      }
-
-      if (filters.complexity) {
-        queryBuilder.andWhere("testCase.metadata->>'complexity' = :complexity", { complexity: filters.complexity });
-      }
-
       if (filters.status) {
         queryBuilder.andWhere('testCase.status = :status', { status: filters.status });
       }
 
       if (filters.search) {
         queryBuilder.andWhere(
-          '(testCase.name ILIKE :search OR testCase.description ILIKE :search)',
+          '(testCase.name LIKE :search OR testCase.description LIKE :search)',
           { search: `%${filters.search}%` }
         );
       }
 
-      if (filters.createdAtFrom) {
-        queryBuilder.andWhere('testCase.createdAt >= :createdAtFrom', { createdAtFrom: filters.createdAtFrom });
+      if (filters.tags && filters.tags.length > 0) {
+        // Buscar test cases que contengan al menos uno de los tags
+        const tagConditions = filters.tags.map((_, index) => `testCase.tags LIKE :tag${index}`);
+        queryBuilder.andWhere(`(${tagConditions.join(' OR ')})`);
+        filters.tags.forEach((tag, index) => {
+          queryBuilder.setParameter(`tag${index}`, `%${tag}%`);
+        });
       }
 
-      if (filters.createdAtTo) {
-        queryBuilder.andWhere('testCase.createdAt <= :createdAtTo', { createdAtTo: filters.createdAtTo });
-      }
-
-      if (filters.updatedAtFrom) {
-        queryBuilder.andWhere('testCase.updatedAt >= :updatedAtFrom', { updatedAtFrom: filters.updatedAtFrom });
-      }
-
-      if (filters.updatedAtTo) {
-        queryBuilder.andWhere('testCase.updatedAt <= :updatedAtTo', { updatedAtTo: filters.updatedAtTo });
-      }
-
-      // Ordenamiento
+      // Aplicar ordenamiento
       const sortBy = filters.sortBy || 'createdAt';
       const sortOrder = filters.sortOrder || 'DESC';
-      queryBuilder.orderBy(`testCase.${sortBy}`, sortOrder);
+      queryBuilder.orderBy(`testCase.${sortBy}`, sortOrder as 'ASC' | 'DESC');
 
-      // Paginación
+      // Aplicar paginación
       const page = filters.page || 1;
       const limit = filters.limit || 20;
       const offset = (page - 1) * limit;
 
       queryBuilder.skip(offset).take(limit);
 
-      // Ejecutar consulta
+      // Ejecutar query
       const [testCases, total] = await queryBuilder.getManyAndCount();
 
+      // Calcular información de paginación
       const totalPages = Math.ceil(total / limit);
 
+      this.logger.log(`Found ${testCases.length} test cases (total: ${total})`);
+
       return {
-        testCases: testCases.map(tc => this.toTestCaseResponseDto(tc)),
+        testCases: testCases.map(testCase => this.toTestCaseResponseDto(testCase)),
         pagination: {
           page,
           limit,
@@ -212,199 +232,87 @@ export class TestCasesService {
         filters,
       };
     } catch (error) {
-      this.logger.error(`Error listing test cases: ${error.message}`, error.stack);
+      this.logger.error('Error listing test cases:', error);
       throw error;
     }
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Duplicar test case con modificaciones inteligentes
   async duplicateTestCase(projectId: string, testCaseId: string, dto: DuplicateTestCaseDto): Promise<TestCaseResponseDto> {
-    this.logger.log(`Duplicating test case: ${testCaseId}`);
-
-    try {
-      const originalTestCase = await this.findTestCaseEntityById(testCaseId);
-      
-      // Crear nuevo test case basado en el original
-      const newTestCaseData: CreateTestCaseDto = {
-        name: dto.newName,
-        description: originalTestCase.description,
-        entityName: originalTestCase.entityName,
-        section: originalTestCase.section,
-        method: originalTestCase.method,
-        testType: originalTestCase.testType,
-        tags: dto.modifications?.tags || originalTestCase.tags,
-        scenario: dto.modifications?.scenario ? {
-          given: dto.modifications.scenario.given || originalTestCase.scenario.given,
-          when: dto.modifications.scenario.when || originalTestCase.scenario.when,
-          then: dto.modifications.scenario.then || originalTestCase.scenario.then,
-        } : {
-          given: originalTestCase.scenario.given,
-          when: originalTestCase.scenario.when,
-          then: originalTestCase.scenario.then,
-        },
-        hooks: originalTestCase.hooks,
-        examples: originalTestCase.examples,
-        metadata: dto.modifications?.metadata || originalTestCase.metadata,
-      };
-
-      return await this.createTestCase(projectId, newTestCaseData);
-    } catch (error) {
-      this.logger.error(`Error duplicating test case: ${error.message}`, error.stack);
-      throw error;
-    }
+    // TODO: Implementar con IA para duplicación inteligente
+    // - Análisis de patrones de modificación
+    // - Generación de variaciones automáticas
+    // - Optimización de cobertura
+    throw new Error('TODO: Implementar con IA - duplicateTestCase');
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Exportar test case con formato optimizado
   async exportTestCase(projectId: string, testCaseId: string): Promise<TestCaseExportDto> {
-    this.logger.log(`Exporting test case: ${testCaseId}`);
-
-    try {
-      const testCase = await this.findTestCaseEntityById(testCaseId);
-      
-      // Generar Gherkin
-      const gherkin = await this.generateGherkin(testCase);
-      
-      return {
-        testCaseId: testCase.testCaseId,
-        name: testCase.name,
-        description: testCase.description,
-        tags: testCase.tags,
-        gherkin,
-        metadata: {
-          entityName: testCase.entityName,
-          method: testCase.method,
-          testType: testCase.testType,
-          priority: testCase.metadata?.priority,
-          complexity: testCase.metadata?.complexity,
-        },
-      };
-    } catch (error) {
-      this.logger.error(`Error exporting test case: ${error.message}`, error.stack);
-      throw error;
-    }
+    // TODO: Implementar con IA para exportación inteligente
+    // - Análisis de formato de exportación
+    // - Generación de metadatos optimizados
+    // - Validación de compatibilidad
+    throw new Error('TODO: Implementar con IA - exportTestCase');
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Obtener estadísticas avanzadas
   async getStatistics(projectId: string): Promise<TestCaseStatisticsDto> {
-    this.logger.log(`Getting test case statistics for project ${projectId}`);
-
-    try {
-      const [
-        totalCases,
-        positiveCases,
-        negativeCases,
-        edgeCases,
-        activeCases,
-        draftCases,
-        deprecatedCases,
-      ] = await Promise.all([
-        this.testCaseRepository.count({ where: { projectId } }),
-        this.testCaseRepository.count({ where: { projectId, testType: TestType.POSITIVE } }),
-        this.testCaseRepository.count({ where: { projectId, testType: TestType.NEGATIVE } }),
-        this.testCaseRepository.count({ where: { projectId, testType: TestType.EDGE_CASE } }),
-        this.testCaseRepository.count({ where: { projectId, status: TestCaseStatus.ACTIVE } }),
-        this.testCaseRepository.count({ where: { projectId, status: TestCaseStatus.DRAFT } }),
-        this.testCaseRepository.count({ where: { projectId, status: TestCaseStatus.DEPRECATED } }),
-      ]);
-
-      // Calcular duración promedio
-      const avgDurationResult = await this.testCaseRepository
-        .createQueryBuilder('testCase')
-        .select('AVG(CAST(testCase.metadata->>\'estimatedDuration\' AS INTEGER))', 'avgDuration')
-        .where('testCase.projectId = :projectId', { projectId })
-        .andWhere("testCase.metadata->>'estimatedDuration' IS NOT NULL")
-        .getRawOne();
-
-      const averageDuration = avgDurationResult?.avgDuration || 0;
-
-      // Obtener última actualización
-      const lastUpdatedResult = await this.testCaseRepository
-        .createQueryBuilder('testCase')
-        .select('MAX(testCase.updatedAt)', 'lastUpdated')
-        .where('testCase.projectId = :projectId', { projectId })
-        .getRawOne();
-
-      return {
-        totalCases,
-        positiveCases,
-        negativeCases,
-        edgeCases,
-        activeCases,
-        draftCases,
-        deprecatedCases,
-        averageDuration: Math.round(averageDuration),
-        lastUpdated: lastUpdatedResult?.lastUpdated || new Date(),
-      };
-    } catch (error) {
-      this.logger.error(`Error getting test case statistics: ${error.message}`, error.stack);
-      throw error;
-    }
+    // TODO: Implementar con IA para estadísticas inteligentes
+    // - Análisis de patrones de uso
+    // - Métricas de cobertura avanzadas
+    // - Predicciones de rendimiento
+    throw new Error('TODO: Implementar con IA - getStatistics');
   }
 
-  // Método interno para obtener entidad TestCase
+  // ✅ MÉTODOS DE SOPORTE EN USO
   private async findTestCaseEntityById(testCaseId: string): Promise<TestCase> {
     const testCase = await this.testCaseRepository.findOne({
       where: { testCaseId },
-      relations: ['project'],
     });
 
     if (!testCase) {
-      throw new NotFoundException(`Test case with ID ${testCaseId} not found`);
+      throw new Error(`Test case not found: ${testCaseId}`);
     }
 
     return testCase;
   }
 
   private async generateTestCaseId(projectId: string, section: string): Promise<string> {
-    // Use simple ID based on timestamp and section
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    return `tc-${section}-${timestamp}-${randomSuffix}`;
+    const count = await this.testCaseRepository.count({
+      where: { projectId, section },
+    });
+    return `TC-${section.toUpperCase()}-${String(count + 1).padStart(2, '0')}`;
   }
 
   private async validateTestCase(dto: CreateTestCaseDto | (TestCase & UpdateTestCaseDto)): Promise<void> {
-    // Skip validation for all steps - allow any step name
-    this.logger.log('Skipping step validation - allowing any step name');
-    return;
-  }
+    // Validaciones básicas
+    if (!dto.name || dto.name.trim().length === 0) {
+      throw new Error('Test case name is required');
+    }
 
-  private async updateProjectMetadata(projectId: string, testCase: TestCase): Promise<void> {
-    try {
-      // Método simplificado - ya no depende de project-meta.json
-      this.logger.log(`Test case metadata updated in database: ${testCase.testCaseId}`);
-    } catch (error) {
-      this.logger.error(`Error updating test case metadata: ${error.message}`, error.stack);
+    if (!dto.description || dto.description.trim().length === 0) {
+      throw new Error('Test case description is required');
     }
-  }
 
-  private async removeFromProjectMetadata(projectId: string, testCase: TestCase): Promise<void> {
-    try {
-      // Método simplificado - ya no depende de project-meta.json
-      this.logger.log(`Test case removed from database: ${testCase.testCaseId}`);
-    } catch (error) {
-      this.logger.error(`Error removing test case from database: ${error.message}`, error.stack);
+    if (!dto.entityName || dto.entityName.trim().length === 0) {
+      throw new Error('Entity name is required');
     }
-  }
 
-  private async generateGherkin(testCase: TestCase): Promise<string> {
-    const tags = testCase.tags.map(tag => `@${tag}`).join(' ');
-    const scenarioName = testCase.name;
-    
-    let gherkin = `${tags}\nScenario: ${scenarioName}\n`;
-    
-    // Agregar steps Given
-    for (const step of testCase.scenario.given) {
-      gherkin += `  Given ${step.stepId}\n`;
+    if (!dto.section || dto.section.trim().length === 0) {
+      throw new Error('Section is required');
     }
-    
-    // Agregar steps When
-    for (const step of testCase.scenario.when) {
-      gherkin += `  When ${step.stepId}\n`;
+
+    if (!dto.method || dto.method.trim().length === 0) {
+      throw new Error('Method is required');
     }
-    
-    // Agregar steps Then
-    for (const step of testCase.scenario.then) {
-      gherkin += `  Then ${step.stepId}\n`;
+
+    if (!dto.tags || dto.tags.length === 0) {
+      throw new Error('At least one tag is required');
     }
-    
-    return gherkin;
+
+    if (!dto.scenario || !dto.scenario.given || !dto.scenario.when || !dto.scenario.then) {
+      throw new Error('Scenario structure is required (given, when, then)');
+    }
   }
 
   private toTestCaseResponseDto(testCase: TestCase): TestCaseResponseDto {
@@ -419,7 +327,11 @@ export class TestCasesService {
       tags: testCase.tags,
       method: testCase.method,
       testType: testCase.testType,
-      scenario: testCase.scenario,
+      scenario: {
+        given: testCase.scenario.given,
+        when: testCase.scenario.when,
+        then: testCase.scenario.then,
+      },
       hooks: testCase.hooks,
       examples: testCase.examples,
       status: testCase.status,

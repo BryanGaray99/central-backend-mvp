@@ -4,11 +4,10 @@ import {
   Post,
   Put,
   Delete,
-  Param,
   Body,
+  Param,
   Query,
   Logger,
-  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,15 +20,38 @@ import { TestCasesService } from '../services/test-cases.service';
 import { StepTemplatesService } from '../services/step-templates.service';
 import { CreateTestCaseDto } from '../dto/create-test-case.dto';
 import { UpdateTestCaseDto } from '../dto/update-test-case.dto';
-import { CreateStepDto } from '../dto/create-step.dto';
-import { TestCaseFiltersDto } from '../dto/test-case-filters.dto';
 import { TestCaseResponseDto } from '../dto/test-case-response.dto';
+import { TestCaseFiltersDto } from '../dto/test-case-filters.dto';
+import { TestCaseStatisticsDto } from '../dto/test-case-statistics.dto';
+import { CreateStepDto } from '../dto/create-step.dto';
 import { TestStepResponseDto } from '../dto/step-template-response.dto';
-import { TestCaseListResponseDto, TestCaseStatisticsDto, TestCaseExportDto, StepTemplateStatisticsDto } from '../dto/test-case-statistics.dto';
-import { DuplicateTestCaseDto } from '../interfaces/test-case.interface';
 
+// Interfaces temporales para los métodos TODO
+interface StepTemplateStatisticsDto {
+  totalSteps: number;
+  activeSteps: number;
+  deprecatedSteps: number;
+  mostUsedSteps: Array<{
+    stepId: string;
+    name: string;
+    usageCount: number;
+  }>;
+  lastUpdated: Date;
+}
+
+interface TestCaseListResponseDto {
+  testCases: TestCaseResponseDto[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  filters: TestCaseFiltersDto;
+}
+
+@ApiTags('test-cases')
 @Controller('projects/:projectId/test-cases')
-@ApiTags('Test Cases')
 export class TestCasesController {
   private readonly logger = new Logger(TestCasesController.name);
 
@@ -38,221 +60,252 @@ export class TestCasesController {
     private readonly stepTemplatesService: StepTemplatesService,
   ) {}
 
+  // ✅ MÉTODOS CRUD BÁSICOS EN USO
   @Post()
-  @ApiOperation({ summary: 'Crear un nuevo caso de prueba' })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Test case creado exitosamente',
-    type: TestCaseResponseDto,
+  @ApiOperation({
+    summary: 'Create a new test case',
+    description: 'Create a new test case for the specified project',
   })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
   @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Datos inválidos o steps no encontrados',
+    status: 201,
+    description: 'Test case created successfully',
+    type: TestCaseResponseDto,
   })
   async createTestCase(
     @Param('projectId') projectId: string,
     @Body() dto: CreateTestCaseDto,
   ): Promise<TestCaseResponseDto> {
-    this.logger.log(`Creating test case for project ${projectId}`);
     return this.testCasesService.createTestCase(projectId, dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar casos de prueba con filtros' })
+  @ApiOperation({
+    summary: 'List test cases',
+    description: 'List all test cases for the specified project with optional filters',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiQuery({ name: 'entityName', required: false })
+  @ApiQuery({ name: 'section', required: false })
+  @ApiQuery({ name: 'method', required: false })
+  @ApiQuery({ name: 'testType', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'tags', required: false, type: [String] })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Lista de test cases',
-    type: TestCaseListResponseDto,
+    status: 200,
+    description: 'Test cases retrieved successfully',
   })
   async listTestCases(
     @Param('projectId') projectId: string,
     @Query() filters: TestCaseFiltersDto,
   ): Promise<TestCaseListResponseDto> {
-    this.logger.log(`Listing test cases for project ${projectId}`);
     return this.testCasesService.listTestCases(projectId, filters);
   }
 
   @Get('statistics')
-  @ApiOperation({ summary: 'Obtener estadísticas de test cases' })
+  @ApiOperation({
+    summary: 'Get test case statistics',
+    description: 'Get statistics for test cases in the specified project',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Estadísticas de test cases',
+    status: 200,
+    description: 'Statistics retrieved successfully',
     type: TestCaseStatisticsDto,
   })
   async getStatistics(
     @Param('projectId') projectId: string,
   ): Promise<TestCaseStatisticsDto> {
-    this.logger.log(`Getting test case statistics for project ${projectId}`);
     return this.testCasesService.getStatistics(projectId);
   }
 
   @Get(':testCaseId')
-  @ApiOperation({ summary: 'Obtener un caso de prueba específico' })
-  @ApiParam({ name: 'testCaseId', description: 'ID del test case' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Test case encontrado',
-    type: TestCaseResponseDto,
+  @ApiOperation({
+    summary: 'Get a specific test case',
+    description: 'Get details of a specific test case by ID',
   })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
   @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Test case no encontrado',
+    status: 200,
+    description: 'Test case retrieved successfully',
+    type: TestCaseResponseDto,
   })
   async getTestCase(
     @Param('projectId') projectId: string,
     @Param('testCaseId') testCaseId: string,
   ): Promise<TestCaseResponseDto> {
-    this.logger.log(`Getting test case ${testCaseId}`);
     return this.testCasesService.findByTestCaseId(testCaseId);
   }
 
   @Put(':testCaseId')
-  @ApiOperation({ summary: 'Actualizar un caso de prueba' })
-  @ApiParam({ name: 'testCaseId', description: 'ID del test case' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Test case actualizado exitosamente',
-    type: TestCaseResponseDto,
+  @ApiOperation({
+    summary: 'Update a test case',
+    description: 'Update an existing test case',
   })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
   @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Test case no encontrado',
+    status: 200,
+    description: 'Test case updated successfully',
+    type: TestCaseResponseDto,
   })
   async updateTestCase(
     @Param('projectId') projectId: string,
     @Param('testCaseId') testCaseId: string,
     @Body() dto: UpdateTestCaseDto,
   ): Promise<TestCaseResponseDto> {
-    this.logger.log(`Updating test case ${testCaseId}`);
     return this.testCasesService.updateTestCase(testCaseId, dto);
   }
 
   @Delete(':testCaseId')
-  @ApiOperation({ summary: 'Eliminar un caso de prueba' })
-  @ApiParam({ name: 'testCaseId', description: 'ID del test case' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Test case eliminado exitosamente',
+  @ApiOperation({
+    summary: 'Delete a test case',
+    description: 'Delete a test case by ID',
   })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
   @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Test case no encontrado',
+    status: 200,
+    description: 'Test case deleted successfully',
   })
   async deleteTestCase(
     @Param('projectId') projectId: string,
     @Param('testCaseId') testCaseId: string,
   ): Promise<{ message: string }> {
-    this.logger.log(`Deleting test case ${testCaseId}`);
     await this.testCasesService.deleteTestCase(testCaseId);
     return { message: 'Test case deleted successfully' };
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Exportar test case
   @Get(':testCaseId/export')
-  @ApiOperation({ summary: 'Exportar caso de prueba como Gherkin' })
-  @ApiParam({ name: 'testCaseId', description: 'ID del test case' })
+  @ApiOperation({
+    summary: 'Export test case',
+    description: 'Export a test case in a specific format',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Test case exportado exitosamente',
-    type: TestCaseExportDto,
+    status: 200,
+    description: 'Test case exported successfully',
   })
   async exportTestCase(
     @Param('projectId') projectId: string,
     @Param('testCaseId') testCaseId: string,
-  ): Promise<TestCaseExportDto> {
-    this.logger.log(`Exporting test case ${testCaseId}`);
-    return this.testCasesService.exportTestCase(projectId, testCaseId);
+  ) {
+    // TODO: Implementar con IA para exportación inteligente
+    throw new Error('TODO: Implementar con IA - exportTestCase');
   }
 
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Duplicar test case
   @Post(':testCaseId/duplicate')
-  @ApiOperation({ summary: 'Duplicar un caso de prueba' })
-  @ApiParam({ name: 'testCaseId', description: 'ID del test case' })
+  @ApiOperation({
+    summary: 'Duplicate test case',
+    description: 'Duplicate a test case with modifications',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
   @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Test case duplicado exitosamente',
+    status: 201,
+    description: 'Test case duplicated successfully',
     type: TestCaseResponseDto,
   })
   async duplicateTestCase(
     @Param('projectId') projectId: string,
     @Param('testCaseId') testCaseId: string,
-    @Body() dto: DuplicateTestCaseDto,
+    @Body() dto: any,
   ): Promise<TestCaseResponseDto> {
-    this.logger.log(`Duplicating test case ${testCaseId}`);
-    return this.testCasesService.duplicateTestCase(projectId, testCaseId, dto);
+    // TODO: Implementar con IA para duplicación inteligente
+    throw new Error('TODO: Implementar con IA - duplicateTestCase');
   }
 
-  // Endpoints para Step Templates
-
-  @Post('steps')
-  @ApiOperation({ summary: 'Crear un nuevo step template' })
+  // ✅ MÉTODOS DE STEP TEMPLATES EN USO
+  @Post('step-templates')
+  @ApiOperation({
+    summary: 'Create a step template',
+    description: 'Create a new step template for the project',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
   @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Step template creado exitosamente',
+    status: 201,
+    description: 'Step template created successfully',
     type: TestStepResponseDto,
   })
   async createStepTemplate(
     @Param('projectId') projectId: string,
     @Body() dto: CreateStepDto,
   ): Promise<TestStepResponseDto> {
-    this.logger.log(`Creating step template for project ${projectId}`);
     return this.stepTemplatesService.createStepTemplate(projectId, dto);
   }
 
-  @Get('steps')
-  @ApiOperation({ summary: 'Listar step templates' })
-  @ApiQuery({ name: 'type', required: false, description: 'Filtrar por tipo de step' })
-  @ApiQuery({ name: 'stepType', required: false, description: 'Filtrar por tipo de template' })
-  @ApiQuery({ name: 'category', required: false, description: 'Filtrar por categoría' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filtrar por estado' })
-  @ApiQuery({ name: 'search', required: false, description: 'Buscar por nombre o definición' })
+  @Get('step-templates')
+  @ApiOperation({
+    summary: 'List step templates',
+    description: 'List all step templates for the project',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Lista de step templates',
+    status: 200,
+    description: 'Step templates retrieved successfully',
     type: [TestStepResponseDto],
   })
   async listStepTemplates(
     @Param('projectId') projectId: string,
     @Query() filters: any,
   ): Promise<TestStepResponseDto[]> {
-    this.logger.log(`Listing step templates for project ${projectId}`);
     return this.stepTemplatesService.listStepTemplates(projectId, filters);
   }
 
-  @Get('steps/statistics')
-  @ApiOperation({ summary: 'Obtener estadísticas de step templates' })
+  @Get('step-templates/statistics')
+  @ApiOperation({
+    summary: 'Get step template statistics',
+    description: 'Get statistics for step templates in the project',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Estadísticas de step templates',
-    type: StepTemplateStatisticsDto,
+    status: 200,
+    description: 'Step template statistics retrieved successfully',
   })
   async getStepTemplateStatistics(
     @Param('projectId') projectId: string,
   ): Promise<StepTemplateStatisticsDto> {
-    this.logger.log(`Getting step template statistics for project ${projectId}`);
     return this.stepTemplatesService.getStatistics(projectId);
   }
 
-  @Get('steps/:stepId')
-  @ApiOperation({ summary: 'Obtener un step template específico' })
-  @ApiParam({ name: 'stepId', description: 'ID del step template' })
+  @Get('step-templates/:stepId')
+  @ApiOperation({
+    summary: 'Get a specific step template',
+    description: 'Get details of a specific step template by ID',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'stepId', description: 'Step template ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Step template encontrado',
+    status: 200,
+    description: 'Step template retrieved successfully',
     type: TestStepResponseDto,
   })
   async getStepTemplate(
     @Param('projectId') projectId: string,
     @Param('stepId') stepId: string,
   ): Promise<TestStepResponseDto> {
-    this.logger.log(`Getting step template ${stepId}`);
     return this.stepTemplatesService.findByStepId(stepId);
   }
 
-  @Put('steps/:stepId')
-  @ApiOperation({ summary: 'Actualizar un step template' })
-  @ApiParam({ name: 'stepId', description: 'ID del step template' })
+  @Put('step-templates/:stepId')
+  @ApiOperation({
+    summary: 'Update a step template',
+    description: 'Update an existing step template',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'stepId', description: 'Step template ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Step template actualizado exitosamente',
+    status: 200,
+    description: 'Step template updated successfully',
     type: TestStepResponseDto,
   })
   async updateStepTemplate(
@@ -260,32 +313,39 @@ export class TestCasesController {
     @Param('stepId') stepId: string,
     @Body() dto: CreateStepDto,
   ): Promise<TestStepResponseDto> {
-    this.logger.log(`Updating step template ${stepId}`);
     return this.stepTemplatesService.updateStepTemplate(projectId, stepId, dto);
   }
 
-  @Delete('steps/:stepId')
-  @ApiOperation({ summary: 'Eliminar un step template' })
-  @ApiParam({ name: 'stepId', description: 'ID del step template' })
+  @Delete('step-templates/:stepId')
+  @ApiOperation({
+    summary: 'Delete a step template',
+    description: 'Delete a step template by ID',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'stepId', description: 'Step template ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Step template eliminado exitosamente',
+    status: 200,
+    description: 'Step template deleted successfully',
   })
   async deleteStepTemplate(
     @Param('projectId') projectId: string,
     @Param('stepId') stepId: string,
   ): Promise<{ message: string }> {
-    this.logger.log(`Deleting step template ${stepId}`);
     await this.stepTemplatesService.deleteStepTemplate(stepId);
     return { message: 'Step template deleted successfully' };
   }
 
-  @Get('steps/:stepId/validate')
-  @ApiOperation({ summary: 'Validar un step template' })
-  @ApiParam({ name: 'stepId', description: 'ID del step template' })
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Validar step template
+  @Get('step-templates/:stepId/validate')
+  @ApiOperation({
+    summary: 'Validate step template',
+    description: 'Validate a step template for correctness',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'stepId', description: 'Step template ID' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Resultado de la validación',
+    status: 200,
+    description: 'Step template validation completed',
   })
   async validateStepTemplate(
     @Param('projectId') projectId: string,
@@ -295,39 +355,49 @@ export class TestCasesController {
     errors: string[];
     warnings: string[];
   }> {
-    this.logger.log(`Validating step template ${stepId}`);
-    return this.stepTemplatesService.validateStep(stepId);
+    // TODO: Implementar con IA para validación inteligente
+    throw new Error('TODO: Implementar con IA - validateStepTemplate');
   }
 
-  @Get('steps/category/:category')
-  @ApiOperation({ summary: 'Obtener step templates por categoría' })
-  @ApiParam({ name: 'category', description: 'Categoría de los steps' })
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Obtener step templates por categoría
+  @Get('step-templates/category/:category')
+  @ApiOperation({
+    summary: 'Get step templates by category',
+    description: 'Get step templates filtered by category',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'category', description: 'Category name' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Lista de step templates por categoría',
+    status: 200,
+    description: 'Step templates by category retrieved successfully',
     type: [TestStepResponseDto],
   })
   async getStepTemplatesByCategory(
     @Param('projectId') projectId: string,
     @Param('category') category: string,
   ): Promise<TestStepResponseDto[]> {
-    this.logger.log(`Getting step templates by category ${category}`);
-    return this.stepTemplatesService.getStepTemplatesByCategory(projectId, category);
+    // TODO: Implementar con IA para categorización inteligente
+    throw new Error('TODO: Implementar con IA - getStepTemplatesByCategory');
   }
 
-  @Get('steps/type/:type')
-  @ApiOperation({ summary: 'Obtener step templates por tipo' })
-  @ApiParam({ name: 'type', description: 'Tipo de step (Given, When, Then, etc.)' })
+  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Obtener step templates por tipo
+  @Get('step-templates/type/:type')
+  @ApiOperation({
+    summary: 'Get step templates by type',
+    description: 'Get step templates filtered by type',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'type', description: 'Step type' })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Lista de step templates por tipo',
+    status: 200,
+    description: 'Step templates by type retrieved successfully',
     type: [TestStepResponseDto],
   })
   async getStepTemplatesByType(
     @Param('projectId') projectId: string,
     @Param('type') type: string,
   ): Promise<TestStepResponseDto[]> {
-    this.logger.log(`Getting step templates by type ${type}`);
-    return this.stepTemplatesService.getStepTemplatesByType(projectId, type);
+    // TODO: Implementar con IA para tipificación inteligente
+    throw new Error('TODO: Implementar con IA - getStepTemplatesByType');
   }
 } 

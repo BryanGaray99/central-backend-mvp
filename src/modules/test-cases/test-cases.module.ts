@@ -1,19 +1,20 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TestCasesController } from './controllers/test-cases.controller';
+import { TestCasesService } from './services/test-cases.service';
 import { TestCase } from './entities/test-case.entity';
 import { TestStep } from './entities/test-step.entity';
 import { Project } from '../projects/project.entity';
-import { TestCasesController } from './controllers/test-cases.controller';
-import { TestCasesService } from './services/test-cases.service';
 import { StepTemplatesService } from './services/step-templates.service';
+import { TestCaseGenerationService } from './services/test-case-generation.service';
 import { FeatureFileManagerService } from './services/feature-file-manager.service';
 import { StepsFileManagerService } from './services/steps-file-manager.service';
 import { TestCaseValidationService } from './services/test-case-validation.service';
-import { TestCaseGenerationService } from './services/test-case-generation.service';
-import { EndpointsModule } from '../endpoints/endpoints.module';
-import { ProjectsModule } from '../projects/projects.module';
+import { TestCaseRegistrationService } from './services/test-case-registration.service';
 import { FileSystemService } from '../projects/services/file-system.service';
 import { TemplateService } from '../projects/services/template.service';
+import { EndpointsModule } from '../endpoints/endpoints.module';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
@@ -25,20 +26,22 @@ import { TemplateService } from '../projects/services/template.service';
   providers: [
     TestCasesService,
     StepTemplatesService,
+    TestCaseGenerationService,
     FeatureFileManagerService,
     StepsFileManagerService,
     TestCaseValidationService,
-    TestCaseGenerationService,
+    TestCaseRegistrationService,
     FileSystemService,
     TemplateService,
   ],
   exports: [
     TestCasesService,
     StepTemplatesService,
+    TestCaseGenerationService,
     FeatureFileManagerService,
     StepsFileManagerService,
     TestCaseValidationService,
-    TestCaseGenerationService,
+    TestCaseRegistrationService,
   ],
 })
 export class TestCasesModule {} 

@@ -11,6 +11,7 @@ Feature: {{entityName}} API
   {{#each methods}}
   {{#if (eq method "POST")}}
   @create @smoke
+  @TC-{{../section}}-Number
   Scenario: Create a new {{../entityName}} successfully
     Given I have valid {{../entityName}} data
     When I create a {{../entityName}}
@@ -19,6 +20,7 @@ Feature: {{entityName}} API
     And the response should contain valid {{../entityName}} data
 
   @create @negative
+  @TC-{{../section}}-Number
   Scenario Outline: Create {{../entityName}} with missing required fields
     Given I have invalid {{../entityName}} data with missing "<field>"
     When I create a {{../entityName}}
@@ -34,6 +36,7 @@ Feature: {{entityName}} API
       {{/each}}
 
   @create @negative
+  @TC-{{../section}}-Number
   Scenario Outline: Create {{../entityName}} with invalid field values
     Given I have {{../entityName}} data with invalid "<field>"
     When I create a {{../entityName}}
@@ -52,6 +55,7 @@ Feature: {{entityName}} API
   {{#if (eq method "GET")}}
   {{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
   @read @smoke
+  @TC-{{../section}}-Number
   Scenario: Get all {{../entityNamePlural}}
     Given multiple {{../entityNamePlural}} exist in the system
     When I get all {{../entityNamePlural}}
@@ -60,6 +64,7 @@ Feature: {{entityName}} API
     And each {{../entityName}} should have required fields
   {{else}}
   @read @smoke
+  @TC-{{../section}}-Number
   Scenario: Get {{../entityName}} by ID
     Given a {{../entityName}} exists in the system
     When I get the {{../entityName}} by ID
@@ -68,6 +73,7 @@ Feature: {{entityName}} API
     And the response should contain valid {{../entityName}} data
 
   @read @negative
+  @TC-{{../section}}-Number
   Scenario: Get {{../entityName}} with non-existent ID
     When I get a {{../entityName}} with ID "non-existent-id"
     Then I should receive a not found error
@@ -77,6 +83,7 @@ Feature: {{entityName}} API
 
   {{#if (eq method "PATCH")}}
   @update @smoke
+  @TC-{{../section}}-Number
   Scenario: Update an existing {{../entityName}}
     Given a {{../entityName}} exists in the system
     When I update the {{../entityName}}
@@ -85,6 +92,7 @@ Feature: {{entityName}} API
     And the response should contain valid {{../entityName}} data
 
   @update @negative
+  @TC-{{../section}}-Number
   Scenario Outline: Update {{../entityName}} with invalid data
     Given a {{../entityName}} exists in the system
     And I have invalid update data for "<field>"
@@ -101,6 +109,7 @@ Feature: {{entityName}} API
 
   {{#if (eq method "PUT")}}
   @update @smoke
+  @TC-{{../section}}-Number
   Scenario: Replace an existing {{../entityName}}
     Given a {{../entityName}} exists in the system
     When I replace the {{../entityName}}
@@ -111,6 +120,7 @@ Feature: {{entityName}} API
 
   {{#if (eq method "DELETE")}}
   @delete @smoke
+  @TC-{{../section}}-Number
   Scenario: Delete an existing {{../entityName}}
     Given a {{../entityName}} exists in the system
     When I delete the {{../entityName}}
@@ -118,6 +128,7 @@ Feature: {{entityName}} API
     And I should receive a {{expectedStatusCode}} status code
 
   @delete @negative
+  @TC-{{../section}}-Number
   Scenario: Delete non-existent {{../entityName}}
     When I delete a {{../entityName}} with ID "non-existent-id"
     Then I should receive a not found error
@@ -126,6 +137,7 @@ Feature: {{entityName}} API
   {{/each}}
 
   @regression
+  @TC-{{section}}-Number
   Scenario: Complete {{entityName}} lifecycle
     {{#each methods}}
     {{#if (eq method "POST")}}
