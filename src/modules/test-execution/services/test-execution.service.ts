@@ -220,7 +220,7 @@ export class TestExecutionService {
     }
 
     // Eliminar resultados asociados
-    await this.testResultRepository.delete({ executionId: execution.id });
+    await this.testResultRepository.delete({ executionId: execution.executionId });
 
     // Eliminar ejecución
     await this.testExecutionRepository.remove(execution);
@@ -311,7 +311,7 @@ export class TestExecutionService {
       // Guardar resultados individuales
       for (const result of results.results) {
         const testResult = this.testResultRepository.create({
-          executionId: execution.id,
+          executionId: execution.executionId,
           scenarioName: result.scenarioName,
           scenarioTags: result.scenarioTags,
           status: result.status,

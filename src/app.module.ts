@@ -14,6 +14,7 @@ import { TestExecutionModule } from './modules/test-execution/test-execution.mod
 import { TestCase } from './modules/test-cases/entities/test-case.entity';
 import { TestStep } from './modules/test-cases/entities/test-step.entity';
 import { TestCasesModule } from './modules/test-cases/test-cases.module';
+import { DatabaseMigrationModule } from './common/database-migration.module';
 
 @Module({
   imports: [
@@ -21,23 +22,22 @@ import { TestCasesModule } from './modules/test-cases/test-cases.module';
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        const dbPath = configService.get('DATABASE_PATH');
-        if (!dbPath) {
-          throw new Error(
-            'DATABASE_PATH must be defined as an absolute or relative path.',
-          );
-        }
+      imports: [ConfigModule, DatabaseMigrationModule],
+      useFactory: async (configService: ConfigService) => {
+        // Usar la nueva ruta de la base de datos
+        const workspacesPath = configService.get('PLAYWRIGHT_WORKSPACES_PATH') || '../playwright-workspaces';
+        const dbPath = require('path').resolve(workspacesPath, 'central-backend.sqlite');
+        
         return {
           type: 'sqlite',
           database: dbPath,
           entities: [Project, Endpoint, TestExecution, TestResult, TestCase, TestStep],
-          synchronize: true,
+          synchronize: false, // Desactivar synchronize ya que usamos migraciones
         };
       },
       inject: [ConfigService],
     }),
+    DatabaseMigrationModule,
     WorkspaceModule,
     ProjectsModule,
     EndpointsModule,

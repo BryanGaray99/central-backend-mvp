@@ -9,6 +9,11 @@
         "include": "**/templates/*.template",
         "outDir": "dist",
         "watchAssets": true
+      },
+      {
+        "include": "**/db-migrations/*.sql",
+        "outDir": "dist",
+        "watchAssets": true
       }
     ],
     "watchAssets": true
