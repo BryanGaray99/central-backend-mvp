@@ -8,7 +8,6 @@ import { UpdateTestCaseDto } from '../dto/update-test-case.dto';
 import { TestCaseFiltersDto } from '../dto/test-case-filters.dto';
 import { TestCaseListResponse, TestCaseStatistics, TestCaseExport, DuplicateTestCaseDto } from '../interfaces/test-case.interface';
 import { FeatureFileManagerService } from './feature-file-manager.service';
-import { ProjectMetaService } from '../../endpoints/services/project-meta.service';
 import { TestCaseResponseDto } from '../dto/test-case-response.dto';
 import { TestCaseListResponseDto, TestCaseStatisticsDto, TestCaseExportDto } from '../dto/test-case-statistics.dto';
 
@@ -22,7 +21,6 @@ export class TestCasesService {
     @InjectRepository(TestStep)
     private readonly testStepRepository: Repository<TestStep>,
     private readonly featureFileManagerService: FeatureFileManagerService,
-    private readonly projectMetaService: ProjectMetaService,
   ) {}
 
   async createTestCase(projectId: string, dto: CreateTestCaseDto): Promise<TestCaseResponseDto> {
@@ -44,16 +42,13 @@ export class TestCasesService {
       
       const savedTestCase = await this.testCaseRepository.save(testCase);
       
-      // 4. Actualizar archivos de feature - DESHABILITADO para evitar duplicación
-      // await this.featureFileManagerService.addTestCaseToFeature(
-      //   projectId,
-      //   dto.section,
-      //   dto.entityName,
-      //   savedTestCase
-      // );
-      
-      // 5. Actualizar metadata del proyecto
-      await this.updateProjectMetadata(projectId, savedTestCase);
+      // 4. Actualizar archivos de feature
+      await this.featureFileManagerService.addTestCaseToFeature(
+        projectId,
+        dto.section,
+        dto.entityName,
+        savedTestCase
+      );
       
       this.logger.log(`Test case created successfully: ${testCaseId}`);
       return this.toTestCaseResponseDto(savedTestCase);
@@ -79,16 +74,13 @@ export class TestCasesService {
       Object.assign(testCase, dto);
       const updatedTestCase = await this.testCaseRepository.save(testCase);
       
-      // 4. Actualizar archivos de feature - DESHABILITADO para evitar duplicación
-      // await this.featureFileManagerService.updateTestCaseInFeature(
-      //   testCase.projectId,
-      //   testCase.section,
-      //   testCase.entityName,
-      //   updatedTestCase
-      // );
-      
-      // 5. Actualizar metadata
-      await this.updateProjectMetadata(testCase.projectId, updatedTestCase);
+      // 4. Actualizar archivos de feature
+      await this.featureFileManagerService.updateTestCaseInFeature(
+        testCase.projectId,
+        testCase.section,
+        testCase.entityName,
+        updatedTestCase
+      );
       
       this.logger.log(`Test case updated successfully: ${testCaseId}`);
       return this.toTestCaseResponseDto(updatedTestCase);
@@ -108,16 +100,13 @@ export class TestCasesService {
       // 2. Eliminar de BD
       await this.testCaseRepository.remove(testCase);
       
-      // 3. Actualizar archivos de feature - DESHABILITADO para evitar duplicación
-      // await this.featureFileManagerService.removeTestCaseFromFeature(
-      //   testCase.projectId,
-      //   testCase.section,
-      //   testCase.entityName,
-      //   testCase
-      // );
-      
-      // 4. Actualizar metadata
-      await this.removeFromProjectMetadata(testCase.projectId, testCase);
+      // 3. Actualizar archivos de feature
+      await this.featureFileManagerService.removeTestCaseFromFeature(
+        testCase.projectId,
+        testCase.section,
+        testCase.entityName,
+        testCase
+      );
       
       this.logger.log(`Test case deleted successfully: ${testCaseId}`);
     } catch (error) {
@@ -378,19 +367,19 @@ export class TestCasesService {
 
   private async updateProjectMetadata(projectId: string, testCase: TestCase): Promise<void> {
     try {
-      // Esta implementación se completará cuando integremos con ProjectMetaService
-      this.logger.log(`Updating project metadata for test case: ${testCase.testCaseId}`);
+      // Método simplificado - ya no depende de project-meta.json
+      this.logger.log(`Test case metadata updated in database: ${testCase.testCaseId}`);
     } catch (error) {
-      this.logger.error(`Error updating project metadata: ${error.message}`, error.stack);
+      this.logger.error(`Error updating test case metadata: ${error.message}`, error.stack);
     }
   }
 
   private async removeFromProjectMetadata(projectId: string, testCase: TestCase): Promise<void> {
     try {
-      // Esta implementación se completará cuando integremos con ProjectMetaService
-      this.logger.log(`Removing test case from project metadata: ${testCase.testCaseId}`);
+      // Método simplificado - ya no depende de project-meta.json
+      this.logger.log(`Test case removed from database: ${testCase.testCaseId}`);
     } catch (error) {
-      this.logger.error(`Error removing from project metadata: ${error.message}`, error.stack);
+      this.logger.error(`Error removing test case from database: ${error.message}`, error.stack);
     }
   }
 

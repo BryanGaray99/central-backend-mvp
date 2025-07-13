@@ -4,7 +4,7 @@ import { TestExecutionController } from './controllers/test-execution.controller
 import { TestExecutionService } from './services/test-execution.service';
 import { TestRunnerService } from './services/test-runner.service';
 import { TestResultsListenerService } from './services/test-results-listener.service';
-import { MetadataUpdaterService } from './services/metadata-updater.service';
+import { ExecutionLoggerService } from './services/execution-logger.service';
 import { TestExecution } from './entities/test-execution.entity';
 import { TestResult } from './entities/test-result.entity';
 import { Project } from '../projects/project.entity';
@@ -18,13 +18,13 @@ import { Project } from '../projects/project.entity';
     TestExecutionService,
     TestRunnerService,
     TestResultsListenerService,
-    MetadataUpdaterService,
+    ExecutionLoggerService,
   ],
   exports: [
     TestExecutionService,
     TestRunnerService,
     TestResultsListenerService,
-    MetadataUpdaterService,
+    ExecutionLoggerService,
   ],
 })
 export class TestExecutionModule {} 

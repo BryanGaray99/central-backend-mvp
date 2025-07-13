@@ -9,7 +9,6 @@ import { AnalysisService } from './services/analysis.service';
 import { ArtifactsGenerationService } from './services/artifacts-generation.service';
 import { TemplateVariablesService } from './services/template-variables.service';
 import { ArtifactsFileGeneratorService } from './services/artifacts-file-generator.service';
-import { ProjectMetaService } from './services/project-meta.service';
 import { HooksUpdaterService } from './services/hooks-updater.service';
 import { ApiConfigUpdaterService } from './services/api-config-updater.service';
 import { CleanupService } from './services/cleanup.service';
@@ -30,13 +29,12 @@ import { TestCasesModule } from '../test-cases/test-cases.module';
     ArtifactsGenerationService,
     TemplateVariablesService,
     ArtifactsFileGeneratorService,
-    ProjectMetaService,
     HooksUpdaterService,
     ApiConfigUpdaterService,
     CleanupService,
     FileSystemService,
     TemplateService,
   ],
-  exports: [EndpointsService, ApiConfigUpdaterService, ProjectMetaService],
+  exports: [EndpointsService, ApiConfigUpdaterService],
 })
 export class EndpointsModule {} 

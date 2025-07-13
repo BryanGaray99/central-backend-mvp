@@ -273,10 +273,11 @@ export class TestCaseGenerationService {
     dto: RegisterEndpointDto,
     templateVariables: any,
   ) {
-    // Create test cases for each method
-    for (const method of dto.methods) {
-      await this.createTestCaseForMethod(projectId, dto, method, templateVariables);
-    }
+    // DISABLED: Create test cases for each method
+    // This was generating duplicate scenarios in .feature files
+    // for (const method of dto.methods) {
+    //   await this.createTestCaseForMethod(projectId, dto, method, templateVariables);
+    // }
   }
 
   private async createTestCaseForMethod(

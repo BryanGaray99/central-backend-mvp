@@ -46,11 +46,4 @@ export class CreateProjectDto {
   @IsEnum(ProjectType)
   @IsOptional()
   type?: ProjectType;
-
-  @ApiPropertyOptional({
-    description: 'Additional project metadata',
-    example: { tags: ['e2e', 'api'], description: 'E2E tests for API' },
-  })
-  @IsOptional()
-  metadata?: Record<string, any>;
 }

@@ -13,11 +13,6 @@ export class ValidationService {
 
     // Validate base URL
     this.validateBaseUrl(dto.baseUrl);
-
-    // Validate metadata if it exists
-    if (dto.metadata) {
-      this.validateMetadata(dto.metadata);
-    }
   }
 
   /**
@@ -90,48 +85,7 @@ export class ValidationService {
     }
   }
 
-  /**
-   * Validates project metadata
-   */
-  private validateMetadata(metadata: Record<string, any>): void {
-    if (typeof metadata !== 'object' || metadata === null) {
-      throw new BadRequestException('Metadata must be a valid object');
-    }
 
-    // Validate maximum metadata size (1MB)
-    const metadataSize = JSON.stringify(metadata).length;
-    if (metadataSize > 1024 * 1024) {
-      throw new BadRequestException('Metadata cannot exceed 1MB');
-    }
-
-    // Validate metadata keys
-    for (const [key, value] of Object.entries(metadata)) {
-      if (typeof key !== 'string' || key.length === 0) {
-        throw new BadRequestException(
-          'Metadata keys must be non-empty strings',
-        );
-      }
-
-      if (key.length > 100) {
-        throw new BadRequestException(
-          'Metadata keys cannot exceed 100 characters',
-        );
-      }
-
-      // Validate that keys don't contain dangerous characters
-      const keyRegex = /^[a-zA-Z0-9_-]+$/;
-      if (!keyRegex.test(key)) {
-        throw new BadRequestException(
-          'Metadata keys can only contain letters, numbers, hyphens (-) and underscores (_)',
-        );
-      }
-
-      // Validate values (don't allow functions)
-      if (typeof value === 'function') {
-        throw new BadRequestException('Metadata cannot contain functions');
-      }
-    }
-  }
 
   /**
    * Validates workspace configuration

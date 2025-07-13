@@ -17,8 +17,6 @@ import { ApiConfigUpdaterService } from './services/api-config-updater.service';
 import { CleanupService } from './services/cleanup.service';
 import { TestCaseGenerationService } from '../test-cases/services/test-case-generation.service';
 import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
-import * as fs from 'fs/promises';
 
 @Injectable()
 export class EndpointsService {
@@ -194,9 +192,6 @@ export class EndpointsService {
       await this.cleanupService.cleanupEndpointArtifacts(project.path, artifacts, section, endpoint.entityName);
     }
 
-    // Update project-meta.json to remove the endpoint entry
-    await this.removeFromProjectMeta(project.path, endpoint);
-
     // Delete endpoint record
     await this.endpointRepository.remove(endpoint);
 
@@ -266,8 +261,7 @@ export class EndpointsService {
       endpoint.status = 'ready';
       await this.endpointRepository.save(endpoint);
 
-      // Update project-meta.json
-      await this.updateProjectMeta(project.path, endpoint, dto, analysisResult);
+
 
       // Update hooks.ts with all endpoints - only if endpoint is ready
       if (endpoint.status === 'ready' && endpoint.analysisResults) {
@@ -304,127 +298,7 @@ export class EndpointsService {
     }
   }
 
-  private async updateProjectMeta(
-    projectPath: string,
-    endpoint: Endpoint,
-    dto: RegisterEndpointDto,
-    analysisResult: any,
-  ) {
-    try {
-      const metaPath = path.join(projectPath, 'project-meta.json');
 
-      // Read existing meta file
-      let metaContent;
-      try {
-        const metaFile = await fs.readFile(metaPath, 'utf8');
-        metaContent = JSON.parse(metaFile);
-      } catch (error) {
-        // If file doesn't exist or is invalid, create default structure
-        metaContent = {
-          endpoints: [],
-          testCases: [],
-          executions: [],
-        };
-      }
-
-      // Check if endpoint already exists (same entity, path, and section)
-      const existingEndpointIndex = metaContent.endpoints.findIndex(
-        (ep: any) =>
-          ep.entityName === dto.entityName &&
-          ep.path === dto.path &&
-          ep.section === dto.section,
-      );
-
-      // Process all methods that were analyzed
-      const methodEntries: any[] = [];
-      for (const methodConfig of dto.methods) {
-        const method = methodConfig.method;
-        const methodAnalysis = analysisResult.analysisResults?.[method];
-
-        if (methodAnalysis) {
-          const methodEntry: any = {
-            method: method,
-            generatedArtifacts: endpoint.generatedArtifacts,
-            lastAnalysis: {
-              timestamp: new Date().toISOString(),
-              inferredStatusCode: methodAnalysis.inferredStatusCode || 200,
-              inferredDataPath: methodAnalysis.inferredDataPath || '',
-            },
-          };
-
-          // Only create DTOs according to HTTP method
-          if (method === 'POST' && methodAnalysis.requestBodyDefinition) {
-            methodEntry.createDto = this.extractDtoFromRequestBody(
-              methodAnalysis.requestBodyDefinition, 
-              'create'
-            );
-            // Log to see extracted DTO
-            // this.logger.log(`[DEBUG] createDto extracted for ${dto.entityName} (POST):`, JSON.stringify(methodEntry.createDto, null, 2));
-          } else if ((method === 'PATCH' || method === 'PUT') && methodAnalysis.requestBodyDefinition) {
-            methodEntry.updateDto = this.extractDtoFromRequestBody(
-              methodAnalysis.requestBodyDefinition, 
-              'update'
-            );
-            // Log to see extracted DTO
-            // this.logger.log(`[DEBUG] updateDto extracted for ${dto.entityName} (${method}):`, JSON.stringify(methodEntry.updateDto, null, 2));
-          }
-          // GET/DELETE: No DTOs
-
-          methodEntries.push(methodEntry);
-        }
-      }
-
-      if (existingEndpointIndex >= 0) {
-        const existingEndpoint = metaContent.endpoints[existingEndpointIndex];
-        if (!existingEndpoint.methods) {
-          existingEndpoint.methods = [];
-        }
-        existingEndpoint.type = dto.entityName;
-        delete existingEndpoint.fields;
-        delete existingEndpoint.validations;
-        delete existingEndpoint.createDto;
-        delete existingEndpoint.updateDto;
-        for (const methodEntry of methodEntries) {
-          const existingMethodIndex = existingEndpoint.methods.findIndex(
-            (m: any) => m.method === methodEntry.method,
-          );
-          if (existingMethodIndex >= 0) {
-            existingEndpoint.methods[existingMethodIndex] = methodEntry;
-          } else {
-            existingEndpoint.methods.push(methodEntry);
-          }
-        }
-      } else {
-        const newEndpointEntry = {
-          id: endpoint.id,
-        entityName: dto.entityName,
-        path: dto.path,
-        section: dto.section,
-          type: dto.entityName,
-          methods: methodEntries,
-        };
-        metaContent.endpoints.push(newEndpointEntry);
-      }
-
-      // Write updated meta file
-      await fs.writeFile(
-        metaPath,
-        JSON.stringify(metaContent, null, 2),
-        'utf8',
-      );
-
-      // Comentado: logs de debug antiguos
-      // this.logger.log(
-      //   `[SERVICE] Project meta updated for endpoint ${endpoint.name} with conditional DTOs`,
-      // );
-    } catch (error) {
-      // Comentado: logs de debug antiguos
-      // this.logger.error(
-      //   `[SERVICE] Error updating project meta:`,
-      //   error.message,
-      // );
-    }
-  }
 
   /**
    * Extrae DTO del request body con sus validaciones
@@ -561,43 +435,5 @@ export class EndpointsService {
       .replace(/[^a-z0-9-]/g, '');
   }
 
-  private async removeFromProjectMeta(
-    projectPath: string,
-    endpoint: Endpoint,
-  ): Promise<void> {
-    try {
-      const metaPath = path.join(projectPath, 'project-meta.json');
 
-      // Read existing meta file
-      let metaContent;
-      try {
-        const metaFile = await fs.readFile(metaPath, 'utf8');
-        metaContent = JSON.parse(metaFile);
-      } catch (error) {
-        return;
-      }
-
-      // Find and remove the endpoint entry by entityName, path, and section
-      const existingEndpointIndex = metaContent.endpoints.findIndex(
-        (ep: any) => 
-          ep.entityName === endpoint.entityName &&
-          ep.path === endpoint.path &&
-          ep.section === endpoint.section,
-      );
-
-      if (existingEndpointIndex >= 0) {
-        // Remove endpoint entry
-        metaContent.endpoints.splice(existingEndpointIndex, 1);
-
-        // Write updated meta file
-        await fs.writeFile(
-          metaPath,
-          JSON.stringify(metaContent, null, 2),
-          'utf8',
-        );
-      }
-    } catch (error) {
-      // Silently handle errors
-    }
-  }
 } 

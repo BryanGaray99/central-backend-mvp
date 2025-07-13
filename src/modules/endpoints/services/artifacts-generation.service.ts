@@ -3,7 +3,6 @@ import { FileSystemService } from '../../projects/services/file-system.service';
 import { TemplateService } from '../../projects/services/template.service';
 import { TemplateVariablesService } from './template-variables.service';
 import { ArtifactsFileGeneratorService } from './artifacts-file-generator.service';
-import { ProjectMetaService } from './project-meta.service';
 import { Project } from '../../projects/project.entity';
 import { RegisterEndpointDto } from '../dto/register-endpoint.dto';
 import { HooksUpdaterService } from './hooks-updater.service';
@@ -17,7 +16,6 @@ export class ArtifactsGenerationService {
     private readonly templateService: TemplateService,
     private readonly templateVariablesService: TemplateVariablesService,
     private readonly artifactsFileGeneratorService: ArtifactsFileGeneratorService,
-    private readonly projectMetaService: ProjectMetaService,
     private readonly hooksUpdaterService: HooksUpdaterService,
   ) {}
 
@@ -45,9 +43,6 @@ export class ArtifactsGenerationService {
         dto.entityName,
         templateVariables,
       );
-
-      // Update project metadata using specialized service
-      await this.projectMetaService.updateProjectMeta(project, dto, analysisResult);
 
       // === INTEGRACIÓN: Actualizar hooks.ts ===
       await this.hooksUpdaterService.updateHooksFile(project.path, dto.entityName, dto.section);
@@ -127,9 +122,6 @@ export class ArtifactsGenerationService {
         dto.entityName,
         templateVariables,
       );
-
-      // Update project metadata using specialized service
-      await this.projectMetaService.updateProjectMeta(project, dto, analysisResult);
 
       console.log('✅ === GENERACIÓN COMPLETADA ===');
       console.log('🎯 Archivos generados exitosamente para:', dto.entityName);

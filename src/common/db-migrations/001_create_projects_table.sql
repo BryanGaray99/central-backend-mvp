@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS "projects" (
     "status" varchar DEFAULT 'pending',
     "type" varchar DEFAULT 'playwright-bdd',
     "path" varchar,
-    "metadata" text,
     "createdAt" datetime DEFAULT (datetime('now')),
     "updatedAt" datetime DEFAULT (datetime('now'))
 );

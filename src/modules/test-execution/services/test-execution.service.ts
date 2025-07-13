@@ -13,7 +13,7 @@ import { ExecuteTestsDto } from '../dto/execute-tests.dto';
 import { ExecutionFiltersDto } from '../dto/execution-filters.dto';
 import { TestRunnerService } from './test-runner.service';
 import { TestResultsListenerService } from './test-results-listener.service';
-import { MetadataUpdaterService } from './metadata-updater.service';
+import { ExecutionLoggerService } from './execution-logger.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -29,7 +29,7 @@ export class TestExecutionService {
     private readonly projectRepository: Repository<Project>,
     private readonly testRunnerService: TestRunnerService,
     private readonly testResultsListenerService: TestResultsListenerService,
-    private readonly metadataUpdaterService: MetadataUpdaterService,
+    private readonly executionLoggerService: ExecutionLoggerService,
   ) {}
 
   async executeTests(projectId: string, dto: ExecuteTestsDto) {
@@ -323,8 +323,8 @@ export class TestExecutionService {
         await this.testResultRepository.save(testResult);
       }
 
-      // Actualizar metadata del proyecto
-      await this.metadataUpdaterService.updateProjectMetadata(
+      // Registrar información de la ejecución completada
+      await this.executionLoggerService.logExecutionCompleted(
         project.id,
         execution.entityName,
         {

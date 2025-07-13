@@ -43,9 +43,6 @@ export class Project {
   @Column({ nullable: true })
   path: string;
 
-  @Column({ type: 'simple-json', nullable: true })
-  metadata: Record<string, any>;
-
   @CreateDateColumn()
   createdAt: Date;
 

@@ -67,10 +67,8 @@ export class GenerationService {
       name: project.name,
       baseUrl: project.baseUrl,
       basePath: '/v1/api', // Default API base path
-      author: project.metadata?.author || '',
-      description:
-        project.metadata?.description ||
-        'API testing project with Playwright + BDD',
+      author: '',
+      description: 'API testing project with Playwright + BDD',
     };
 
     // Modify existing package.json with our configurations
