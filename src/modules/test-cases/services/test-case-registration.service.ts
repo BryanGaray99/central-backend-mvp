@@ -56,44 +56,67 @@ export class TestCaseRegistrationService {
       const lines = featureContent.split('\n');
       const tagPattern = `@TC-${section}-Number`;
       let currentNumber = await this.getNextTestCaseNumber(projectId, section);
-      let replacements: { lineIdx: number, scenarioName: string, number: number }[] = [];
+      let replacements: { lineIdx: number, scenarioName: string, number: number, tags: string[], steps: string }[] = [];
 
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].includes(tagPattern)) {
+          // Extraer todos los tags del escenario
+          const tags = this.extractTagsForScenario(lines, i);
+          
           let scenarioName = '';
+          let steps = '';
           let found = false;
+          
+          // Buscar el nombre del escenario
           for (let j = i + 1; j < lines.length; j++) {
             const nextLine = lines[j].trim();
             if (nextLine.startsWith('Scenario:') || nextLine.startsWith('Scenario Outline:')) {
               scenarioName = nextLine.replace('Scenario:', '').replace('Scenario Outline:', '').trim();
               found = true;
+              
+              // Extraer los steps desde la siguiente línea hasta el próximo escenario o final del archivo
+              steps = this.extractStepsFromScenario(lines, j + 1);
               break;
             }
             if (nextLine.startsWith('@') || nextLine === '') continue;
           }
+          
           // Si no se encontró, intentar buscar hacia atrás (por si es el último del archivo)
           if (!found && i < lines.length - 1) {
             for (let j = i + 1; j < lines.length; j++) {
               if (lines[j].trim() !== '' && !lines[j].trim().startsWith('@')) {
                 scenarioName = lines[j].trim();
+                steps = this.extractStepsFromScenario(lines, j + 1);
                 found = true;
                 break;
               }
             }
           }
+          
           if (!found) {
             this.logger.warn(`[REGISTRO] No se encontró el nombre del escenario después del tag en línea ${i + 1}`);
           }
+          
           if (scenarioName) {
             this.logger.log(`[REGISTRO] Encontrado tag en línea ${i + 1}`);
             this.logger.log(`[REGISTRO] Escenario: "${scenarioName}"`);
+            this.logger.log(`[REGISTRO] Tags encontrados: ${tags.join(', ')}`);
+            this.logger.log(`[REGISTRO] Steps extraídos: ${steps.split('\n').length} líneas`);
             this.logger.log(`[REGISTRO] Asignando número: ${currentNumber}`);
+            
             lines[i] = lines[i].replace(tagPattern, `@TC-${section}-${currentNumber}`);
-            replacements.push({ lineIdx: i, scenarioName, number: currentNumber });
+            replacements.push({ 
+              lineIdx: i, 
+              scenarioName, 
+              number: currentNumber, 
+              tags, 
+              steps 
+            });
             currentNumber++;
           }
         }
       }
+      
       await fs.writeFile(featureFilePath, lines.join('\n'), 'utf-8');
       this.logger.log(`[REGISTRO] Feature file actualizado con tags reemplazados: ${featureFilePath}`);
 
@@ -106,7 +129,9 @@ export class TestCaseRegistrationService {
           entityName,
           rep.scenarioName,
           method,
-          rep.number
+          rep.number,
+          rep.tags,
+          rep.steps
         );
       }
       this.logger.log(`[REGISTRO] Total de test cases registrados: ${replacements.length}`);
@@ -114,6 +139,51 @@ export class TestCaseRegistrationService {
       this.logger.error(`[REGISTRO] Error procesando feature file:`, error);
       throw error;
     }
+  }
+
+  private extractTagsForScenario(lines: string[], tagLineIndex: number): string[] {
+    const tags: string[] = [];
+    
+    // Buscar tags hacia arriba desde la línea del tag TC
+    for (let i = tagLineIndex; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (line === '') break; // Línea vacía marca el fin de los tags
+      if (line.startsWith('@')) {
+        // Omitir tags de numeración
+        if (!line.match(/^@TC-/)) {
+          tags.unshift(line);
+        }
+      } else if (!line.startsWith('Feature:') && !line.startsWith('Background:')) {
+        break; // Si no es tag ni feature ni background, terminar
+      }
+    }
+    
+    return tags;
+  }
+
+  private extractStepsFromScenario(lines: string[], startLineIndex: number): string {
+    const steps: string[] = [];
+    
+    for (let i = startLineIndex; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Si encontramos otro escenario, outline, o línea vacía seguida de tag, terminar
+      if (line.startsWith('Scenario:') || line.startsWith('Scenario Outline:')) {
+        break;
+      }
+      
+      // Si encontramos una línea vacía seguida de un tag, también terminar
+      if (line === '' && i + 1 < lines.length && lines[i + 1].trim().startsWith('@')) {
+        break;
+      }
+      
+      // Si la línea no está vacía y no es un tag, es un step
+      if (line !== '' && !line.startsWith('@')) {
+        steps.push(line);
+      }
+    }
+    
+    return steps.join('\n');
   }
 
   private determineMethodFromScenario(scenarioName: string, methods: any[]): string {
@@ -133,12 +203,15 @@ export class TestCaseRegistrationService {
     scenarioName: string,
     method: string,
     number: number,
+    tags: string[],
+    steps: string,
   ): Promise<void> {
     const testCaseId = `TC-${section}-${number}`;
-    const tags = this.generateTagsForMethod(method);
     const testType = this.determineTestType(scenarioName);
-    const scenario = this.createBasicScenarioStructure(method, entityName);
+    
     this.logger.log(`[REGISTRO] Guardando en BD: ${testCaseId} - ${scenarioName} - tags: ${tags.join(', ')} - tipo: ${testType}`);
+    this.logger.log(`[REGISTRO] Steps a guardar: ${steps.split('\n').length} líneas`);
+    
     const testCase = this.testCaseRepository.create({
       testCaseId,
       projectId,
@@ -149,22 +222,10 @@ export class TestCaseRegistrationService {
       tags,
       method,
       testType,
-      scenario,
+      scenario: steps, // Guardar los steps como texto
       status: TestCaseStatus.ACTIVE,
     });
     await this.testCaseRepository.save(testCase);
-  }
-
-  private generateTagsForMethod(method: string): string[] {
-    const tags = ['@smoke'];
-    switch (method) {
-      case 'POST': tags.push('@create'); break;
-      case 'GET': tags.push('@read'); break;
-      case 'PUT':
-      case 'PATCH': tags.push('@update'); break;
-      case 'DELETE': tags.push('@delete'); break;
-    }
-    return tags;
   }
 
   private determineTestType(scenarioName: string): TestType {
@@ -173,26 +234,8 @@ export class TestCaseRegistrationService {
       return TestType.NEGATIVE;
     }
     if (scenarioLower.includes('regression')) {
-      // No existe TestType.EDGE, usar POSITIVE para regresión
       return TestType.POSITIVE;
     }
     return TestType.POSITIVE;
-  }
-
-  private createBasicScenarioStructure(method: string, entityName: string): any {
-    const entityLower = entityName.toLowerCase();
-    switch (method) {
-      case 'POST':
-        return { given: [{ stepId: `ST-${entityLower}-setup`, order: 1 }], when: [{ stepId: `ST-${entityLower}-create`, order: 1 }], then: [{ stepId: `ST-${entityLower}-validate`, order: 1 }] };
-      case 'GET':
-        return { given: [{ stepId: `ST-${entityLower}-setup`, order: 1 }], when: [{ stepId: `ST-${entityLower}-get`, order: 1 }], then: [{ stepId: `ST-${entityLower}-validate`, order: 1 }] };
-      case 'PUT':
-      case 'PATCH':
-        return { given: [{ stepId: `ST-${entityLower}-setup`, order: 1 }], when: [{ stepId: `ST-${entityLower}-update`, order: 1 }], then: [{ stepId: `ST-${entityLower}-validate`, order: 1 }] };
-      case 'DELETE':
-        return { given: [{ stepId: `ST-${entityLower}-setup`, order: 1 }], when: [{ stepId: `ST-${entityLower}-delete`, order: 1 }], then: [{ stepId: `ST-${entityLower}-validate`, order: 1 }] };
-      default:
-        return { given: [], when: [], then: [] };
-    }
   }
 } 

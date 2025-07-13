@@ -128,24 +128,12 @@ export class FeatureFileManagerService {
     const tags = testCase.tags.map(tag => `@${tag}`).join(' ');
     const scenarioName = testCase.name;
     
-    let scenario = `\n  ${tags}\n  Scenario: ${scenarioName}\n`;
+    // Ahora el scenario es un string, así que simplemente lo usamos directamente
+    // pero necesitamos agregar los tags y el nombre del escenario
+    const scenarioLines = testCase.scenario.split('\n');
+    const indentedSteps = scenarioLines.map(line => `    ${line}`).join('\n');
     
-    // Add Given steps
-    for (const step of testCase.scenario.given) {
-      scenario += `    Given ${step.stepId}\n`;
-    }
-    
-    // Add When steps
-    for (const step of testCase.scenario.when) {
-      scenario += `    When ${step.stepId}\n`;
-    }
-    
-    // Add Then steps
-    for (const step of testCase.scenario.then) {
-      scenario += `    Then ${step.stepId}\n`;
-    }
-    
-    return scenario;
+    return `\n  ${tags}\n  Scenario: ${scenarioName}\n${indentedSteps}\n`;
   }
 
   private addScenarioToFeature(featureContent: string, newScenario: string): string {

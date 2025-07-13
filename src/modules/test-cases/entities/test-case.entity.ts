@@ -75,12 +75,8 @@ export class TestCase {
   })
   testType: TestType;
 
-  @Column('json')
-  scenario: {
-    given: StepDefinition[];
-    when: StepDefinition[];
-    then: StepDefinition[];
-  };
+  @Column('text')
+  scenario: string;
 
   @Column('json', { nullable: true })
   hooks?: {

@@ -181,12 +181,11 @@ export class CreateTestCaseDto {
   tags: string[];
 
   @ApiProperty({
-    description: 'Estructura del escenario',
-    type: ScenarioStructureDto,
+    description: 'Contenido del escenario como texto Gherkin',
+    example: 'Given I have valid Product data\nWhen I create a Product\nThen the Product should be created successfully',
   })
-  @ValidateNested()
-  @Type(() => ScenarioStructureDto)
-  scenario: ScenarioStructureDto;
+  @IsString()
+  scenario: string;
 
   @ApiPropertyOptional({
     description: 'Hooks específicos para este test case',

@@ -43,7 +43,7 @@ interface DuplicateTestCaseDto {
   modifications?: {
     tags?: string[];
     metadata?: any;
-    scenario?: any;
+    scenario?: string;
   };
 }
 
@@ -237,6 +237,17 @@ export class TestCasesService {
     }
   }
 
+  async deleteTestCasesByProjectSectionEntity(projectId: string, section: string, entityName: string): Promise<void> {
+    this.logger.log(`Deleting all test cases for projectId=${projectId}, section=${section}, entityName=${entityName}`);
+    try {
+      await this.testCaseRepository.delete({ projectId, section, entityName });
+      this.logger.log(`All test cases deleted for projectId=${projectId}, section=${section}, entityName=${entityName}`);
+    } catch (error) {
+      this.logger.error('Error deleting test cases by project/section/entity:', error);
+      throw error;
+    }
+  }
+
   // TODO: FUTURA IMPLEMENTACIÓN CON IA - Duplicar test case con modificaciones inteligentes
   async duplicateTestCase(projectId: string, testCaseId: string, dto: DuplicateTestCaseDto): Promise<TestCaseResponseDto> {
     // TODO: Implementar con IA para duplicación inteligente
@@ -310,8 +321,8 @@ export class TestCasesService {
       throw new Error('At least one tag is required');
     }
 
-    if (!dto.scenario || !dto.scenario.given || !dto.scenario.when || !dto.scenario.then) {
-      throw new Error('Scenario structure is required (given, when, then)');
+    if (!dto.scenario || dto.scenario.trim().length === 0) {
+      throw new Error('Scenario content is required');
     }
   }
 
@@ -327,11 +338,7 @@ export class TestCasesService {
       tags: testCase.tags,
       method: testCase.method,
       testType: testCase.testType,
-      scenario: {
-        given: testCase.scenario.given,
-        when: testCase.scenario.when,
-        then: testCase.scenario.then,
-      },
+      scenario: testCase.scenario,
       hooks: testCase.hooks,
       examples: testCase.examples,
       status: testCase.status,

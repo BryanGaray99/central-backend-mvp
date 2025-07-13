@@ -151,10 +151,10 @@ export class TestCaseResponseDto {
   testType: TestType;
 
   @ApiProperty({
-    description: 'Estructura del escenario',
-    type: ScenarioStructureResponseDto,
+    description: 'Contenido del escenario como texto Gherkin',
+    example: 'Given I have valid Product data\nWhen I create a Product\nThen the Product should be created successfully',
   })
-  scenario: ScenarioStructureResponseDto;
+  scenario: string;
 
   @ApiPropertyOptional({
     description: 'Hooks específicos para este test case',

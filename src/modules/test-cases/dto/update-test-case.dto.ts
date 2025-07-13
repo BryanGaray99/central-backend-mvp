@@ -72,13 +72,12 @@ export class UpdateTestCaseDto {
   tags?: string[];
 
   @ApiPropertyOptional({
-    description: 'Nueva estructura del escenario',
-    type: ScenarioStructureDto,
+    description: 'Nuevo contenido del escenario como texto Gherkin',
+    example: 'Given I have valid Product data\nWhen I create a Product\nThen the Product should be created successfully',
   })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => ScenarioStructureDto)
-  scenario?: ScenarioStructureDto;
+  @IsString()
+  scenario?: string;
 
   @ApiPropertyOptional({
     description: 'Nuevos hooks específicos para este test case',
