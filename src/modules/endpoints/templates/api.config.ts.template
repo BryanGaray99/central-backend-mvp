@@ -1,0 +1,61 @@
+export const API_CONFIG = {
+  baseUrl: '{{baseUrl}}{{basePath}}',
+  endpoints: {
+    {{#each endpoints}}
+    {{entityLower}}: {
+      base: '{{endpointPath}}',
+      byId: (id: string) => `{{endpointPath}}/\${id}`,
+    },
+    {{/each}}
+  },
+  security: {
+    bearer: {
+      type: 'bearer',
+      bearerFormat: 'JWT',
+    },
+    apiKey: {
+      type: 'apiKey',
+      in: 'header',
+      name: 'X-API-KEY',
+    },
+  },
+} as const;
+
+// Tipos para las respuestas de la API
+export type ApiResponse<T> = {
+  data?: T;
+  error?: {
+    message: string;
+    code: string;
+  };
+  status: number;
+};
+
+// Tipos para los DTOs principales
+{{#each endpoints}}
+export interface Create{{EntityName}}Dto {
+  {{#each createFields}}
+  {{name}}: {{type}};
+  {{/each}}
+}
+
+export interface Update{{EntityName}}Dto {
+  {{#each updateFields}}
+  {{name}}?: {{type}};
+  {{/each}}
+}
+{{/each}}
+
+{{#if hasAddress}}
+export interface AddressDto {
+  street: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+}
+{{/if}}
+
+{{#if hasOrderStatus}}
+export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+{{/if}} 

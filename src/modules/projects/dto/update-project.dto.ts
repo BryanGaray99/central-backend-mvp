@@ -23,9 +23,10 @@ export class UpdateProjectDto {
   baseUrl?: string;
 
   @ApiPropertyOptional({
-    description: 'Metadatos adicionales del proyecto',
-    example: { tags: ['e2e', 'api'], description: 'Pruebas E2E para API' },
+    description: 'Base path para endpoints de API',
+    example: '/v1/api',
   })
+  @IsString()
   @IsOptional()
-  metadata?: Record<string, any>;
+  basePath?: string;
 }

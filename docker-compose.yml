@@ -18,7 +18,6 @@ services:
       # ---- Variables para init de Playwright ----
       - CI=true
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-      - TEST_OPTIONS={"language":"TypeScript","testDir":"tests","installGitHubActions":false,"installPlaywrightBrowsers":false}
 
     volumes:
       # Persistir la base de datos en una carpeta del host
@@ -51,7 +50,6 @@ services:
       # Puedes añadir aquí las mismas vars si quieres testear init dentro de dev
       - CI=true
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-      - TEST_OPTIONS={"language":"TypeScript","testDir":"tests","installGitHubActions":false,"installPlaywrightBrowsers":false}
 
     volumes:
       - ../data:/app_data

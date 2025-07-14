@@ -1,69 +1,59 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Project } from '../../projects/project.entity';
+import { Endpoint } from '../endpoint.entity';
+import { TemplateService } from '../../projects/services/template.service';
 
 @Injectable()
 export class HooksUpdaterService {
   private readonly logger = new Logger(HooksUpdaterService.name);
 
+  constructor(
+    @InjectRepository(Project)
+    private readonly projectRepository: Repository<Project>,
+    @InjectRepository(Endpoint)
+    private readonly endpointRepository: Repository<Endpoint>,
+    private readonly templateService: TemplateService,
+  ) {}
+
   /**
-   * Updates the hooks.ts file to import and configure the step file and client for the generated entity
+   * Regenerates the complete hooks.ts file based on all endpoints in the project
+   */
+  async regenerateHooksFile(projectId: string): Promise<void> {
+    try {
+      const project = await this.projectRepository.findOne({ where: { id: projectId } });
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
+
+      const endpoints = await this.endpointRepository.find({ 
+        where: { projectId },
+        order: { section: 'ASC', entityName: 'ASC' }
+      });
+
+      await this.generateHooksFile(project.path, endpoints);
+      this.logger.log(`✅ hooks.ts regenerated for project ${project.name} with ${endpoints.length} endpoints`);
+    } catch (error) {
+      this.logger.error(`Error regenerating hooks.ts: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Updates the hooks.ts file when a new endpoint is added
    */
   async updateHooksFile(projectPath: string, entityName: string, section: string): Promise<void> {
-    const hooksPath = path.join(projectPath, 'src', 'steps', 'hooks.ts');
-    if (!fs.existsSync(hooksPath)) {
-      this.logger.warn(`Hooks file not found at ${hooksPath}`);
-      return;
-    }
     try {
-      let hooksContent = fs.readFileSync(hooksPath, 'utf8');
-      // 1. Import the entity client if it doesn't exist
-      const clientImport = `import { ${entityName}Client } from '../api/${section}/${entityName.toLowerCase()}.client';`;
-      if (!hooksContent.includes(clientImport)) {
-        // Insert after existing imports
-        const importLines = hooksContent.split('\n');
-        let lastImport = importLines.findIndex(line => line.startsWith('import') && !line.includes('@cucumber/cucumber'));
-        if (lastImport === -1) lastImport = 1;
-        importLines.splice(lastImport + 1, 0, clientImport);
-        hooksContent = importLines.join('\n');
+      // Get all endpoints for the project to regenerate the complete file
+      const project = await this.projectRepository.findOne({ where: { path: projectPath } });
+      if (!project) {
+        throw new Error(`Project not found for path: ${projectPath}`);
       }
-      // 2. Declare global variable for the client
-      const clientVar = `export let ${entityName.toLowerCase()}Client: ${entityName}Client;`;
-      if (!hooksContent.includes(clientVar)) {
-        hooksContent = hooksContent.replace('// Test data storage', `// Test data storage\n${clientVar}`);
-      }
-      // 3. Add specific storage in testData
-      const storageVar = `  created${entityName}s: new Map<string, any>(),`;
-      if (!hooksContent.includes(storageVar)) {
-        hooksContent = hooksContent.replace('createdEntities: new Map<string, any>(),', `createdEntities: new Map<string, any>(),\n${storageVar}`);
-      }
-      // 4. Initialize the client in BeforeAll
-      const beforeAllInit = `${entityName.toLowerCase()}Client = new ${entityName}Client();`;
-      if (!hooksContent.includes(beforeAllInit)) {
-        hooksContent = hooksContent.replace('console.log(\'🚀 Initializing test environment for BDD tests...\');', `console.log('🚀 Initializing test environment for BDD tests...');\n  ${beforeAllInit}\n  await ${entityName.toLowerCase()}Client.init();`);
-      }
-      // 5. Clean storage in After
-      const afterCleanup = `    testData.created${entityName}s.clear();`;
-      if (!hooksContent.includes(afterCleanup)) {
-        hooksContent = hooksContent.replace('testData.createdEntities.clear();', `testData.createdEntities.clear();\n${afterCleanup}`);
-      }
-      // 6. Dispose client in AfterAll
-      const afterAllDispose = `  await ${entityName.toLowerCase()}Client?.dispose();`;
-      if (!hooksContent.includes(afterAllDispose)) {
-        hooksContent = hooksContent.replace('console.log(\'✅ Test environment cleaned up successfully\');', `await ${entityName.toLowerCase()}Client?.dispose();\n  console.log('✅ Test environment cleaned up successfully');`);
-      }
-      // 7. Import the entity step file (if exists)
-      const stepImport = `import '../${section}/${entityName.toLowerCase()}.steps';`;
-      if (!hooksContent.includes(stepImport)) {
-        // Insert at the end of imports
-        const importLines = hooksContent.split('\n');
-        let lastImport = importLines.reduce((acc, line, idx) => line.startsWith('import') ? idx : acc, 0);
-        importLines.splice(lastImport + 1, 0, stepImport);
-        hooksContent = importLines.join('\n');
-      }
-      // Save the updated file
-      fs.writeFileSync(hooksPath, hooksContent, 'utf8');
-      this.logger.debug(`✅ hooks.ts updated for entity ${entityName}`);
+
+      await this.regenerateHooksFile(project.id);
     } catch (error) {
       this.logger.error(`Error updating hooks.ts: ${error.message}`);
       throw error;
@@ -71,81 +61,133 @@ export class HooksUpdaterService {
   }
 
   /**
-   * Removes imports and configurations of an endpoint from the hooks.ts file when deleted
+   * Removes an endpoint from hooks.ts when deleted
    */
   async removeFromHooksFile(projectPath: string, entityName: string, section: string): Promise<void> {
-    const hooksPath = path.join(projectPath, 'src', 'steps', 'hooks.ts');
-    if (!fs.existsSync(hooksPath)) {
-      this.logger.warn(`Hooks file not found at ${hooksPath}`);
-      return;
-    }
-    
     try {
-      let hooksContent = fs.readFileSync(hooksPath, 'utf8');
-      const lines = hooksContent.split('\n');
-      const updatedLines: string[] = [];
-      
-      // Patterns to remove
-      const patternsToRemove = [
-        `import { ${entityName}Client } from '../api/${section}/${entityName.toLowerCase()}.client';`,
-        `export let ${entityName.toLowerCase()}Client: ${entityName}Client;`,
-        `  created${entityName}s: new Map<string, any>(),`,
-        `  ${entityName.toLowerCase()}Client = new ${entityName}Client();`,
-        `  await ${entityName.toLowerCase()}Client.init();`,
-        `    testData.created${entityName}s.clear();`,
-        `  await ${entityName.toLowerCase()}Client?.dispose();`,
-        `import '../${section}/${entityName.toLowerCase()}.steps';`
-      ];
-
-      let skipNextLine = false;
-      
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmedLine = line.trim();
-        
-        // Check if this line should be removed
-        const shouldRemove = patternsToRemove.some(pattern => 
-          trimmedLine.includes(pattern.trim())
-        );
-        
-        // Check if the next line should be removed (for lines with await)
-        if (shouldRemove) {
-          this.logger.debug(`Removing line: ${trimmedLine}`);
-          continue;
-        }
-        
-        // Check if this line contains a pattern that requires removing the next line
-        if (trimmedLine.includes(`${entityName.toLowerCase()}Client = new ${entityName}Client();`)) {
-          // Remove this line and the next (await init)
-          continue;
-        }
-        
-        // Check if this line contains a pattern that requires removing the previous line
-        if (trimmedLine.includes(`await ${entityName.toLowerCase()}Client.init();`)) {
-          // Remove this line
-          continue;
-        }
-        
-        updatedLines.push(line);
+      // Get all endpoints for the project to regenerate the complete file
+      const project = await this.projectRepository.findOne({ where: { path: projectPath } });
+      if (!project) {
+        throw new Error(`Project not found for path: ${projectPath}`);
       }
-      
-      // Clean consecutive empty lines
-      const cleanedLines = updatedLines.filter((line, index) => {
-        if (line.trim() === '') {
-          // Keep only one consecutive empty line
-          return index === 0 || updatedLines[index - 1].trim() !== '';
-        }
-        return true;
-      });
-      
-      // Write the updated file
-      const updatedContent = cleanedLines.join('\n');
-      fs.writeFileSync(hooksPath, updatedContent, 'utf8');
-      
-      this.logger.debug(`✅ Removed ${entityName} configurations from hooks.ts`);
+
+      await this.regenerateHooksFile(project.id);
     } catch (error) {
-      this.logger.error(`Error removing ${entityName} from hooks.ts: ${error.message}`);
+      this.logger.error(`Error removing from hooks.ts: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Generates the complete hooks.ts file based on all endpoints
+   */
+  private async generateHooksFile(projectPath: string, endpoints: Endpoint[]): Promise<void> {
+    const hooksPath = path.join(projectPath, 'src', 'steps', 'hooks.ts');
+    
+    // Group endpoints by section
+    const endpointsBySection = this.groupEndpointsBySection(endpoints);
+    
+    // Prepare template variables
+    const templateVariables = {
+      clients: this.generateClientDeclarations(endpointsBySection),
+      entities: this.generateEntityStorage(endpointsBySection),
+      imports: this.generateImports(endpointsBySection),
+    };
+
+    // Generate the complete hooks file
+    const hooksContent = await this.templateService.renderTemplate(
+      'hooks.ts.template',
+      templateVariables
+    );
+
+    // Write the file
+    fs.writeFileSync(hooksPath, hooksContent, 'utf8');
+  }
+
+  /**
+   * Groups endpoints by section
+   */
+  private groupEndpointsBySection(endpoints: Endpoint[]): Record<string, Endpoint[]> {
+    const grouped: Record<string, Endpoint[]> = {};
+    
+    for (const endpoint of endpoints) {
+      if (!grouped[endpoint.section]) {
+        grouped[endpoint.section] = [];
+      }
+      grouped[endpoint.section].push(endpoint);
+    }
+    
+    return grouped;
+  }
+
+  /**
+   * Generates client declarations for the template
+   */
+  private generateClientDeclarations(endpointsBySection: Record<string, Endpoint[]>): any[] {
+    const clients: any[] = [];
+    
+    for (const [section, endpoints] of Object.entries(endpointsBySection)) {
+      for (const endpoint of endpoints) {
+        clients.push({
+          clientName: `${endpoint.entityName.toLowerCase()}Client`,
+          clientType: `${endpoint.entityName}Client`,
+          section: section,
+          entityName: endpoint.entityName,
+        });
+      }
+    }
+    
+    return clients;
+  }
+
+  /**
+   * Generates entity storage declarations for the template
+   */
+  private generateEntityStorage(endpointsBySection: Record<string, Endpoint[]>): any[] {
+    const entities: any[] = [];
+    
+    for (const [section, endpoints] of Object.entries(endpointsBySection)) {
+      for (const endpoint of endpoints) {
+        entities.push({
+          pluralName: `${endpoint.entityName}s`,
+          singularName: endpoint.entityName,
+          entityName: endpoint.entityName,
+          section: section,
+          clientName: `${endpoint.entityName.toLowerCase()}Client`,
+        });
+      }
+    }
+    
+    return entities;
+  }
+
+  /**
+   * Generates imports for the template
+   */
+  private generateImports(endpointsBySection: Record<string, Endpoint[]>): string[] {
+    const imports: string[] = [];
+    
+    for (const [section, endpoints] of Object.entries(endpointsBySection)) {
+      for (const endpoint of endpoints) {
+        imports.push(`import { ${endpoint.entityName}Client } from '../api/${section}/${endpoint.entityName.toLowerCase()}.client';`);
+      }
+    }
+    
+    return imports;
+  }
+
+  /**
+   * Generates step imports for the template
+   */
+  private generateStepImports(endpointsBySection: Record<string, Endpoint[]>): string[] {
+    const imports: string[] = [];
+    
+    for (const [section, endpoints] of Object.entries(endpointsBySection)) {
+      for (const endpoint of endpoints) {
+        imports.push(`import '../${section}/${endpoint.entityName.toLowerCase()}.steps';`);
+      }
+    }
+    
+    return imports;
   }
 }

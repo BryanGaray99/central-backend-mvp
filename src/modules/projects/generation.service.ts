@@ -28,22 +28,22 @@ export class GenerationService {
   async generateProject(project: Project): Promise<void> {
     try {
       await this.updateProjectStatus(project.id, ProjectStatus.PENDING);
-
+      
       // Initialize Playwright project (this creates the basic structure)
       await this.playwrightService.initializeProject(project);
-
+      
       // Create additional structure for BDD BEFORE generating files
       await this.fileSystemService.createDirectoryStructure(
         project.path,
         PROJECT_STRUCTURE,
       );
-
+      
       // Generate/modify files from templates
       await this.generateProjectFiles(project);
-
+      
       // Run health check before marking as ready
       const isHealthy = await this.playwrightService.runHealthCheck(project);
-
+      
       if (isHealthy) {
         await this.updateProjectStatus(project.id, ProjectStatus.READY);
       } else {
@@ -54,10 +54,10 @@ export class GenerationService {
         `Error generating project ${project.name}: ${error.message}`,
       );
       await this.updateProjectStatus(project.id, ProjectStatus.FAILED);
-
+      
       // Execute automatic cleanup in case of failure
       await this.cleanupService.cleanupFailedProject(project, error);
-
+      
       throw error;
     }
   }
@@ -67,16 +67,21 @@ export class GenerationService {
       name: project.name,
       baseUrl: project.baseUrl,
       basePath: '/v1/api', // Default API base path
-      author: project.metadata?.author || '',
-      description:
-        project.metadata?.description ||
-        'API testing project with Playwright + BDD',
+      author: '',
+      description: 'API testing project with Playwright + BDD',
     };
 
     // Modify existing package.json with our configurations
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.PACKAGE_JSON,
       path.join(project.path, 'package.json'),
+      templateVariables,
+    );
+
+    // Generate tsconfig.json
+    await this.templateService.writeRenderedTemplate(
+      path.join(__dirname, 'templates', 'tsconfig.json.template'),
+      path.join(project.path, 'tsconfig.json'),
       templateVariables,
     );
 
@@ -136,6 +141,13 @@ export class GenerationService {
       templateVariables,
     );
 
+    // Generate .env
+    await this.templateService.writeRenderedTemplate(
+      path.join(__dirname, 'templates', 'env.template'),
+      path.join(project.path, '.env'),
+      templateVariables,
+    );
+
     // Modify existing README.md
     await this.templateService.writeRenderedTemplate(
       TEMPLATE_FILES.README,
@@ -150,4 +162,4 @@ export class GenerationService {
   ): Promise<void> {
     await this.projectRepo.update(id, { status });
   }
-}
+} 

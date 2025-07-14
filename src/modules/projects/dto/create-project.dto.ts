@@ -30,6 +30,15 @@ export class CreateProjectDto {
   baseUrl: string;
 
   @ApiPropertyOptional({
+    description: 'Base path for API endpoints',
+    example: '/v1/api',
+    default: '/v1/api',
+  })
+  @IsString()
+  @IsOptional()
+  basePath?: string;
+
+  @ApiPropertyOptional({
     description: 'Type of project',
     enum: ProjectType,
     default: ProjectType.PLAYWRIGHT_BDD,
@@ -37,11 +46,4 @@ export class CreateProjectDto {
   @IsEnum(ProjectType)
   @IsOptional()
   type?: ProjectType;
-
-  @ApiPropertyOptional({
-    description: 'Additional project metadata',
-    example: { tags: ['e2e', 'api'], description: 'E2E tests for API' },
-  })
-  @IsOptional()
-  metadata?: Record<string, any>;
 }

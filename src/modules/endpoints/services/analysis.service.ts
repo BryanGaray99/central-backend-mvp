@@ -113,8 +113,8 @@ export class AnalysisService {
       dto,
       methodConfig.method,
       createdResourceId,
+      project.basePath,
     );
-    this.logger.log(`[ANALYZE] URL: ${methodConfig.method} ${url}`);
 
     try {
       let response;
@@ -130,9 +130,6 @@ export class AnalysisService {
           config.data = this.buildRequestBody(
             methodConfig.requestBodyDefinition,
           );
-          this.logger.log(
-            `[ANALYZE] Request body generated for ${methodConfig.method}`,
-          );
         } else {
           this.logger.warn(
             `[ANALYZE] No request body definition for ${methodConfig.method}`,
@@ -141,9 +138,6 @@ export class AnalysisService {
       }
 
       // Make request based on method
-      this.logger.log(
-        `[ANALYZE] Executing HTTP request: ${methodConfig.method} ${url}`,
-      );
       switch (methodConfig.method) {
         case 'GET':
           response = await firstValueFrom(this.httpService.get(url, config));
@@ -174,14 +168,11 @@ export class AnalysisService {
             `Unsupported HTTP method: ${methodConfig.method}`,
           );
       }
-
-      this.logger.log(`[ANALYZE] Response received: status=${response.status}`);
-
+      
       // Extract only the specific entity from the response
       const entityData = this.extractEntityData(response.data, dto.entityName);
       const inferredSchema = this.inferSchemaFromData(entityData);
       const dataPath = this.findDataPath(response.data);
-      this.logger.log(`[ANALYZE] Data path found: ${dataPath}`);
 
       const analysisResult = {
         inferredStatusCode: response.status,
@@ -331,8 +322,18 @@ export class AnalysisService {
     dto: RegisterEndpointDto,
     method: string,
     createdResourceId?: string,
+    basePath?: string,
   ): string {
-    let url = `${baseUrl}${dto.path}`;
+    // Check if dto.path already includes the basePath to avoid duplication
+    const apiBasePath = basePath || '';
+    let endpointPath = dto.path;
+    
+    // If the path already starts with the basePath, remove it to avoid duplication
+    if (apiBasePath && endpointPath.startsWith(apiBasePath)) {
+      endpointPath = endpointPath.substring(apiBasePath.length);
+    }
+    
+    let url = `${baseUrl}${apiBasePath}${endpointPath}`;
 
     // Check if method needs ID parameter
     const needsId = this.methodNeedsId(method);
@@ -350,14 +351,14 @@ export class AnalysisService {
     // Handle ID replacement for PATCH/DELETE methods
     if (needsId && createdResourceId) {
       // Find the last occurrence of the entity path and append the ID
-      const entityPath = dto.path.split('/').pop(); // Get the last part of the path
+      const entityPath = endpointPath.split('/').pop(); // Get the last part of the path
       if (entityPath && !entityPath.includes('{')) {
-        const pathBeforeEntity = dto.path.substring(
+        const pathBeforeEntity = endpointPath.substring(
           0,
-          dto.path.lastIndexOf('/'),
+          endpointPath.lastIndexOf('/'),
         );
         const newPath = `${pathBeforeEntity}/${entityPath}/${createdResourceId}`;
-        url = `${baseUrl}${newPath}`;
+        url = `${baseUrl}${apiBasePath}${newPath}`;
       }
     }
 
@@ -404,7 +405,7 @@ export class AnalysisService {
   private inferSchemaFromData(data: any): any {
     if (data === null) {
       return { type: 'null' };
-    }
+      }
 
     if (typeof data === 'string') {
       return { type: 'string' };
@@ -444,7 +445,7 @@ export class AnalysisService {
         properties,
         required: required.length > 0 ? required : undefined,
       };
-    }
+  }
 
     return { type: 'string' };
   }

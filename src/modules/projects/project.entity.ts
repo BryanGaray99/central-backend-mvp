@@ -31,6 +31,9 @@ export class Project {
   @Column()
   baseUrl: string;
 
+  @Column({ nullable: true, default: '/v1/api' })
+  basePath: string;
+
   @Column({ type: 'varchar', default: ProjectStatus.PENDING })
   status: ProjectStatus;
 
@@ -39,9 +42,6 @@ export class Project {
 
   @Column({ nullable: true })
   path: string;
-
-  @Column({ type: 'simple-json', nullable: true })
-  metadata: Record<string, any>;
 
   @CreateDateColumn()
   createdAt: Date;

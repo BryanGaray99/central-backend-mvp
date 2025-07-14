@@ -87,7 +87,7 @@ export class RegisterEndpointDto {
   @IsString()
   entityName: string;
 
-  @ApiProperty({ example: '/v1/api/categories/{id}' })
+  @ApiProperty({ example: '/categories/{id}' })
   @IsString()
   path: string;
 

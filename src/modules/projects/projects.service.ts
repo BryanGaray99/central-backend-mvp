@@ -13,8 +13,6 @@ import { GenerationService } from './generation.service';
 import { ValidationService } from './services/validation.service';
 import { QueueService } from './services/queue.service';
 import { CleanupService } from './services/cleanup.service';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
 @Injectable()
 export class ProjectsService {
@@ -47,12 +45,12 @@ export class ProjectsService {
     const project = this.projectRepo.create({
       ...createDto,
       displayName: createDto.displayName || createDto.name,
+      basePath: createDto.basePath || '/v1/api',
       status: ProjectStatus.PENDING,
       type: createDto.type || ProjectType.PLAYWRIGHT_BDD,
       path: workspacePath,
     });
     const savedProject = await this.projectRepo.save(project);
-    await this.createProjectMetadata(savedProject);
 
     // Add to generation queue instead of executing directly
     try {
@@ -81,10 +79,9 @@ export class ProjectsService {
     if (updateDto.displayName !== undefined)
       project.displayName = updateDto.displayName;
     if (updateDto.baseUrl !== undefined) project.baseUrl = updateDto.baseUrl;
-    if (updateDto.metadata !== undefined) project.metadata = updateDto.metadata;
+    if (updateDto.basePath !== undefined) project.basePath = updateDto.basePath;
 
     const updatedProject = await this.projectRepo.save(project);
-    await this.createProjectMetadata(updatedProject);
     return updatedProject;
   }
 
@@ -96,22 +93,5 @@ export class ProjectsService {
     await this.projectRepo.remove(project);
   }
 
-  private async createProjectMetadata(project: Project): Promise<void> {
-    const metadataPath = path.join(project.path, 'project-meta.json');
-    const metadata = {
-      id: project.id,
-      name: project.name,
-      displayName: project.displayName,
-      baseUrl: project.baseUrl,
-      type: project.type,
-      status: project.status,
-      metadata: project.metadata || {},
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-      endpoints: [],
-      testCases: [],
-      executions: [],
-    };
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
-  }
+
 }

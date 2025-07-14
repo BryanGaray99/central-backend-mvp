@@ -20,7 +20,7 @@ export class PlaywrightService {
     );
 
     try {
-      // Step 1: Initialize Playwright project with skip browser download and pre-seeded options
+      // Step 1: Initialize Playwright project with skip browser download
       this.logger.log('Step 1: Initializing Playwright project...');
       await this.execCommandWithTimeout(
         'npm init playwright@latest -- --yes --quiet',
@@ -29,19 +29,13 @@ export class PlaywrightService {
         {
           NODE_ENV: 'development',
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1',
-          TEST_OPTIONS: JSON.stringify({
-            language: 'TypeScript',
-            testDir: 'tests',
-            installGitHubActions: false,
-            installPlaywrightBrowsers: false,
-          }),
         },
       );
 
       // Step 2: Install additional dependencies for BDD
       this.logger.log('Step 2: Installing BDD dependencies...');
       await this.execCommandWithTimeout(
-        'npm install --save-dev @playwright/test @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats',
+        'npm install --save-dev @playwright/test @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats typescript ts-node @types/node dotenv',
         project.path,
         'BDD dependencies installation',
         { NODE_ENV: 'development' },
@@ -114,27 +108,34 @@ export class PlaywrightService {
     this.logger.log(`Running health check for project: ${project.name}`);
 
     try {
+      // Ensure src/tests directory exists
+      const testsDir = path.join(project.path, 'src', 'tests');
+      await fs.mkdir(testsDir, { recursive: true });
+
       const healthTestContent = `
 import { test, expect } from '@playwright/test';
 
 test('health check - project setup', async () => {
-  expect(process.env.npm_package_name).toBe('${project.name}');
+  // Verify that required dependencies are available
   const { Given, When, Then } = require('@cucumber/cucumber');
   const { faker } = require('@faker-js/faker');
   const Ajv = require('ajv');
+  
+  // Check that dependencies are properly installed
   expect(Given).toBeDefined();
   expect(faker).toBeDefined();
   expect(Ajv).toBeDefined();
+  
+  // Verify that we can access the project structure
+  expect(process.cwd()).toContain('${project.name}');
 });`;
 
-      await fs.writeFile(
-        path.join(project.path, 'tests/health.spec.ts'),
-        healthTestContent,
-      );
+      const healthTestPath = path.join(project.path, 'src/tests/health.spec.ts');
+      await fs.writeFile(healthTestPath, healthTestContent);
 
       // Run health check with NODE_ENV=development to ensure devDependencies are present
       await this.execCommandWithTimeout(
-        'npx playwright test tests/health.spec.ts',
+        'npx playwright test health.spec.ts',
         project.path,
         'Health check test',
         { NODE_ENV: 'development' },
