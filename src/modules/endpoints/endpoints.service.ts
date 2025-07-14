@@ -38,10 +38,6 @@ export class EndpointsService {
   ) {}
 
   async registerAndAnalyze(dto: RegisterEndpointDto) {
-    // this.logger.log(
-    //   `[SERVICE] Iniciando registro y análisis para endpoint: ${dto.entityName}`,
-    // );
-
     // Validate projectId is present
     if (!dto.projectId) {
       throw new BadRequestException('Project ID is required');
@@ -91,14 +87,12 @@ export class EndpointsService {
       jobId: uuidv4(),
       name,
       id: savedEndpoint.id,
-        projectId: dto.projectId,
+      projectId: dto.projectId,
       message: `Analysis and generation started for endpoint ${name}`,
     };
   }
 
   async listEndpoints(projectId: string): Promise<Endpoint[]> {
-    // this.logger.log(`[SERVICE] Listando endpoints para proyecto: ${projectId}`);
-
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
@@ -112,10 +106,6 @@ export class EndpointsService {
   }
 
   async getEndpoint(id: string, projectId: string): Promise<Endpoint> {
-    // this.logger.log(
-    //   `[SERVICE] Obteniendo endpoint con ID: ${id} del proyecto: ${projectId}`,
-    // );
-
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
@@ -138,10 +128,6 @@ export class EndpointsService {
     projectId: string,
     dto: UpdateEndpointDto,
   ): Promise<Endpoint> {
-    // this.logger.log(
-    //   `[SERVICE] Actualizando endpoint con ID: ${id} del proyecto: ${projectId}`,
-    // );
-
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
@@ -225,10 +211,6 @@ export class EndpointsService {
     project: Project,
   ) {
     try {
-      // this.logger.log(
-      //   `[SERVICE] Procesando endpoint ${endpoint.name} en background`,
-      // );
-
       // Update status to analyzing
       endpoint.status = 'analyzing';
       await this.endpointRepository.save(endpoint);
@@ -270,15 +252,12 @@ export class EndpointsService {
       endpoint.status = 'ready';
       await this.endpointRepository.save(endpoint);
 
-
-
       // Update hooks.ts with all endpoints - only if endpoint is ready
       if (endpoint.status === 'ready' && endpoint.analysisResults) {
         try {
           await this.hooksUpdaterService.regenerateHooksFile(project.id);
         } catch (error) {
           this.logger.warn(`Failed to update hooks.ts: ${error.message}`);
-          // Don't fail the entire process if hooks.ts update fails
         }
       }
 
@@ -288,31 +267,15 @@ export class EndpointsService {
           await this.apiConfigUpdaterService.updateApiConfigOnEndpointRegistration(project.id);
         } catch (error) {
           this.logger.warn(`Failed to update api.config.ts: ${error.message}`);
-          // Don't fail the entire process if api.config.ts update fails
         }
       }
-
-      // this.logger.log(
-      //   `[SERVICE] Endpoint ${endpoint.name} procesado exitosamente`,
-      // );
     } catch (error) {
-      // this.logger.error(
-      //   `[SERVICE] Error procesando endpoint ${endpoint.name}:`,
-      //   error,
-      // );
-
       endpoint.status = 'failed';
       endpoint.errorMessage = error.message;
       await this.endpointRepository.save(endpoint);
     }
   }
 
-
-
-  /**
-   * Extrae DTO del request body con sus validaciones
-   * ✅ CORREGIDO: Usa la misma lógica que TemplateVariablesService.mapInputField()
-   */
   private extractDtoFromRequestBody(requestBody: any, dtoType: 'create' | 'update'): any {
     const dto: any = {};
 
@@ -410,14 +373,9 @@ export class EndpointsService {
       }
     }
 
-    // Comentado: logs de debug antiguos
-    // this.logger.log(`[SERVICE] Extracted ${Object.keys(dto).length} fields for ${dtoType}Dto`);
     return dto;
   }
 
-  /**
-   * Mapea tipos JSON Schema a TypeScript
-   */
   private mapJsonTypeToTypeScript(jsonType: string): string {
     const typeMap: { [key: string]: string } = {
       'string': 'string',
@@ -443,6 +401,5 @@ export class EndpointsService {
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '');
   }
-
 
 } 

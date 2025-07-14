@@ -98,11 +98,11 @@ export class TestCaseRegistrationService {
           }
           
           if (scenarioName) {
-            this.logger.log(`[REGISTRO] Encontrado tag en línea ${i + 1}`);
-            this.logger.log(`[REGISTRO] Escenario: "${scenarioName}"`);
-            this.logger.log(`[REGISTRO] Tags encontrados: ${tags.join(', ')}`);
-            this.logger.log(`[REGISTRO] Steps extraídos: ${steps.split('\n').length} líneas`);
-            this.logger.log(`[REGISTRO] Asignando número: ${currentNumber}`);
+//             this.logger.log(`Encontrado tag en línea ${i + 1}`);
+//             this.logger.log(`Escenario: "${scenarioName}"`);
+//             this.logger.log(`Tags encontrados: ${tags.join(', ')}`);
+//             this.logger.log(`Steps extraídos: ${steps.split('\n').length} líneas`);
+//             this.logger.log(`Asignando número: ${currentNumber}`);
             
             lines[i] = lines[i].replace(tagPattern, `@TC-${section}-${currentNumber}`);
             replacements.push({ 
@@ -118,11 +118,11 @@ export class TestCaseRegistrationService {
       }
       
       await fs.writeFile(featureFilePath, lines.join('\n'), 'utf-8');
-      this.logger.log(`[REGISTRO] Feature file actualizado con tags reemplazados: ${featureFilePath}`);
+//     this.logger.log(`Feature file actualizado con tags reemplazados: ${featureFilePath}`);
 
       for (const rep of replacements) {
         const method = this.determineMethodFromScenario(rep.scenarioName, dto.methods);
-        this.logger.log(`[REGISTRO] Creando test case: TC-${section}-${rep.number} - ${rep.scenarioName} - Método: ${method}`);
+//         this.logger.log(`Creando test case: TC-${section}-${rep.number} - ${rep.scenarioName} - Método: ${method}`);
         await this.createTestCaseFromScenario(
           projectId,
           section,
@@ -134,9 +134,9 @@ export class TestCaseRegistrationService {
           rep.steps
         );
       }
-      this.logger.log(`[REGISTRO] Total de test cases registrados: ${replacements.length}`);
+//     this.logger.log(`Total de test cases registrados: ${replacements.length}`);
     } catch (error) {
-      this.logger.error(`[REGISTRO] Error procesando feature file:`, error);
+      this.logger.error(`Error procesando feature file:`, error);
       throw error;
     }
   }
@@ -209,8 +209,8 @@ export class TestCaseRegistrationService {
     const testCaseId = `TC-${section}-${number}`;
     const testType = this.determineTestType(scenarioName);
     
-    this.logger.log(`[REGISTRO] Guardando en BD: ${testCaseId} - ${scenarioName} - tags: ${tags.join(', ')} - tipo: ${testType}`);
-    this.logger.log(`[REGISTRO] Steps a guardar: ${steps.split('\n').length} líneas`);
+    this.logger.log(`Guardando en BD: ${testCaseId} - ${scenarioName} - tags: ${tags.join(', ')} - tipo: ${testType}`);
+//     this.logger.log(`Steps a guardar: ${steps.split('\n').length} líneas`);
     
     const testCase = this.testCaseRepository.create({
       testCaseId,

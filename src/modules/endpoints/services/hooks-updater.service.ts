@@ -102,7 +102,6 @@ export class HooksUpdaterService {
 
     // Write the file
     fs.writeFileSync(hooksPath, hooksContent, 'utf8');
-    this.logger.debug(`✅ hooks.ts generated with ${endpoints.length} endpoints`);
   }
 
   /**

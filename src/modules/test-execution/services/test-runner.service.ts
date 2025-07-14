@@ -129,7 +129,30 @@ export class TestRunnerService {
 
       child.stdout.on('data', (data) => {
         stdout += data.toString();
-        this.logger.debug(`STDOUT: ${data.toString()}`);
+        // Resumir logs: solo mostrar nombre del escenario y si pasó o falló
+        const lines = data.toString().split('\n');
+        for (const line of lines) {
+          // Detectar líneas de resultado de escenario
+          if (/^✅\s+Scenario:/.test(line)) {
+            // Escenario pasado
+            const match = line.match(/^✅\s+Scenario: (.+)$/);
+            if (match) {
+              this.logger.log(`✅ PASSED: ${match[1]}`);
+            }
+          } else if (/^❌\s+Scenario:/.test(line)) {
+            // Escenario fallido
+            const match = line.match(/^❌\s+Scenario: (.+)$/);
+            if (match) {
+              this.logger.error(`❌ FAILED: ${match[1]}`);
+            }
+          } else if (/^Scenario:/.test(line)) {
+            // Si hay línea de escenario sin símbolo, mostrar como info
+            const match = line.match(/^Scenario: (.+)$/);
+            if (match) {
+              this.logger.log(`Escenario: ${match[1]}`);
+            }
+          }
+        }
       });
 
       child.stderr.on('data', (data) => {

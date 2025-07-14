@@ -44,12 +44,11 @@ export class ArtifactsGenerationService {
         templateVariables,
       );
 
-      // === INTEGRACIÓN: Actualizar hooks.ts ===
+      // Actualizar hooks.ts
       await this.hooksUpdaterService.updateHooksFile(project.path, dto.entityName, dto.section);
       this.logger.log('hooks.ts actualizado para la entidad ' + dto.entityName);
-      // === FIN INTEGRACIÓN ===
     
-    this.logger.log('Artifacts generation completed.');
+      this.logger.log('Artifacts generation completed.');
       return result;
     } catch (error) {
       this.logger.error('Error generating artifacts:', error);
@@ -57,79 +56,5 @@ export class ArtifactsGenerationService {
     }
   }
 
-  async generateArtifacts(
-    dto: RegisterEndpointDto,
-    analysisResult: any,
-    project: Project,
-  ) {
-    try {
-      console.log('🔍 === DATOS OBTENIDOS DEL ANÁLISIS ===');
-      console.log('📋 DTO Original:', {
-      entityName: dto.entityName,
-        section: dto.section,
-      path: dto.path,
-        methods: dto.methods?.map((m) => m.method) || [],
-      });
-      console.log('🔬 Resultado del Análisis:', {
-        successCount: Object.values(
-          analysisResult.analysisResults || {},
-        ).filter((r: any) => r.success).length,
-        methods: Object.keys(analysisResult.analysisResults || {}),
-        hasSchema:
-          !!analysisResult.analysisResults?.['POST']?.inferredResponseSchema,
-      });
-      console.log('📁 Proyecto:', {
-        id: project.id,
-        name: project.name,
-        baseUrl: project.baseUrl,
-      });
-
-      // Build template variables using specialized service
-      const templateVariables = this.templateVariablesService.buildTemplateVariables(
-        dto,
-        analysisResult,
-        project,
-      );
-
-      console.log('🔧 === VARIABLES DE TEMPLATE GENERADAS ===');
-      console.log('📝 Variables para Types:', {
-        entityName: templateVariables.entityName,
-        fieldsCount: templateVariables.fields.length,
-        createFieldsCount: templateVariables.createFields.length,
-        updateFieldsCount: templateVariables.updateFields.length,
-      });
-
-      console.log('📝 Variables para Schema:', {
-        entityName: templateVariables.entityName,
-        fieldsCount: templateVariables.fields.length,
-        requiredFields: templateVariables.fields
-          .filter((f) => f.required)
-          .map((f) => f.name),
-      });
-
-      console.log('📝 Variables para Fixture:', {
-        entityName: templateVariables.entityName,
-        fieldsCount: templateVariables.fields.length,
-        fakerFields: templateVariables.fields
-          .filter((f) => f.isFaker)
-          .map((f) => f.name),
-      });
-
-      // Generate artifacts (types, schemas, fixtures, clients) - excluding feature and steps
-      const result = await this.artifactsFileGeneratorService.generateArtifactsOnly(
-        project.path,
-        dto.section,
-        dto.entityName,
-        templateVariables,
-      );
-
-      console.log('✅ === GENERACIÓN COMPLETADA ===');
-      console.log('🎯 Archivos generados exitosamente para:', dto.entityName);
-
-      return result;
-    } catch (error) {
-      console.error('❌ Error generating artifacts:', error);
-      throw error;
-    }
-  }
+  // El método generateArtifacts solo se usa para debug/desarrollo, lo dejamos comentado o lo eliminamos si no se usa.
 }

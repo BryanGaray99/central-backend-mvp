@@ -22,7 +22,7 @@ Before(async function(scenario) {
   const scenarioName = scenario.pickle.name;
   const tags = scenario.pickle.tags.map(tag => tag.name);
   
-  console.log(`🚀 Starting scenario: ${scenarioName}`);
+  // console.log(`🚀 Starting scenario: ${scenarioName}`);
   
   listenerService.captureScenarioStart(
     scenarioName,
@@ -40,9 +40,9 @@ After(async function(scenario) {
   const duration = scenario.result?.duration || 0;
   const errorMessage = scenario.result?.message;
 
-  console.log(`✅ **************${status.toUpperCase()}**************`);
-  console.log(`✅ Scenario: ${scenarioName}`);
-  console.log(`✅ ************************************`);
+  // console.log(`✅ **************${status.toUpperCase()}**************`);
+  // console.log(`✅ Scenario: ${scenarioName}`);
+  // console.log(`✅ ************************************`);
 
   listenerService.captureScenarioResult(
     scenarioName,

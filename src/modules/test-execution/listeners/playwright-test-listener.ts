@@ -37,7 +37,7 @@ export class PlaywrightTestListener {
 
   onTestStart(test: Test): void {
     this.currentScenarioName = test.title;
-    console.log(`🚀 Starting scenario: ${this.currentScenarioName}`);
+    // console.log(`🚀 Starting scenario: ${this.currentScenarioName}`);
     
     this.listenerService.captureScenarioStart(
       this.currentScenarioName,
@@ -50,9 +50,9 @@ export class PlaywrightTestListener {
     const duration = result.duration;
     const errorMessage = result.error?.message;
 
-    console.log(`✅ **************${status.toUpperCase()}**************`);
-    console.log(`✅ Scenario: ${this.currentScenarioName}`);
-    console.log(`✅ ************************************`);
+    // console.log(`✅ **************${status.toUpperCase()}**************`);
+    // console.log(`✅ Scenario: ${this.currentScenarioName}`);
+    // console.log(`✅ ************************************`);
 
     this.listenerService.captureScenarioResult(
       this.currentScenarioName,
