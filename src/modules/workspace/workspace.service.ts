@@ -11,12 +11,7 @@ export class WorkspaceService {
   private readonly workspacesDir: string;
 
   constructor() {
-    const envPath = process.env.PLAYWRIGHT_WORKSPACES_PATH;
-    if (!envPath) {
-      throw new Error(
-        'PLAYWRIGHT_WORKSPACES_PATH must be defined as an absolute or relative path OUTSIDE the backend central.',
-      );
-    }
+    const envPath = process.env.PLAYWRIGHT_WORKSPACES_PATH || '../playwright-workspaces';
     let dir = envPath;
     if (!path.isAbsolute(dir)) {
       dir = path.resolve(process.cwd(), dir);
