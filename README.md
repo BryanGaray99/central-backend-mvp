@@ -222,6 +222,29 @@ Este MVP es la **primera parte** de un sistema más grande:
 - `PUT /endpoints/:id` - Actualizar endpoint
 - `DELETE /endpoints/:id` - Eliminar endpoint
 
+### Test Cases
+- `POST /test-cases` - Crear caso de prueba
+- `GET /test-cases` - Listar casos de prueba
+- `GET /test-cases/:id` - Obtener caso de prueba
+- `PUT /test-cases/:id` - Actualizar caso de prueba
+- `DELETE /test-cases/:id` - Eliminar caso de prueba
+- `POST /test-cases/:id/duplicate` - Duplicar caso de prueba
+- `GET /test-cases/:id/export` - Exportar caso de prueba
+
+### Test Steps
+- `POST /test-cases/steps` - Crear plantilla de step
+- `GET /test-cases/steps` - Listar plantillas de steps
+- `GET /test-cases/steps/:id` - Obtener plantilla de step
+- `PUT /test-cases/steps/:id` - Actualizar plantilla de step
+- `DELETE /test-cases/steps/:id` - Eliminar plantilla de step
+
+### Test Execution
+- `POST /test-execution/execute` - Ejecutar tests
+- `GET /test-execution/status` - Obtener estado de ejecución
+- `GET /test-execution/results` - Obtener resultados
+- `POST /test-execution/stop` - Detener ejecución
+- `GET /test-execution/history` - Historial de ejecuciones
+
 ## 🧪 Probar la API
 
 ### Crear un Proyecto
@@ -279,25 +302,23 @@ rm central-backend.sqlite
 npm run start:dev
 ```
 
-### Archivo .env no configurado
-Si el servidor no inicia o da errores de configuración:
+### Configuración opcional con .env
+Si quieres personalizar la configuración, puedes crear un archivo `.env`:
 ```bash
-# Verificar que existe el archivo .env
-ls -la .env
-
-# Si no existe, copiarlo del ejemplo
+# Crear archivo .env (opcional)
 cp .env.example .env
 
-# Editar las variables necesarias
+# Editar las variables según tus necesidades
 nano .env  # o usar tu editor preferido
 ```
 
-### Variables de entorno faltantes
-Asegúrate de que todas las variables del `.env.example` estén presentes en tu `.env`:
-- `PORT`: Puerto del servidor
-- `DATABASE_PATH`: Ruta de la base de datos
-- `PLAYWRIGHT_WORKSPACES_PATH`: Ruta para workspaces
-- `LOG_LEVEL`: Nivel de logging
+### Variables de entorno disponibles
+Si creas un archivo `.env`, puedes configurar estas variables:
+- `PORT`: Puerto del servidor (default: 3000)
+- `PLAYWRIGHT_WORKSPACES_PATH`: Ruta para workspaces (default: ../playwright-workspaces)
+- `LOG_LEVEL`: Nivel de logging (default: debug)
+- `JWT_SECRET`: Clave secreta JWT (default: your-secret-key)
+- `API_KEY`: API Key para seguridad (default: your-api-key)
 
 ## 📁 Estructura
 
@@ -314,11 +335,11 @@ src/
 ## 📝 Notas Importantes
 
 - **Ejecución Local**: Este MVP está diseñado para ejecutarse localmente donde se generarán los proyectos
-- **Base de datos**: SQLite se crea automáticamente en la ruta especificada en `DATABASE_PATH`
-- **Workspaces**: Se generan en la ruta especificada en `PLAYWRIGHT_WORKSPACES_PATH`
+- **Base de datos**: SQLite se crea automáticamente en la ruta `../playwright-workspaces/central-backend.sqlite`
+- **Workspaces**: Se generan en la ruta `../playwright-workspaces` por defecto
 - **Documentación**: Swagger UI disponible en `/docs`
-- **Configuración**: Requiere archivo `.env` configurado según `.env.example`
-- **Variables críticas**: `PORT`, `DATABASE_PATH`, `PLAYWRIGHT_WORKSPACES_PATH` son obligatorias
+- **Configuración**: El proyecto funciona sin archivo `.env` usando valores por defecto
+- **Variables opcionales**: Puedes crear un archivo `.env` para personalizar la configuración
 
 ## 🔮 Arquitectura Futura
 
