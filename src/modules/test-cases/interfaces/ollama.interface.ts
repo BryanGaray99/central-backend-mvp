@@ -27,6 +27,7 @@ export interface TestCaseContext {
   analysis: Record<string, any>;
   projectPath?: string;
   existingPatterns?: any[];
+  section?: string;
 }
 
 export interface CodeValidationResult {

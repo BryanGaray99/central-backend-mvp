@@ -14,6 +14,8 @@ export class TSMorphService {
   private project: Project | null = null;
   private readonly ANALYSIS_FILENAME = 'project-analysis.json';
 
+  constructor() {}
+
   /**
    * Inicializa el proyecto TS-Morph
    */
@@ -44,35 +46,47 @@ export class TSMorphService {
    * Analiza el proyecto completo
    */
   async analyzeProject(projectPath: string): Promise<CodeAnalysis> {
-    // Primero intentar cargar análisis existente
-    const existingAnalysis = await this.loadAnalysisFromFile(projectPath);
-    if (existingAnalysis) {
-      this.logger.log('Análisis cargado desde archivo existente');
-      return existingAnalysis;
-    }
-
-    // Si no existe, realizar análisis completo
-    await this.initializeProject(projectPath);
-
-    if (!this.project) {
-      throw new Error('Proyecto TS-Morph no inicializado');
-    }
-
-    const sourceFiles = this.project.getSourceFiles();
+    const startTime = Date.now();
     
-    const analysis: CodeAnalysis = {
-      existingTests: this.findExistingTests(sourceFiles),
-      imports: this.analyzeImports(sourceFiles),
-      patterns: this.extractPatterns(sourceFiles),
-      classes: this.analyzeClasses(sourceFiles),
-      interfaces: this.analyzeInterfaces(sourceFiles),
-      methods: this.analyzeMethods(sourceFiles),
-    };
+    try {
+      // Primero intentar cargar análisis existente
+      const existingAnalysis = await this.loadAnalysisFromFile(projectPath);
+      if (existingAnalysis) {
+        this.logger.log('Análisis cargado desde archivo existente');
+        return existingAnalysis;
+      }
 
-    // Guardar análisis en archivo
-    await this.saveAnalysisToFile(projectPath, analysis);
+      // Si no existe, realizar análisis completo
+      await this.initializeProject(projectPath);
 
-    return analysis;
+      if (!this.project) {
+        throw new Error('Proyecto TS-Morph no inicializado');
+      }
+
+      const sourceFiles = this.project.getSourceFiles();
+      
+      this.logger.log(`Analizando ${sourceFiles.length} archivos fuente`);
+      
+      const analysis: CodeAnalysis = {
+        existingTests: this.findExistingTests(sourceFiles),
+        imports: this.analyzeImports(sourceFiles),
+        patterns: this.extractPatterns(sourceFiles),
+        classes: this.analyzeClasses(sourceFiles),
+        interfaces: this.analyzeInterfaces(sourceFiles),
+        methods: this.analyzeMethods(sourceFiles),
+      };
+
+      // Guardar análisis en archivo
+      await this.saveAnalysisToFile(projectPath, analysis);
+
+      const endTime = Date.now();
+      const processingTime = endTime - startTime;
+
+      this.logger.log(`Análisis completado en ${processingTime}ms`);
+      return analysis;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
