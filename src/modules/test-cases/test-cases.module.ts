@@ -1,46 +1,40 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TestCasesController } from './controllers/test-cases.controller';
 import { TestCasesService } from './services/test-cases.service';
 import { TestCase } from './entities/test-case.entity';
 import { TestStep } from './entities/test-step.entity';
-import { Project } from '../projects/project.entity';
+import { AIGeneration } from './entities/ai-generation.entity';
 import { StepTemplatesService } from './services/step-templates.service';
-import { TestCaseGenerationService } from './services/test-case-generation.service';
-import { FeatureFileManagerService } from './services/feature-file-manager.service';
 import { StepsFileManagerService } from './services/steps-file-manager.service';
-import { TestCaseValidationService } from './services/test-case-validation.service';
+import { FeatureFileManagerService } from './services/feature-file-manager.service';
+import { TestCaseGenerationService } from './services/test-case-generation.service';
 import { TestCaseRegistrationService } from './services/test-case-registration.service';
-import { FileSystemService } from '../projects/services/file-system.service';
-import { TemplateService } from '../projects/services/template.service';
-import { EndpointsModule } from '../endpoints/endpoints.module';
+import { Project } from '../projects/project.entity';
 import { ProjectsModule } from '../projects/projects.module';
+import { AIModule } from '../ai/ai.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TestCase, TestStep, Project]),
-    forwardRef(() => EndpointsModule),
-    ProjectsModule,
+    TypeOrmModule.forFeature([TestCase, TestStep, Project, AIGeneration]),
+    ProjectsModule, // Importar ProjectsModule para acceder a FileSystemService y TemplateService
+    AIModule, // Importar AI Module para acceder a AIAgentService
   ],
   controllers: [TestCasesController],
   providers: [
     TestCasesService,
     StepTemplatesService,
-    TestCaseGenerationService,
-    FeatureFileManagerService,
     StepsFileManagerService,
-    TestCaseValidationService,
+    FeatureFileManagerService,
+    TestCaseGenerationService,
     TestCaseRegistrationService,
-    FileSystemService,
-    TemplateService,
   ],
   exports: [
     TestCasesService,
     StepTemplatesService,
-    TestCaseGenerationService,
-    FeatureFileManagerService,
     StepsFileManagerService,
-    TestCaseValidationService,
+    FeatureFileManagerService,
+    TestCaseGenerationService,
     TestCaseRegistrationService,
   ],
 })

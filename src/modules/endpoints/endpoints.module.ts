@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
-import { EndpointsController } from './endpoints.controller';
+import { EndpointsController } from './controllers/endpoints.controller';
 import { EndpointsService } from './endpoints.service';
 import { Endpoint } from './endpoint.entity';
 import { Project } from '../projects/project.entity';

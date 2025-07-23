@@ -13,8 +13,12 @@ import { TestResult } from './modules/test-execution/entities/test-result.entity
 import { TestExecutionModule } from './modules/test-execution/test-execution.module';
 import { TestCase } from './modules/test-cases/entities/test-case.entity';
 import { TestStep } from './modules/test-cases/entities/test-step.entity';
+import { AIGeneration } from './modules/test-cases/entities/ai-generation.entity';
 import { TestCasesModule } from './modules/test-cases/test-cases.module';
 import { DatabaseMigrationModule } from './common/database-migration.module';
+import { AIAssistant } from './modules/ai/entities/ai-assistant.entity';
+import { AIThread } from './modules/ai/entities/ai-thread.entity';
+import { AIModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -31,7 +35,17 @@ import { DatabaseMigrationModule } from './common/database-migration.module';
         return {
           type: 'sqlite',
           database: dbPath,
-          entities: [Project, Endpoint, TestExecution, TestResult, TestCase, TestStep],
+          entities: [
+            Project,
+            Endpoint,
+            TestExecution,
+            TestResult,
+            TestCase,
+            TestStep,
+            AIGeneration,
+            AIAssistant,
+            AIThread,
+          ],
           synchronize: false, // Desactivar synchronize ya que usamos migraciones
         };
       },
@@ -43,6 +57,7 @@ import { DatabaseMigrationModule } from './common/database-migration.module';
     EndpointsModule,
     TestExecutionModule,
     TestCasesModule,
+    AIModule,
   ],
   controllers: [AppController],
   providers: [AppService],

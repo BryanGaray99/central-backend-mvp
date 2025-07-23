@@ -25,6 +25,9 @@ import { TestCaseFiltersDto } from '../dto/test-case-filters.dto';
 import { TestCaseStatisticsDto } from '../dto/test-case-statistics.dto';
 import { CreateStepDto } from '../dto/create-step.dto';
 import { TestStepResponseDto } from '../dto/step-template-response.dto';
+import { TestCaseGenerationService } from '../../ai/services/test-case-generation.service';
+import { AIGenerationRequest, AIGenerationResponse } from '../../ai/interfaces/ai-agent.interface';
+import { AIGenerationRequestDto } from '../../ai/dto/ai-generation-request.dto';
 
 // Interfaces temporales para los métodos TODO
 interface StepTemplateStatisticsDto {
@@ -58,6 +61,7 @@ export class TestCasesController {
   constructor(
     private readonly testCasesService: TestCasesService,
     private readonly stepTemplatesService: StepTemplatesService,
+    private readonly testCaseGenerationService: TestCaseGenerationService,
   ) {}
 
   // ✅ MÉTODOS CRUD BÁSICOS EN USO
@@ -399,5 +403,50 @@ export class TestCasesController {
   ): Promise<TestStepResponseDto[]> {
     // TODO: Implementar con IA para tipificación inteligente
     throw new Error('TODO: Implementar con IA - getStepTemplatesByType');
+  }
+
+  // ✅ ENDPOINT DE IA PARA GENERACIÓN DE TESTS
+  @Post('ai/generate')
+  @ApiOperation({
+    summary: 'Generate test cases with AI',
+    description: 'Generate new test cases using AI for the specified project',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Test cases generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: { type: 'object' },
+        error: { type: 'string' },
+        metadata: { type: 'object' },
+      },
+    },
+  })
+  async generateWithAI(
+    @Param('projectId') projectId: string,
+    @Body() request: AIGenerationRequestDto,
+  ): Promise<AIGenerationResponse> {
+    this.logger.log(`🎯 [CONTROLLER] Recibido request para generar tests con IA`);
+    this.logger.log(`📋 [CONTROLLER] ProjectId: ${projectId}`);
+    this.logger.log(`📋 [CONTROLLER] Request body: ${JSON.stringify(request, null, 2)}`);
+    
+    // Convertir DTO a interface
+    const aiRequest: AIGenerationRequest = {
+      projectId,
+      entityName: request.entityName,
+      section: request.section,
+      operation: request.operation,
+      requirements: request.requirements,
+      metadata: request.metadata,
+    };
+    
+    this.logger.log(`🔄 [CONTROLLER] Enviando request al TestCaseGenerationService...`);
+    const result = await this.testCaseGenerationService.generateTestCases(aiRequest);
+    this.logger.log(`✅ [CONTROLLER] Respuesta recibida del TestCaseGenerationService: ${JSON.stringify(result, null, 2)}`);
+    
+    return result;
   }
 } 

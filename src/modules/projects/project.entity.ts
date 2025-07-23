@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { AIAssistant } from '../ai/entities/ai-assistant.entity';
+import { AIThread } from '../ai/entities/ai-thread.entity';
 
 export enum ProjectStatus {
   PENDING = 'pending',
@@ -43,9 +46,25 @@ export class Project {
   @Column({ nullable: true })
   path: string;
 
+  // Nuevos campos para AI
+  @Column({ name: 'assistant_id', nullable: true })
+  assistantId: string;
+
+  @Column({ name: 'assistant_created_at', type: 'datetime', nullable: true })
+  assistantCreatedAt: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // Relaciones con entidades AI
+  @OneToMany(() => AIAssistant, assistant => assistant.project)
+  aiAssistants: AIAssistant[];
+
+  @OneToMany(() => AIThread, thread => thread.project)
+  aiThreads: AIThread[];
+
+
 }
