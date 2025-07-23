@@ -14,7 +14,7 @@ LOG_LEVEL=debug
 JWT_SECRET=your-secret-key
 
 # API Key (para futuras integraciones de seguridad)
-API_KEY=your-api-key
+OPENAI_API_KEY=your-api-key
 
 # Configuración de generación (para sobrescribir archivos existentes)
 OVERRIDE_EXISTING=false
