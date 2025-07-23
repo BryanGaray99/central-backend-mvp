@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CodeAnalysisController } from './controllers/code-analysis.controller';
 import { TestCasesController } from './controllers/test-cases.controller';
 import { TestCasesService } from './services/test-cases.service';
 import { TestCase } from './entities/test-case.entity';
@@ -12,12 +11,7 @@ import { FeatureFileManagerService } from './services/feature-file-manager.servi
 import { TestCaseGenerationService } from './services/test-case-generation.service';
 import { TestCaseRegistrationService } from './services/test-case-registration.service';
 import { Project } from '../projects/project.entity';
-
-// Code Analysis Services
-import { TSMorphService } from './services/code-manipulation/ts-morph.service';
 import { ProjectsModule } from '../projects/projects.module';
-
-// AI Module
 import { AIModule } from '../ai/ai.module';
 
 @Module({
@@ -26,7 +20,7 @@ import { AIModule } from '../ai/ai.module';
     ProjectsModule, // Importar ProjectsModule para acceder a FileSystemService y TemplateService
     AIModule, // Importar AI Module para acceder a AIAgentService
   ],
-  controllers: [CodeAnalysisController, TestCasesController], // Agregar TestCasesController
+  controllers: [TestCasesController],
   providers: [
     TestCasesService,
     StepTemplatesService,
@@ -34,8 +28,6 @@ import { AIModule } from '../ai/ai.module';
     FeatureFileManagerService,
     TestCaseGenerationService,
     TestCaseRegistrationService,
-    // Code Analysis Services
-    TSMorphService,
   ],
   exports: [
     TestCasesService,
@@ -44,8 +36,6 @@ import { AIModule } from '../ai/ai.module';
     FeatureFileManagerService,
     TestCaseGenerationService,
     TestCaseRegistrationService,
-    // Code Analysis Services
-    TSMorphService,
   ],
 })
 export class TestCasesModule {} 

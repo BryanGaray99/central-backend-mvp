@@ -9,9 +9,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { EndpointsService } from './endpoints.service';
-import { RegisterEndpointDto } from './dto/register-endpoint.dto';
-import { UpdateEndpointDto } from './dto/update-endpoint.dto';
+import { EndpointsService } from '../endpoints.service';
+import { RegisterEndpointDto } from '../dto/register-endpoint.dto';
+import { UpdateEndpointDto } from '../dto/update-endpoint.dto';
 
 @ApiTags('endpoints')
 @Controller('projects/:projectId/endpoints')
