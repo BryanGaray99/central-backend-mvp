@@ -43,26 +43,42 @@ export class StepFilesManipulationService {
     // Insertar cada bloque en su ubicación correspondiente usando comentarios
     if (stepBlocks.given && sectionComments.whenCommentLine >= 0) {
       this.logger.log(`🔍 [${generationId}] Procesando inserción de Given...`);
-      this.logger.log(`📍 [${generationId}] Insertando Given antes del comentario "// When steps" en línea ${sectionComments.whenCommentLine + 1}`);
-      insertions.push({
-        file: filePath,
-        line: sectionComments.whenCommentLine + 1,
-        content: '\n' + stepBlocks.given,
-        type: 'step',
-        description: 'Insertar nuevo Given antes del comentario "// When steps"',
-      });
+      
+      // Verificar si el step ya existe
+      const stepPattern = stepBlocks.given.match(/Given\(['"`]([^'"`]+)['"`]/)?.[1];
+      if (stepPattern && this.stepExists(filePath, stepPattern)) {
+        this.logger.warn(`⚠️ [${generationId}] Step ya existe: ${stepPattern}`);
+        // No insertar el step duplicado
+      } else {
+        this.logger.log(`📍 [${generationId}] Insertando Given antes del comentario "// When steps" en línea ${sectionComments.whenCommentLine + 1}`);
+        insertions.push({
+          file: filePath,
+          line: sectionComments.whenCommentLine + 1,
+          content: '\n' + stepBlocks.given,
+          type: 'step',
+          description: 'Insertar nuevo Given antes del comentario "// When steps"',
+        });
+      }
     }
     
     if (stepBlocks.when && sectionComments.thenCommentLine >= 0) {
       this.logger.log(`🔍 [${generationId}] Procesando inserción de When...`);
-      this.logger.log(`📍 [${generationId}] Insertando When antes del comentario "// Then steps" en línea ${sectionComments.thenCommentLine + 1}`);
-      insertions.push({
-        file: filePath,
-        line: sectionComments.thenCommentLine + 1,
-        content: '\n' + stepBlocks.when,
-        type: 'step',
-        description: 'Insertar nuevo When antes del comentario "// Then steps"',
-      });
+      
+      // Verificar si el step ya existe
+      const stepPattern = stepBlocks.when.match(/When\(['"`]([^'"`]+)['"`]/)?.[1];
+      if (stepPattern && this.stepExists(filePath, stepPattern)) {
+        this.logger.warn(`⚠️ [${generationId}] Step ya existe: ${stepPattern}`);
+        // No insertar el step duplicado
+      } else {
+        this.logger.log(`📍 [${generationId}] Insertando When antes del comentario "// Then steps" en línea ${sectionComments.thenCommentLine + 1}`);
+        insertions.push({
+          file: filePath,
+          line: sectionComments.thenCommentLine + 1,
+          content: '\n' + stepBlocks.when,
+          type: 'step',
+          description: 'Insertar nuevo When antes del comentario "// Then steps"',
+        });
+      }
     }
     
     if (stepBlocks.then) {
@@ -188,23 +204,35 @@ export class StepFilesManipulationService {
   }
 
   /**
-   * Verifica si un step ya existe en el archivo
+   * Verifica si un step ya existe en el archivo (mejorada para ignorar parámetros)
    */
   stepExists(filePath: string, stepPattern: string): boolean {
     if (!fs.existsSync(filePath)) {
       return false;
     }
     
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n');
-    
-    for (const line of lines) {
-      if (line.trim().includes(stepPattern)) {
-        return true;
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      
+      // Limpiar el patrón de parámetros específicos (ej: {int}, 330, etc.)
+      const cleanPattern = stepPattern
+        .replace(/\{int\}/g, '\\d+')
+        .replace(/\{string\}/g, '[^\\s]+')
+        .replace(/\{float\}/g, '\\d+\\.\\d+')
+        .replace(/\d+/g, '\\d+'); // Reemplazar números específicos con \d+
+      
+      const escapedPattern = cleanPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(?:Given|When|Then|And|But)\\(['"\`][^'"\`]*${escapedPattern}[^'"\`]*['"\`]`);
+      
+      const exists = regex.test(content);
+      if (exists) {
+        this.logger.log(`🔍 Step duplicado detectado: ${stepPattern} → ${cleanPattern}`);
       }
+      return exists;
+    } catch (error) {
+      this.logger.warn(`Error verificando step existente: ${error.message}`);
+      return false;
     }
-    
-    return false;
   }
 
   /**

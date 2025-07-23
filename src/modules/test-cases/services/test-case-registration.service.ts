@@ -54,7 +54,7 @@ export class TestCaseRegistrationService {
       );
       let featureContent = await fs.readFile(featureFilePath, 'utf-8');
       const lines = featureContent.split('\n');
-      const tagPattern = `@TC-${section}-Number`;
+      const tagPattern = `@TC-${section}-${entityName}-Number`;
       let currentNumber = await this.getNextTestCaseNumber(projectId, section);
       let replacements: { lineIdx: number, scenarioName: string, number: number, tags: string[], steps: string }[] = [];
 
@@ -104,7 +104,7 @@ export class TestCaseRegistrationService {
 //             this.logger.log(`Steps extraídos: ${steps.split('\n').length} líneas`);
 //             this.logger.log(`Asignando número: ${currentNumber}`);
             
-            lines[i] = lines[i].replace(tagPattern, `@TC-${section}-${currentNumber}`);
+            lines[i] = lines[i].replace(tagPattern, `@TC-${section}-${entityName}-${currentNumber}`);
             replacements.push({ 
               lineIdx: i, 
               scenarioName, 

@@ -20,6 +20,8 @@ export interface AIGenerationResponse {
     tokensUsed: number;
     modelUsed: string;
     generationId?: string;
+    assistantId?: string;
+    threadId?: string;
   };
 }
 

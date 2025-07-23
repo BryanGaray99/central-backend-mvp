@@ -25,7 +25,7 @@ import { TestCaseFiltersDto } from '../dto/test-case-filters.dto';
 import { TestCaseStatisticsDto } from '../dto/test-case-statistics.dto';
 import { CreateStepDto } from '../dto/create-step.dto';
 import { TestStepResponseDto } from '../dto/step-template-response.dto';
-import { AIAgentService } from '../../ai/services/ai-agent.service';
+import { TestCaseGenerationService } from '../../ai/services/test-case-generation.service';
 import { AIGenerationRequest, AIGenerationResponse } from '../../ai/interfaces/ai-agent.interface';
 import { AIGenerationRequestDto } from '../../ai/dto/ai-generation-request.dto';
 
@@ -61,7 +61,7 @@ export class TestCasesController {
   constructor(
     private readonly testCasesService: TestCasesService,
     private readonly stepTemplatesService: StepTemplatesService,
-    private readonly aiAgentService: AIAgentService,
+    private readonly testCaseGenerationService: TestCaseGenerationService,
   ) {}
 
   // ✅ MÉTODOS CRUD BÁSICOS EN USO
@@ -443,9 +443,9 @@ export class TestCasesController {
       metadata: request.metadata,
     };
     
-    this.logger.log(`🔄 [CONTROLLER] Enviando request al AIAgentService...`);
-    const result = await this.aiAgentService.generateTestCases(aiRequest);
-    this.logger.log(`✅ [CONTROLLER] Respuesta recibida del AIAgentService: ${JSON.stringify(result, null, 2)}`);
+    this.logger.log(`🔄 [CONTROLLER] Enviando request al TestCaseGenerationService...`);
+    const result = await this.testCaseGenerationService.generateTestCases(aiRequest);
+    this.logger.log(`✅ [CONTROLLER] Respuesta recibida del TestCaseGenerationService: ${JSON.stringify(result, null, 2)}`);
     
     return result;
   }

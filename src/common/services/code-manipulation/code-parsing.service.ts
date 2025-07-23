@@ -13,22 +13,93 @@ export class CodeParsingService {
     
     const code: GeneratedCode = {};
     
-    // Buscar código de feature (con o sin dos puntos)
-    const featureMatch = generatedText.match(/```gherkin:?([\s\S]*?)```/);
-    if (featureMatch) {
-      code.feature = featureMatch[1].trim();
-      this.logger.log(`✅ Código feature encontrado`);
+    // Buscar código usando el formato específico ***Features:*** y ***Steps:***
+    const featuresMatch = generatedText.match(/\*\*\*Features:\*\*\*([\s\S]*?)(?=\*\*\*Steps:\*\*\*|$)/);
+    if (featuresMatch) {
+      code.feature = featuresMatch[1].trim();
+      this.logger.log(`✅ Código feature encontrado (formato ***Features:***)`);
     } else {
-      this.logger.log(`⚠️ No se encontró código feature con formato esperado`);
+      this.logger.log(`⚠️ No se encontró código feature con formato ***Features:***`);
     }
     
-    // Buscar código de steps (con o sin dos puntos)
-    const stepsMatch = generatedText.match(/```typescript:?([\s\S]*?)```/);
+    const stepsMatch = generatedText.match(/\*\*\*Steps:\*\*\*([\s\S]*?)(?=\*\*\*Features:\*\*\*|$)/);
     if (stepsMatch) {
       code.steps = stepsMatch[1].trim();
-      this.logger.log(`✅ Código steps encontrado`);
+      this.logger.log(`✅ Código steps encontrado (formato ***Steps:***)`);
     } else {
-      this.logger.log(`⚠️ No se encontró código steps con formato esperado`);
+      this.logger.log(`⚠️ No se encontró código steps con formato ***Steps:***`);
+    }
+    
+    // Fallback: buscar código de feature (múltiples formatos) si no se encontró con el formato específico
+    if (!code.feature) {
+      let featureMatch = generatedText.match(/```gherkin:?([\s\S]*?)```/);
+      if (!featureMatch) {
+        // Buscar sin bloques de markdown, solo el escenario
+        featureMatch = generatedText.match(/(?:Scenario:|@TC-.*?\nScenario:)([\s\S]*?)(?=\n\n|\n\/\/|\nGiven\(|$)/);
+      }
+      if (!featureMatch) {
+        // Buscar cualquier línea que contenga "Scenario:"
+        const scenarioLines = generatedText.split('\n').filter(line => line.includes('Scenario:'));
+        if (scenarioLines.length > 0) {
+          const scenarioIndex = generatedText.indexOf(scenarioLines[0]);
+          const nextSection = generatedText.indexOf('\n\n', scenarioIndex);
+          const endIndex = nextSection > -1 ? nextSection : generatedText.length;
+          code.feature = generatedText.substring(scenarioIndex, endIndex).trim();
+          this.logger.log(`✅ Código feature encontrado (formato libre)`);
+        }
+      } else {
+        code.feature = featureMatch[1].trim();
+        this.logger.log(`✅ Código feature encontrado (formato markdown)`);
+      }
+      
+      // Si no se encontró feature, buscar en el texto completo
+      if (!code.feature) {
+        // Buscar el patrón completo del escenario con tags
+        const fullScenarioMatch = generatedText.match(/(@\w+[^\n]*\n)*@TC-[^\n]*\nScenario:[^\n]*\n((?:  [^\n]*\n)*)/);
+        if (fullScenarioMatch) {
+          code.feature = fullScenarioMatch[0].trim();
+          this.logger.log(`✅ Código feature encontrado (patrón completo)`);
+        } else {
+          this.logger.log(`⚠️ No se encontró código feature con formato esperado`);
+        }
+      }
+    }
+    
+    // Fallback: buscar código de steps (múltiples formatos) si no se encontró con el formato específico
+    if (!code.steps) {
+      let stepsMatch = generatedText.match(/```typescript:?([\s\S]*?)```/);
+      if (!stepsMatch) {
+        // Buscar sin bloques de markdown, solo el step
+        stepsMatch = generatedText.match(/(?:Given\(|When\(|Then\()([\s\S]*?)(?=\n\n|\n\/\/|\nGiven\(|\nWhen\(|\nThen\(|$)/);
+      }
+      if (!stepsMatch) {
+        // Buscar cualquier línea que contenga "Given(", "When(", "Then("
+        const stepLines = generatedText.split('\n').filter(line => 
+          line.includes('Given(') || line.includes('When(') || line.includes('Then(')
+        );
+        if (stepLines.length > 0) {
+          const stepIndex = generatedText.indexOf(stepLines[0]);
+          const nextSection = generatedText.indexOf('\n\n', stepIndex);
+          const endIndex = nextSection > -1 ? nextSection : generatedText.length;
+          code.steps = generatedText.substring(stepIndex, endIndex).trim();
+          this.logger.log(`✅ Código steps encontrado (formato libre)`);
+        }
+      } else {
+        code.steps = stepsMatch[1].trim();
+        this.logger.log(`✅ Código steps encontrado (formato markdown)`);
+      }
+      
+      // Si no se encontró steps, buscar en el texto completo
+      if (!code.steps) {
+        // Buscar el patrón completo del step con Given/When/Then
+        const fullStepMatch = generatedText.match(/Given\([^)]*\)[^}]*}/);
+        if (fullStepMatch) {
+          code.steps = fullStepMatch[0].trim();
+          this.logger.log(`✅ Código steps encontrado (patrón completo)`);
+        } else {
+          this.logger.log(`⚠️ No se encontró código steps con formato esperado`);
+        }
+      }
     }
     
     // Buscar otros tipos de código si es necesario
