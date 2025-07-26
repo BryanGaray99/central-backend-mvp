@@ -105,6 +105,12 @@ export class EndpointsService {
     });
   }
 
+  async listAllEndpoints(): Promise<Endpoint[]> {
+    return this.endpointRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async getEndpoint(id: string, projectId: string): Promise<Endpoint> {
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });

@@ -72,6 +72,12 @@ export class ProjectsService {
     return project;
   }
 
+  async findByName(name: string): Promise<Project> {
+    const project = await this.projectRepo.findOne({ where: { name } });
+    if (!project) throw new NotFoundException('Project not found');
+    return project;
+  }
+
   async update(id: string, updateDto: UpdateProjectDto): Promise<Project> {
     const project = await this.findOne(id);
 

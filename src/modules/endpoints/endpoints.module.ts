@@ -15,6 +15,7 @@ import { CleanupService } from './services/cleanup.service';
 import { FileSystemService } from '../projects/services/file-system.service';
 import { TemplateService } from '../projects/services/template.service';
 import { TestCasesModule } from '../test-cases/test-cases.module';
+import { ProjectEndpointsController } from './controllers/project-endpoints.controller';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { TestCasesModule } from '../test-cases/test-cases.module';
     forwardRef(() => TestCasesModule),
     HttpModule,
   ],
-  controllers: [EndpointsController],
+  controllers: [EndpointsController, ProjectEndpointsController],
   providers: [
     EndpointsService,
     AnalysisService,

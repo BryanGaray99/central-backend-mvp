@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TestExecutionController } from './controllers/test-execution.controller';
+import { GlobalTestExecutionController } from './controllers/global-test-execution.controller';
 import { TestExecutionService } from './services/test-execution.service';
 import { TestRunnerService } from './services/test-runner.service';
 import { TestResultsListenerService } from './services/test-results-listener.service';
@@ -13,7 +14,7 @@ import { Project } from '../projects/project.entity';
   imports: [
     TypeOrmModule.forFeature([TestExecution, TestResult, Project]),
   ],
-  controllers: [TestExecutionController],
+  controllers: [TestExecutionController, GlobalTestExecutionController],
   providers: [
     TestExecutionService,
     TestRunnerService,

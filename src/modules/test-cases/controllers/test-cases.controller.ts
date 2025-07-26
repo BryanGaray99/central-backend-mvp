@@ -108,7 +108,8 @@ export class TestCasesController {
     @Param('projectId') projectId: string,
     @Query() filters: TestCaseFiltersDto,
   ): Promise<TestCaseListResponseDto> {
-    return this.testCasesService.listTestCases(projectId, filters);
+    const result = await this.testCasesService.listTestCases(projectId, filters);
+    return result;
   }
 
   @Get('statistics')

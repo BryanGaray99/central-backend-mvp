@@ -24,12 +24,13 @@ export enum TestEnvironment {
 }
 
 export class ExecuteTestsDto {
-  @ApiProperty({
-    description: 'Nombre de la entidad para ejecutar pruebas',
+  @ApiPropertyOptional({
+    description: 'Nombre de la entidad para ejecutar pruebas. Si no se proporciona, se ejecutarán todos los test cases del proyecto',
     example: 'Product',
   })
+  @IsOptional()
   @IsString()
-  entityName: string;
+  entityName?: string;
 
   @ApiPropertyOptional({
     description: 'Método HTTP específico para filtrar casos de prueba',

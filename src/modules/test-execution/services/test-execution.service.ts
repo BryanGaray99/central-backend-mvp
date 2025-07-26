@@ -33,7 +33,8 @@ export class TestExecutionService {
   ) {}
 
   async executeTests(projectId: string, dto: ExecuteTestsDto) {
-    this.logger.log(`Iniciando ejecución de pruebas para entidad: ${dto.entityName}`);
+    const entityName = dto.entityName || 'all';
+    this.logger.log(`Iniciando ejecución de pruebas para entidad: ${entityName}`);
 
     // Validar que el proyecto existe
     const project = await this.projectRepository.findOneBy({ id: projectId });
@@ -41,12 +42,14 @@ export class TestExecutionService {
       throw new NotFoundException(`Proyecto con ID ${projectId} no encontrado`);
     }
 
-    // Validar que la entidad tiene casos de prueba
-    const hasTestCases = await this.validateEntityHasTestCases(project.path, dto.entityName);
-    if (!hasTestCases) {
-      throw new BadRequestException(
-        `No se encontraron casos de prueba para la entidad '${dto.entityName}'. Verifique que la entidad esté registrada y tenga casos de prueba generados.`
-      );
+    // Si se especifica una entidad, validar que tiene casos de prueba
+    if (dto.entityName) {
+      const hasTestCases = await this.validateEntityHasTestCases(project.path, dto.entityName);
+      if (!hasTestCases) {
+        throw new BadRequestException(
+          `No se encontraron casos de prueba para la entidad '${dto.entityName}'. Verifique que la entidad esté registrada y tenga casos de prueba generados.`
+        );
+      }
     }
 
     // Crear registro de ejecución
@@ -79,7 +82,9 @@ export class TestExecutionService {
     return {
       executionId: savedExecution.executionId,
       status: savedExecution.status,
-      message: `Ejecución de pruebas iniciada para entidad '${dto.entityName}'`,
+      message: dto.entityName 
+        ? `Ejecución de pruebas iniciada para entidad '${dto.entityName}'`
+        : `Ejecución de pruebas iniciada para todos los test cases del proyecto`,
       startedAt: savedExecution.startedAt,
     };
   }
@@ -253,6 +258,33 @@ export class TestExecutionService {
   async getExecutionSummary(projectId: string) {
     const [executions, totalExecutions] = await this.testExecutionRepository.findAndCount({
       where: { projectId },
+    });
+
+    const totalScenarios = executions.reduce((sum, exec) => sum + exec.totalScenarios, 0);
+    const totalPassed = executions.reduce((sum, exec) => sum + exec.passedScenarios, 0);
+    const totalFailed = executions.reduce((sum, exec) => sum + exec.failedScenarios, 0);
+    const totalTime = executions.reduce((sum, exec) => sum + exec.executionTime, 0);
+
+    const statusCounts = executions.reduce((acc, exec) => {
+      acc[exec.status] = (acc[exec.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalExecutions,
+      totalScenarios,
+      totalPassed,
+      totalFailed,
+      successRate: totalScenarios > 0 ? (totalPassed / totalScenarios) * 100 : 0,
+      averageExecutionTime: totalExecutions > 0 ? totalTime / totalExecutions : 0,
+      statusDistribution: statusCounts,
+      lastExecution: executions.length > 0 ? executions[0].startedAt : null,
+    };
+  }
+
+  async getGlobalExecutionSummary() {
+    const [executions, totalExecutions] = await this.testExecutionRepository.findAndCount({
+      order: { startedAt: 'DESC' },
     });
 
     const totalScenarios = executions.reduce((sum, exec) => sum + exec.totalScenarios, 0);

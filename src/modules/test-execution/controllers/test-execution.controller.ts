@@ -54,16 +54,12 @@ export class TestExecutionController {
     @Param('projectId') projectId: string,
     @Body() dto: ExecuteTestsDto,
   ) {
+    const entityName = dto.entityName || 'todos los test cases';
     this.logger.log(
-      `[CONTROLLER] Ejecutando pruebas para entidad: ${dto.entityName} en proyecto: ${projectId}`,
+      `[CONTROLLER] Ejecutando pruebas para entidad: ${entityName} en proyecto: ${projectId}`,
     );
 
-    const result = await this.testExecutionService.executeTests(projectId, dto);
-
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.testExecutionService.executeTests(projectId, dto);
   }
 
   @Get('results/:executionId')
@@ -176,12 +172,7 @@ export class TestExecutionController {
       `[CONTROLLER] Obteniendo resultados de ejecución: ${executionId}`,
     );
 
-    const results = await this.testExecutionService.getResults(executionId);
-
-    return {
-      success: true,
-      data: results,
-    };
+    return await this.testExecutionService.getResults(executionId);
   }
 
   @Get('results')
@@ -206,16 +197,9 @@ export class TestExecutionController {
     @Param('projectId') projectId: string,
     @Query() filters: ExecutionFiltersDto,
   ) {
-    this.logger.log(
-      `[CONTROLLER] Listando ejecuciones para proyecto: ${projectId}`,
-    );
-
     const results = await this.testExecutionService.listResults(projectId, filters);
 
-    return {
-      success: true,
-      data: results,
-    };
+    return results;
   }
 
   @Delete('results/:executionId')
@@ -240,10 +224,7 @@ export class TestExecutionController {
 
     await this.testExecutionService.deleteResults(executionId);
 
-    return {
-      success: true,
-      message: 'Resultados de ejecución eliminados exitosamente',
-    };
+    return { message: 'Resultados de ejecución eliminados exitosamente' };
   }
 
   @Get('history/:entityName')
@@ -265,15 +246,10 @@ export class TestExecutionController {
       `[CONTROLLER] Obteniendo historial para entidad: ${entityName}`,
     );
 
-    const history = await this.testExecutionService.getExecutionHistory(
+    return await this.testExecutionService.getExecutionHistory(
       projectId,
       entityName,
     );
-
-    return {
-      success: true,
-      data: history,
-    };
   }
 
   @Get('summary')
@@ -310,11 +286,6 @@ export class TestExecutionController {
       `[CONTROLLER] Obteniendo resumen de ejecuciones para proyecto: ${projectId}`,
     );
 
-    const summary = await this.testExecutionService.getExecutionSummary(projectId);
-
-    return {
-      success: true,
-      data: summary,
-    };
+    return await this.testExecutionService.getExecutionSummary(projectId);
   }
 } 
