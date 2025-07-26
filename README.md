@@ -1,5 +1,9 @@
 # 🚀 Central Backend MVP - Generador de Proyectos de Testing
 
+## Repositorio Frontend - Trabajo de titulación 
+
+## Autor: Bryan Enrique Garay Benavidez
+
 ## 📋 Descripción del Proyecto
 
 Este es el **motor de generación** de un sistema completo de testing automatizado. Su propósito es crear automáticamente proyectos de testing Playwright + BDD en TypeScript a partir de una configuración simple.
