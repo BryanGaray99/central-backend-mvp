@@ -56,7 +56,7 @@ export class TestExecutionService {
     const execution = this.testExecutionRepository.create({
       projectId,
       executionId: uuidv4(),
-      entityName: dto.entityName,
+      entityName: entityName, // Usar el valor calculado en lugar de dto.entityName
       method: dto.method,
       testType: dto.testType,
       tags: dto.tags,
@@ -82,9 +82,9 @@ export class TestExecutionService {
     return {
       executionId: savedExecution.executionId,
       status: savedExecution.status,
-      message: dto.entityName 
-        ? `Ejecución de pruebas iniciada para entidad '${dto.entityName}'`
-        : `Ejecución de pruebas iniciada para todos los test cases del proyecto`,
+      message: entityName === 'all'
+        ? `Ejecución de pruebas iniciada para todos los test cases del proyecto`
+        : `Ejecución de pruebas iniciada para entidad '${entityName}'`,
       startedAt: savedExecution.startedAt,
     };
   }
@@ -327,8 +327,14 @@ export class TestExecutionService {
       execution.status = ExecutionStatus.RUNNING;
       await this.testExecutionRepository.save(execution);
 
+      // Crear un DTO modificado con el entityName correcto
+      const modifiedDto = {
+        ...dto,
+        entityName: execution.entityName, // Usar el valor guardado en la ejecución
+      };
+
       // Ejecutar pruebas usando el servicio de runner
-      const results = await this.testRunnerService.runPlaywrightTests(project.path, dto);
+      const results = await this.testRunnerService.runPlaywrightTests(project.path, modifiedDto);
 
       // Actualizar ejecución con resultados
       execution.status = ExecutionStatus.COMPLETED;

@@ -40,11 +40,65 @@ export class EndpointsController {
               },
               entityName: { type: 'string' },
               path: { type: 'string' },
-              methods: { type: 'array', items: { type: 'string' } },
+              methods: { 
+                type: 'array', 
+                items: { 
+                  type: 'object',
+                  properties: {
+                    method: { type: 'string' },
+                    requestBodyDefinition: { 
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          name: { type: 'string' },
+                          type: { type: 'string' },
+                          example: { type: 'any' },
+                          validations: { type: 'object' }
+                        }
+                      }
+                    },
+                    description: { type: 'string' },
+                    requiresAuth: { type: 'boolean' }
+                  }
+                } 
+              },
               section: { type: 'string' },
               status: { type: 'string' },
               projectId: { type: 'string' },
               createdAt: { type: 'string' },
+              updatedAt: { type: 'string' },
+              generatedArtifacts: { type: 'object' },
+                                      analysisResults: { 
+                  type: 'object',
+                  additionalProperties: {
+                    type: 'object',
+                    properties: {
+                      statusCode: { type: 'number' },
+                      responseSchema: { type: 'object' },
+                      responseFields: { 
+                        type: 'array', 
+                        items: {
+                          type: 'object',
+                          properties: {
+                            name: { type: 'string' },
+                            type: { type: 'string' },
+                            required: { type: 'boolean' },
+                            description: { type: 'string' },
+                            example: { type: 'any' }
+                          }
+                        }
+                      },
+                      requiredFields: { type: 'array', items: { type: 'string' } },
+                      dto: { type: 'object' },
+                      example: { type: 'object' },
+                      description: { type: 'string' },
+                      contentType: { type: 'string' },
+                      produces: { type: 'array', items: { type: 'string' } },
+                      consumes: { type: 'array', items: { type: 'string' } }
+                    }
+                  }
+                },
             },
           },
         },
@@ -54,16 +108,25 @@ export class EndpointsController {
   async listAllEndpoints() {
     const endpoints = await this.endpointsService.listAllEndpoints();
       
-    return endpoints.map((endpoint) => ({
-      endpointId: endpoint.id, // Real unique ID (UUID)
-      name: endpoint.name, // Descriptive name
-      entityName: endpoint.entityName,
-      path: endpoint.path,
-      methods: endpoint.methods.map((m) => m.method),
-      section: endpoint.section,
-      status: endpoint.status,
-      projectId: endpoint.projectId,
-      createdAt: endpoint.createdAt,
-    }));
+    return endpoints.map((endpoint) => {
+      // Usar los métodos de procesamiento del servicio
+      const processedMethods = this.endpointsService.processMethods(endpoint.methods);
+      const processedAnalysisResults = this.endpointsService.processAnalysisResults(endpoint.analysisResults);
+      
+      return {
+        endpointId: endpoint.id, // Real unique ID (UUID)
+        name: endpoint.name, // Descriptive name
+        entityName: endpoint.entityName,
+        path: endpoint.path,
+        methods: processedMethods,
+        section: endpoint.section,
+        status: endpoint.status,
+        projectId: endpoint.projectId,
+        createdAt: endpoint.createdAt,
+        updatedAt: endpoint.updatedAt,
+        generatedArtifacts: endpoint.generatedArtifacts,
+        analysisResults: processedAnalysisResults,
+      };
+    });
   }
 }

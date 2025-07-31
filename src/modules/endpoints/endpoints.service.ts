@@ -129,6 +129,168 @@ export class EndpointsService {
     return endpoint;
   }
 
+  /**
+   * Procesa y filtra analysisResults para devolver solo información relevante
+   * en formato Swagger-like para cada método del endpoint
+   */
+  public processAnalysisResults(analysisResults: any): any {
+    if (!analysisResults) return null;
+
+    const processedResults: any = {};
+
+    for (const [method, analysis] of Object.entries(analysisResults)) {
+      if (typeof analysis === 'object' && analysis !== null) {
+        const analysisObj = analysis as any;
+        const responseSchema = analysisObj.inferredResponseSchema || analysisObj.responseSchema || null;
+        
+        processedResults[method] = {
+          statusCode: analysisObj.inferredStatusCode || analysisObj.statusCode || 200,
+          responseFields: this.extractResponseFields(responseSchema),
+          contentType: analysisObj.contentType || 'application/json',
+        };
+      }
+    }
+
+    return processedResults;
+  }
+
+  /**
+   * Extrae los campos de la respuesta y su estado de requerido
+   * para mostrar de forma concisa en el frontend
+   */
+  private extractResponseFields(responseSchema: any): any[] {
+    if (!responseSchema || typeof responseSchema !== 'object') {
+      return [];
+    }
+
+    const fields: any[] = [];
+
+    // Si es un objeto con propiedades
+    if (responseSchema.properties && typeof responseSchema.properties === 'object') {
+      const requiredFields = responseSchema.required || [];
+      
+      // Buscar específicamente el campo 'data' que contiene los datos reales
+      if (responseSchema.properties.data) {
+        const dataSchema = responseSchema.properties.data;
+        
+        // Si data es un array, extraer los campos de los items
+        if (dataSchema.type === 'array' && dataSchema.items && dataSchema.items.properties) {
+          const itemRequiredFields = dataSchema.items.required || [];
+          
+          for (const [fieldName, fieldSchema] of Object.entries(dataSchema.items.properties)) {
+            const field = fieldSchema as any;
+            fields.push({
+              name: fieldName,
+              type: field.type || 'unknown',
+              required: itemRequiredFields.includes(fieldName),
+              description: field.description || null,
+              example: field.example || null,
+            });
+          }
+        }
+        // Si data es un objeto, extraer sus campos directamente
+        else if (dataSchema.type === 'object' && dataSchema.properties) {
+          const dataRequiredFields = dataSchema.required || [];
+          
+          for (const [fieldName, fieldSchema] of Object.entries(dataSchema.properties)) {
+            const field = fieldSchema as any;
+            fields.push({
+              name: fieldName,
+              type: field.type || 'unknown',
+              required: dataRequiredFields.includes(fieldName),
+              description: field.description || null,
+              example: field.example || null,
+            });
+          }
+        }
+        // Si data es un tipo primitivo
+        else {
+          fields.push({
+            name: 'data',
+            type: dataSchema.type || 'unknown',
+            required: requiredFields.includes('data'),
+            description: 'Response data',
+            example: null,
+          });
+        }
+      } else {
+        // Si no hay campo 'data', extraer todos los campos del nivel superior
+        for (const [fieldName, fieldSchema] of Object.entries(responseSchema.properties)) {
+          const field = fieldSchema as any;
+          fields.push({
+            name: fieldName,
+            type: field.type || 'unknown',
+            required: requiredFields.includes(fieldName),
+            description: field.description || null,
+            example: field.example || null,
+          });
+        }
+      }
+    }
+    // Si es un array, mostrar información del tipo de items
+    else if (responseSchema.type === 'array' && responseSchema.items) {
+      if (responseSchema.items.properties) {
+        const requiredFields = responseSchema.items.required || [];
+        
+        for (const [fieldName, fieldSchema] of Object.entries(responseSchema.items.properties)) {
+          const field = fieldSchema as any;
+          fields.push({
+            name: fieldName,
+            type: field.type || 'unknown',
+            required: requiredFields.includes(fieldName),
+            description: field.description || null,
+            example: field.example || null,
+          });
+        }
+      } else {
+        fields.push({
+          name: 'items',
+          type: responseSchema.items.type || 'unknown',
+          required: false,
+          description: 'Array items',
+          example: null,
+        });
+      }
+    }
+    // Si es un tipo primitivo
+    else {
+      fields.push({
+        name: 'response',
+        type: responseSchema.type || 'unknown',
+        required: false,
+        description: 'Response data',
+        example: null,
+      });
+    }
+
+    return fields;
+  }
+
+  /**
+   * Procesa los métodos del endpoint para incluir requestBodyDefinition
+   * en formato Swagger-like
+   */
+  public processMethods(methods: any[]): any[] {
+    if (!Array.isArray(methods)) return [];
+
+    return methods.map(method => {
+      if (typeof method === 'string') {
+        return { method };
+      }
+      
+      if (typeof method === 'object' && method !== null) {
+        return {
+          method: method.method,
+          requestBodyDefinition: method.requestBodyDefinition || null,
+          description: method.description || null,
+          requiresAuth: method.requiresAuth || false,
+        };
+      }
+
+      return method;
+    });
+  }
+
   async updateEndpoint(
     id: string,
     projectId: string,
