@@ -6,13 +6,15 @@ import { TestExecutionService } from './services/test-execution.service';
 import { TestRunnerService } from './services/test-runner.service';
 import { TestResultsListenerService } from './services/test-results-listener.service';
 import { ExecutionLoggerService } from './services/execution-logger.service';
+import { TestCaseUpdateService } from './services/test-case-update.service';
 import { TestExecution } from './entities/test-execution.entity';
 import { TestResult } from './entities/test-result.entity';
 import { Project } from '../projects/project.entity';
+import { TestCase } from '../test-cases/entities/test-case.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TestExecution, TestResult, Project]),
+    TypeOrmModule.forFeature([TestExecution, TestResult, Project, TestCase]),
   ],
   controllers: [TestExecutionController, GlobalTestExecutionController],
   providers: [
@@ -20,12 +22,14 @@ import { Project } from '../projects/project.entity';
     TestRunnerService,
     TestResultsListenerService,
     ExecutionLoggerService,
+    TestCaseUpdateService,
   ],
   exports: [
     TestExecutionService,
     TestRunnerService,
     TestResultsListenerService,
     ExecutionLoggerService,
+    TestCaseUpdateService,
   ],
 })
 export class TestExecutionModule {} 

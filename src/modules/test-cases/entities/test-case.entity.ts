@@ -95,6 +95,12 @@ export class TestCase {
   })
   status: TestCaseStatus;
 
+  @Column({ nullable: true })
+  lastRun?: Date;
+
+  @Column({ nullable: true })
+  lastRunStatus?: string;
+
   @Column('json', { nullable: true })
   metadata?: {
     priority?: Priority;

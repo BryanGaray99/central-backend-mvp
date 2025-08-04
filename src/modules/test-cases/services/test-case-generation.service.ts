@@ -6,6 +6,7 @@ import { StepTemplatesService } from './step-templates.service';
 import { FeatureFileManagerService } from './feature-file-manager.service';
 import { StepsFileManagerService } from './steps-file-manager.service';
 import { TestCaseRegistrationService } from './test-case-registration.service';
+import { TestStepRegistrationService } from './test-step-registration.service';
 import { Project } from '../../projects/project.entity';
 import { RegisterEndpointDto } from '../../endpoints/dto/register-endpoint.dto';
 import * as path from 'path';
@@ -23,6 +24,7 @@ export class TestCaseGenerationService {
     private readonly featureFileManagerService: FeatureFileManagerService,
     private readonly stepsFileManagerService: StepsFileManagerService,
     private readonly testCaseRegistrationService: TestCaseRegistrationService,
+    private readonly testStepRegistrationService: TestStepRegistrationService,
   ) {}
 
   // ✅ MÉTODO EN USO - Se llama desde endpoints para generar features y steps
@@ -50,7 +52,14 @@ export class TestCaseGenerationService {
         dto
       );
 
-      this.logger.log('Test cases generation completed successfully.');
+      // ✅ NUEVO: Registrar test steps en la base de datos
+      await this.testStepRegistrationService.processStepsFileAndRegisterSteps(
+        project.id,
+        dto.section,
+        dto.entityName
+      );
+
+      this.logger.log('Test cases and steps generation completed successfully.');
       return {
         success: true,
         message: `Test cases generated successfully for ${dto.entityName}`,

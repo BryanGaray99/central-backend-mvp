@@ -14,6 +14,7 @@ import { ExecutionFiltersDto } from '../dto/execution-filters.dto';
 import { TestRunnerService } from './test-runner.service';
 import { TestResultsListenerService } from './test-results-listener.service';
 import { ExecutionLoggerService } from './execution-logger.service';
+import { TestCaseUpdateService } from './test-case-update.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -30,6 +31,7 @@ export class TestExecutionService {
     private readonly testRunnerService: TestRunnerService,
     private readonly testResultsListenerService: TestResultsListenerService,
     private readonly executionLoggerService: ExecutionLoggerService,
+    private readonly testCaseUpdateService: TestCaseUpdateService,
   ) {}
 
   async executeTests(projectId: string, dto: ExecuteTestsDto) {
@@ -79,6 +81,11 @@ export class TestExecutionService {
     // Ejecutar pruebas en background
     this.runTestsInBackground(savedExecution, project, dto);
 
+    // Contar test cases que se van a actualizar
+    const testCasesToUpdate = dto.entityName 
+      ? await this.countTestCasesForEntity(projectId, dto.entityName)
+      : await this.countAllTestCasesForProject(projectId);
+
     return {
       executionId: savedExecution.executionId,
       status: savedExecution.status,
@@ -86,6 +93,8 @@ export class TestExecutionService {
         ? `Ejecución de pruebas iniciada para todos los test cases del proyecto`
         : `Ejecución de pruebas iniciada para entidad '${entityName}'`,
       startedAt: savedExecution.startedAt,
+      testCasesToUpdate,
+      entityName: savedExecution.entityName,
     };
   }
 
@@ -361,6 +370,20 @@ export class TestExecutionService {
         await this.testResultRepository.save(testResult);
       }
 
+      // ✅ NUEVO: Actualizar test cases con resultados de ejecución
+      const testCaseResults = results.results.map(result => ({
+        testCaseId: this.extractTestCaseIdFromScenarioName(result.scenarioName),
+        status: result.status,
+        executionTime: result.duration,
+        errorMessage: result.errorMessage,
+      }));
+
+      await this.testCaseUpdateService.updateTestCasesWithExecutionResults(
+        project.id,
+        execution.entityName,
+        testCaseResults,
+      );
+
       // Registrar información de la ejecución completada
       await this.executionLoggerService.logExecutionCompleted(
         project.id,
@@ -402,5 +425,34 @@ export class TestExecutionService {
       startTime: execution.startedAt,
       endTime: execution.completedAt,
     };
+  }
+
+  /**
+   * Extrae el testCaseId del nombre del escenario
+   */
+  private extractTestCaseIdFromScenarioName(scenarioName: string): string {
+    // Buscar patrones como "TC-ecommerce-Product-1" en el nombre del escenario
+    const tcMatch = scenarioName.match(/TC-[a-zA-Z]+-[a-zA-Z]+-\d+/);
+    if (tcMatch) {
+      return tcMatch[0];
+    }
+
+    // Si no encuentra el patrón, generar un ID basado en el nombre
+    const sanitizedName = scenarioName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    return `TC-${sanitizedName}-${Date.now()}`;
+  }
+
+  /**
+   * Cuenta test cases para una entidad específica
+   */
+  private async countTestCasesForEntity(projectId: string, entityName: string): Promise<number> {
+    return await this.testCaseUpdateService.getTestCasesCount(projectId, entityName);
+  }
+
+  /**
+   * Cuenta todos los test cases de un proyecto
+   */
+  private async countAllTestCasesForProject(projectId: string): Promise<number> {
+    return await this.testCaseUpdateService.getTestCasesCount(projectId);
   }
 } 

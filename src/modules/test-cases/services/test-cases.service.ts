@@ -68,7 +68,7 @@ export class TestCasesService {
       await this.validateTestCase(dto);
 
       // 2. Generar ID único
-      const testCaseId = await this.generateTestCaseId(projectId, dto.section);
+      const testCaseId = await this.generateTestCaseId(projectId, dto.section, dto.entityName);
 
       // 3. Crear test case en BD
       const testCase = this.testCaseRepository.create({
@@ -237,6 +237,22 @@ export class TestCasesService {
     }
   }
 
+  async listAllTestCases(): Promise<TestCase[]> {
+    this.logger.log('Listing all test cases across all projects');
+
+    try {
+      const testCases = await this.testCaseRepository.find({
+        order: { createdAt: 'DESC' },
+      });
+
+      this.logger.log(`Found ${testCases.length} test cases globally`);
+      return testCases;
+    } catch (error) {
+      this.logger.error('Error listing all test cases:', error);
+      throw error;
+    }
+  }
+
   async deleteTestCasesByProjectSectionEntity(projectId: string, section: string, entityName: string): Promise<void> {
     this.logger.log(`Deleting all test cases for projectId=${projectId}, section=${section}, entityName=${entityName}`);
     try {
@@ -288,11 +304,25 @@ export class TestCasesService {
     return testCase;
   }
 
-  private async generateTestCaseId(projectId: string, section: string): Promise<string> {
-    const count = await this.testCaseRepository.count({
-      where: { projectId, section },
-    });
-    return `TC-${section.toUpperCase()}-${String(count + 1).padStart(2, '0')}`;
+  private async generateTestCaseId(projectId: string, section: string, entityName: string): Promise<string> {
+    // Buscar el patrón correcto: TC-{SECTION}-{ENTITYNAME}-{NUMBER}
+    const pattern = `TC-${section.toUpperCase()}-${entityName.toUpperCase()}-`;
+    const testCases = await this.testCaseRepository
+      .createQueryBuilder('testCase')
+      .where('testCase.projectId = :projectId', { projectId })
+      .andWhere('testCase.testCaseId LIKE :pattern', { pattern: `${pattern}%` })
+      .getMany();
+    
+    let maxNumber = 0;
+    for (const tc of testCases) {
+      const match = tc.testCaseId.match(new RegExp(`${pattern}(\\d+)`));
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNumber) maxNumber = num;
+      }
+    }
+    
+    return `TC-${section.toUpperCase()}-${entityName.toUpperCase()}-${String(maxNumber + 1).padStart(2, '0')}`;
   }
 
   private async validateTestCase(dto: CreateTestCaseDto | (TestCase & UpdateTestCaseDto)): Promise<void> {
@@ -342,6 +372,8 @@ export class TestCasesService {
       hooks: testCase.hooks,
       examples: testCase.examples,
       status: testCase.status,
+      lastRun: testCase.lastRun,
+      lastRunStatus: testCase.lastRunStatus,
       metadata: testCase.metadata,
       createdAt: testCase.createdAt,
       updatedAt: testCase.updatedAt,

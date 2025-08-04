@@ -17,6 +17,7 @@ import { ApiConfigUpdaterService } from './services/api-config-updater.service';
 import { CleanupService } from './services/cleanup.service';
 import { TestCaseGenerationService } from '../test-cases/services/test-case-generation.service';
 import { TestCasesService } from '../test-cases/services/test-cases.service';
+import { TestStepRegistrationService } from '../test-cases/services/test-step-registration.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -34,7 +35,8 @@ export class EndpointsService {
     private readonly apiConfigUpdaterService: ApiConfigUpdaterService,
     private readonly cleanupService: CleanupService,
     private readonly testCaseGenerationService: TestCaseGenerationService,
-    private readonly testCasesService: TestCasesService, // <--- inyectar aquí
+    private readonly testCasesService: TestCasesService,
+    private readonly testStepRegistrationService: TestStepRegistrationService,
   ) {}
 
   async registerAndAnalyze(dto: RegisterEndpointDto) {
@@ -350,10 +352,10 @@ export class EndpointsService {
     }
 
     // Eliminar test cases asociados a este endpoint (por projectId, section y entityName)
-    const testCasesService = (this as any).testCasesService;
-    if (testCasesService && typeof testCasesService.deleteTestCasesByProjectSectionEntity === 'function') {
-      await testCasesService.deleteTestCasesByProjectSectionEntity(projectId, section, entityName);
-    }
+    await this.testCasesService.deleteTestCasesByProjectSectionEntity(projectId, section, entityName);
+
+    // Eliminar test steps asociados a este endpoint (por projectId, section y entityName)
+    await this.testStepRegistrationService.deleteTestStepsByProjectSectionEntity(projectId, section, entityName);
 
     // Delete endpoint record
     await this.endpointRepository.remove(endpoint);

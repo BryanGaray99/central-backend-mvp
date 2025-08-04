@@ -40,6 +40,8 @@ export class TestExecutionController {
             status: { type: 'string' },
             message: { type: 'string' },
             startedAt: { type: 'string', format: 'date-time' },
+            testCasesToUpdate: { type: 'number' },
+            entityName: { type: 'string' },
           },
         },
       },

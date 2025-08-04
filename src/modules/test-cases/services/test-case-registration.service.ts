@@ -18,8 +18,9 @@ export class TestCaseRegistrationService {
     private readonly projectRepository: Repository<Project>,
   ) {}
 
-  async getNextTestCaseNumber(projectId: string, section: string): Promise<number> {
-    const pattern = `TC-${section}-`;
+  async getNextTestCaseNumber(projectId: string, section: string, entityName: string): Promise<number> {
+    // Buscar el patrón correcto: TC-{SECTION}-{ENTITYNAME}-{NUMBER}
+    const pattern = `TC-${section.toUpperCase()}-${entityName.toUpperCase()}-`;
     const testCases = await this.testCaseRepository
       .createQueryBuilder('testCase')
       .where('testCase.projectId = :projectId', { projectId })
@@ -55,8 +56,8 @@ export class TestCaseRegistrationService {
       let featureContent = await fs.readFile(featureFilePath, 'utf-8');
       const lines = featureContent.split('\n');
       const tagPattern = `@TC-${section}-${entityName}-Number`;
-      let currentNumber = await this.getNextTestCaseNumber(projectId, section);
-      let replacements: { lineIdx: number, scenarioName: string, number: number, tags: string[], steps: string }[] = [];
+      let currentNumber = await this.getNextTestCaseNumber(projectId, section, entityName);
+      let replacements: { lineIdx: number, scenarioName: string, testCaseId: string, tags: string[], steps: string }[] = [];
 
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].includes(tagPattern)) {
@@ -98,17 +99,18 @@ export class TestCaseRegistrationService {
           }
           
           if (scenarioName) {
-//             this.logger.log(`Encontrado tag en línea ${i + 1}`);
-//             this.logger.log(`Escenario: "${scenarioName}"`);
-//             this.logger.log(`Tags encontrados: ${tags.join(', ')}`);
-//             this.logger.log(`Steps extraídos: ${steps.split('\n').length} líneas`);
-//             this.logger.log(`Asignando número: ${currentNumber}`);
-            
+            // 1. PRIMERO: Reemplazar "Number" con el número real en el feature file
             lines[i] = lines[i].replace(tagPattern, `@TC-${section}-${entityName}-${currentNumber}`);
+            
+            // 2. SEGUNDO: Extraer el testCaseId real del archivo para guardar en BD
+            const testCaseId = `TC-${section}-${entityName}-${currentNumber}`;
+            
+            this.logger.log(`Encontrado test case: ${testCaseId} - "${scenarioName}"`);
+            
             replacements.push({ 
               lineIdx: i, 
               scenarioName, 
-              number: currentNumber, 
+              testCaseId, // Usar el testCaseId extraído del archivo
               tags, 
               steps 
             });
@@ -122,14 +124,14 @@ export class TestCaseRegistrationService {
 
       for (const rep of replacements) {
         const method = this.determineMethodFromScenario(rep.scenarioName, dto.methods);
-//         this.logger.log(`Creando test case: TC-${section}-${rep.number} - ${rep.scenarioName} - Método: ${method}`);
+        this.logger.log(`Creando test case: ${rep.testCaseId} - ${rep.scenarioName} - Método: ${method}`);
         await this.createTestCaseFromScenario(
           projectId,
           section,
           entityName,
           rep.scenarioName,
           method,
-          rep.number,
+          rep.testCaseId, // Usar el testCaseId extraído
           rep.tags,
           rep.steps
         );
@@ -202,18 +204,17 @@ export class TestCaseRegistrationService {
     entityName: string,
     scenarioName: string,
     method: string,
-    number: number,
+    testCaseId: string, // Cambiar de number a string
     tags: string[],
     steps: string,
   ): Promise<void> {
-    const testCaseId = `TC-${section}-${number}`;
     const testType = this.determineTestType(scenarioName);
     
     this.logger.log(`Guardando en BD: ${testCaseId} - ${scenarioName} - tags: ${tags.join(', ')} - tipo: ${testType}`);
 //     this.logger.log(`Steps a guardar: ${steps.split('\n').length} líneas`);
     
     const testCase = this.testCaseRepository.create({
-      testCaseId,
+      testCaseId, // Usar el testCaseId extraído del archivo
       projectId,
       entityName,
       section,

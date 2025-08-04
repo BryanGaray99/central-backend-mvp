@@ -175,6 +175,18 @@ export class TestCaseResponseDto {
   status: TestCaseStatus;
 
   @ApiPropertyOptional({
+    description: 'Fecha de la última ejecución',
+    example: '2024-01-01T00:00:00Z',
+  })
+  lastRun?: Date;
+
+  @ApiPropertyOptional({
+    description: 'Estado de la última ejecución',
+    example: 'passed',
+  })
+  lastRunStatus?: string;
+
+  @ApiPropertyOptional({
     description: 'Metadatos adicionales',
     type: TestCaseMetadataResponseDto,
   })

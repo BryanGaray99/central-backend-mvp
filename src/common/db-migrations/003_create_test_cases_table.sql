@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS "test_cases" (
     "hooks" text,
     "examples" text,
     "status" varchar DEFAULT 'active',
+    "lastRun" datetime,
+    "lastRunStatus" varchar,
     "metadata" text,
     "createdAt" datetime DEFAULT (datetime('now')),
     "updatedAt" datetime DEFAULT (datetime('now')),

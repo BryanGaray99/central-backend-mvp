@@ -50,6 +50,12 @@ export class TestStep {
   project: Project;
 
   @Column()
+  section: string;
+
+  @Column()
+  entityName: string;
+
+  @Column()
   name: string;
 
   @Column('text')

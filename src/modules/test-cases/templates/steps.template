@@ -4,6 +4,8 @@ import { {{entityLowerClient}}, handleApiResponse, getLastResponse, getLastError
 import { {{entityName}}Fixture } from '../../fixtures/{{section}}/{{entityNameLower}}.fixture';
 import { isValid{{entityName}}, isValid{{entityName}}List, get{{entityName}}ValidationErrors } from '../../schemas/{{section}}/{{entityNameLower}}.schema';
 
+// Beginning of Given steps
+
 // Given steps for data preparation
 Given('I have valid {{entityName}} data', function () {
   this.{{entityLower}}Data = {{entityName}}Fixture.create{{entityName}}Dto();
@@ -126,7 +128,9 @@ Given('multiple {{../entityNamePlural}} exist in the system', async function () 
 {{/if}}
 {{/each}}
 
-// When steps
+// End of Given steps
+// Beginning of When steps
+
 {{#each methods}}
 {{#if (eq method "GET")}}
 {{#if (eq ../endpointPath (concat "/" ../entityNamePlural))}}
@@ -413,6 +417,8 @@ Then('the response should contain valid {{entityName}} data', function () {
   }
   console.log('(P) {{entityName}} data validation passed');
 });
+
+// End of Then steps
 
 // Note: Status code steps (200, 201, 204, 422, 404) are defined in hooks.ts to avoid duplication
 
