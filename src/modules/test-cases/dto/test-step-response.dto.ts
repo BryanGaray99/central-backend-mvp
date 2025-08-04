@@ -1,7 +1,8 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiExtraModels } from '@nestjs/swagger';
 import { StepType, StepStatus, StepTemplateType } from '../entities/test-step.entity';
 
-export class TestStepResponseDto {
+@ApiExtraModels()
+export class TestStepListResponseDto {
   @ApiProperty({ description: 'Test step ID' })
   id: string;
 

@@ -372,7 +372,7 @@ export class TestExecutionService {
 
       // ✅ NUEVO: Actualizar test cases con resultados de ejecución
       const testCaseResults = results.results.map(result => ({
-        testCaseId: this.extractTestCaseIdFromScenarioName(result.scenarioName),
+        scenarioName: result.scenarioName,
         status: result.status,
         executionTime: result.duration,
         errorMessage: result.errorMessage,
@@ -427,20 +427,7 @@ export class TestExecutionService {
     };
   }
 
-  /**
-   * Extrae el testCaseId del nombre del escenario
-   */
-  private extractTestCaseIdFromScenarioName(scenarioName: string): string {
-    // Buscar patrones como "TC-ecommerce-Product-1" en el nombre del escenario
-    const tcMatch = scenarioName.match(/TC-[a-zA-Z]+-[a-zA-Z]+-\d+/);
-    if (tcMatch) {
-      return tcMatch[0];
-    }
 
-    // Si no encuentra el patrón, generar un ID basado en el nombre
-    const sanitizedName = scenarioName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    return `TC-${sanitizedName}-${Date.now()}`;
-  }
 
   /**
    * Cuenta test cases para una entidad específica

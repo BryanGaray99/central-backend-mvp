@@ -356,7 +356,7 @@ export class TestCasesService {
     }
   }
 
-  private toTestCaseResponseDto(testCase: TestCase): TestCaseResponseDto {
+  public toTestCaseResponseDto(testCase: TestCase): TestCaseResponseDto {
     return {
       id: testCase.id,
       testCaseId: testCase.testCaseId,

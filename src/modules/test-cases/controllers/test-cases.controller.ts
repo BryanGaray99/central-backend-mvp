@@ -67,23 +67,6 @@ export class TestCasesController {
   async listAllTestCases() {
     const testCases = await this.testCasesService.listAllTestCases();
       
-    return testCases.map((testCase) => ({
-      testCaseId: testCase.id, // Real unique ID (UUID)
-      testCaseIdName: testCase.testCaseId,
-      name: testCase.name, // Descriptive name
-      entityName: testCase.entityName,
-      section: testCase.section,
-      method: testCase.method,
-      testType: testCase.testType,
-      scenario: testCase.scenario,
-      status: testCase.status,
-      projectId: testCase.projectId,
-      createdAt: testCase.createdAt,
-      updatedAt: testCase.updatedAt,
-      tags: testCase.tags,
-      hooks: testCase.hooks,
-      examples: testCase.examples,
-      metadata: testCase.metadata,
-    }));
+    return testCases.map((testCase) => this.testCasesService.toTestCaseResponseDto(testCase));
   }
 } 

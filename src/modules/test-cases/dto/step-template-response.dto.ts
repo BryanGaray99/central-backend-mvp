@@ -1,6 +1,7 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiExtraModels } from '@nestjs/swagger';
 import { StepType, StepTemplateType, Reusability, StepStatus } from '../entities/test-step.entity';
 
+@ApiExtraModels()
 export class StepParameterResponseDto {
   @ApiProperty({
     description: 'Nombre del parámetro',
@@ -100,6 +101,7 @@ export class StepMetadataResponseDto {
   reusability?: Reusability;
 }
 
+@ApiExtraModels()
 export class TestStepResponseDto {
   @ApiProperty({
     description: 'ID único del step',

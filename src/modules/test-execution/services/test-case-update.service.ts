@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { TestCase, TestCaseStatus } from '../../test-cases/entities/test-case.entity';
 
 export interface TestCaseExecutionResult {
-  testCaseId: string;
+  scenarioName: string;
   status: 'passed' | 'failed' | 'skipped';
   executionTime: number;
   errorMessage?: string;
@@ -46,12 +46,13 @@ export class TestCaseUpdateService {
    */
   private async updateTestCaseWithResult(result: TestCaseExecutionResult): Promise<void> {
     try {
+      // Buscar el test case por nombre en lugar de por ID
       const testCase = await this.testCaseRepository.findOne({
-        where: { testCaseId: result.testCaseId },
+        where: { name: result.scenarioName },
       });
 
       if (!testCase) {
-        this.logger.warn(`Test case con ID ${result.testCaseId} no encontrado`);
+        this.logger.warn(`Test case con nombre "${result.scenarioName}" no encontrado`);
         return;
       }
 
@@ -68,9 +69,9 @@ export class TestCaseUpdateService {
 
       await this.testCaseRepository.save(testCase);
 
-      this.logger.debug(`Test case ${result.testCaseId} actualizado con status: ${result.status}`);
+      // this.logger.debug(`Test case "${result.scenarioName}" actualizado con status: ${result.status}`);
     } catch (error) {
-      this.logger.error(`Error actualizando test case ${result.testCaseId}: ${error.message}`);
+      this.logger.error(`Error actualizando test case "${result.scenarioName}": ${error.message}`);
       // No lanzar error para evitar que falle toda la actualización
     }
   }

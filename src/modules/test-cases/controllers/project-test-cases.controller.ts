@@ -21,7 +21,7 @@ import { TestCaseStatisticsDto } from '../dto/test-case-statistics.dto';
 import { CreateStepDto } from '../dto/create-step.dto';
 import { TestStepResponseDto } from '../dto/step-template-response.dto';
 import { TestStepFiltersDto } from '../dto/test-step-filters.dto';
-import { TestStepResponseDto as TestStepListResponseDto } from '../dto/test-step-response.dto';
+import { TestStepListResponseDto } from '../dto/test-step-response.dto';
 import { StepType, StepStatus } from '../entities/test-step.entity';
 import { TestCaseGenerationService } from '../../ai/services/test-case-generation.service';
 import { AIGenerationRequest, AIGenerationResponse } from '../../ai/interfaces/ai-agent.interface';
@@ -152,7 +152,7 @@ export class ProjectTestCasesController {
       properties: {
         testSteps: {
           type: 'array',
-          items: { $ref: '#/components/schemas/TestStepResponseDto' }
+          items: { $ref: '#/components/schemas/TestStepListResponseDto' }
         },
         pagination: {
           type: 'object',
