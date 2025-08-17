@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import * as fs from 'fs';
@@ -23,6 +23,8 @@ import {
 } from '../../../common/services/code-manipulation';
 import { AssistantManagerService } from './assistant-manager.service';
 import { ThreadManagerService } from './thread-manager.service';
+import { TestCasesService } from '../../test-cases/services/test-cases.service';
+import { TestStepRegistrationService } from '../../test-cases/services/test-step-registration.service';
 
 @Injectable()
 export class TestCaseGenerationService {
@@ -42,6 +44,9 @@ export class TestCaseGenerationService {
     private readonly testCaseAnalysisService: TestCaseAnalysisService,
     private readonly assistantManagerService: AssistantManagerService,
     private readonly threadManagerService: ThreadManagerService,
+    @Inject(forwardRef(() => TestCasesService))
+    private readonly testCasesService: TestCasesService,
+    private readonly testStepRegistrationService: TestStepRegistrationService,
   ) {
     this.openai = new OpenAI({
       apiKey: this.configService.get<string>('OPENAI_API_KEY'),
@@ -57,6 +62,15 @@ export class TestCaseGenerationService {
     let totalTokensUsed = 0;
     let promptTokens = 0;
     let completionTokens = 0;
+    
+    // Nombres fijos para los archivos de debug (sobrescribir siempre)
+    const debugFiles = {
+      prompt: 'ai-generation-prompt.txt',
+      response: 'ai-generation-response.txt',
+      metadata: 'ai-generation-metadata.json',
+      summary: 'ai-generation-summary.json',
+      error: 'ai-generation-error.json'
+    };
     
     this.logger.log(`🚀 [${generationId}] INICIANDO GENERACIÓN DE TESTS CON ASSISTANT API`);
     this.logger.log(`📋 [${generationId}] Request: ${JSON.stringify(request, null, 2)}`);
@@ -96,7 +110,7 @@ export class TestCaseGenerationService {
       this.logger.log(`📤 [${generationId}] Prompt construido (${prompt.length} caracteres)`);
       
       // Guardar prompt enviado
-      const promptPath = path.join(debugDir, `${generationId}-prompt.txt`);
+      const promptPath = path.join(debugDir, debugFiles.prompt);
       fs.writeFileSync(promptPath, prompt);
       this.logger.log(`📄 [${generationId}] Prompt guardado en: ${promptPath}`);
 
@@ -181,7 +195,7 @@ export class TestCaseGenerationService {
       this.logger.log(`📥 [${generationId}] Respuesta recibida (${generatedText.length} caracteres)`);
       
       // Guardar respuesta bruta
-      const responsePath = path.join(debugDir, `${generationId}-response.txt`);
+      const responsePath = path.join(debugDir, debugFiles.response);
       fs.writeFileSync(responsePath, generatedText);
       this.logger.log(`📄 [${generationId}] Respuesta guardada en: ${responsePath}`);
       
@@ -201,7 +215,7 @@ export class TestCaseGenerationService {
         timestamp: new Date().toISOString(),
       };
       
-      const metadataPath = path.join(debugDir, `${generationId}-metadata.json`);
+      const metadataPath = path.join(debugDir, debugFiles.metadata);
       fs.writeFileSync(metadataPath, JSON.stringify(responseMetadata, null, 2));
       this.logger.log(`📄 [${generationId}] Metadata guardada en: ${metadataPath}`);
       this.logger.log(`💰 [${generationId}] USO REAL DE TOKENS: Prompt=${promptTokens}, Completion=${completionTokens}, Total=${totalTokensUsed}`);
@@ -225,8 +239,52 @@ export class TestCaseGenerationService {
       const insertionResult = await this.codeInsertionService.insertCode(insertions, generationId);
       this.logger.log(`✅ [${generationId}] Resultado de inserción: ${JSON.stringify(insertionResult, null, 2)}`);
 
-      // Paso 12: Los archivos se incluyen directamente en el prompt (no vector store)
-      this.logger.log(`📤 [${generationId}] PASO 12: Archivos incluidos directamente en el prompt`);
+      // Paso 11.5: Guardar steps en base de datos si se insertaron steps
+      this.logger.log(`💾 [${generationId}] PASO 11.5: Guardando steps en base de datos...`);
+      if (parsedCode.steps && parsedCode.steps.trim() && insertionResult.success) {
+        try {
+          // Verificar si se insertaron steps exitosamente
+          const stepsInserted = insertions.some(insertion => insertion.type === 'step');
+          if (stepsInserted) {
+            await this.testStepRegistrationService.processStepsFileAndRegisterSteps(
+              request.projectId,
+              request.section,
+              request.entityName
+            );
+            this.logger.log(`✅ [${generationId}] Steps guardados en base de datos exitosamente`);
+          } else {
+            this.logger.log(`⚠️ [${generationId}] No se insertaron steps, saltando guardado en BD`);
+          }
+        } catch (stepDbError) {
+          this.logger.error(`❌ [${generationId}] Error al guardar steps en BD: ${stepDbError.message}`);
+          // No lanzar error aquí, solo loggear como error pero continuar
+        }
+      } else {
+        this.logger.log(`⚠️ [${generationId}] No hay código steps para guardar en BD`);
+      }
+
+      // Paso 12: Guardar test case en base de datos
+      this.logger.log(`💾 [${generationId}] PASO 12: Guardando test case en base de datos...`);
+      let savedTestCase: any = null;
+      if (parsedCode.feature && parsedCode.feature.trim()) {
+        try {
+          // Extraer información del test case generado
+          const testCaseData = this.extractTestCaseFromGeneratedCode(parsedCode.feature, request);
+          if (testCaseData) {
+            savedTestCase = await this.testCasesService.createTestCase(request.projectId, testCaseData, true); // true = skip feature insertion
+            this.logger.log(`✅ [${generationId}] Test case guardado en BD: ${savedTestCase.testCaseId}`);
+          }
+        } catch (dbError) {
+          this.logger.error(`❌ [${generationId}] Error al guardar test case en BD: ${dbError.message}`);
+          this.logger.error(`❌ [${generationId}] Feature code que causó el error: ${parsedCode.feature}`);
+          // No lanzar error aquí, solo loggear como error pero continuar
+        }
+      } else {
+        this.logger.warn(`⚠️ [${generationId}] No se encontró código feature para guardar en BD`);
+      }
+
+      // Paso 13: Los archivos se incluyen directamente en el prompt (no vector store)
+      this.logger.log(`📤 [${generationId}] PASO 13: Archivos incluidos directamente en el prompt`);
       this.logger.log(`📤 [${generationId}] Feature content length: ${featureContent?.length || 0} caracteres`);
       this.logger.log(`📤 [${generationId}] Steps content length: ${stepsContent?.length || 0} caracteres`);
 
@@ -245,6 +303,7 @@ export class TestCaseGenerationService {
         newCode: parsedCode,
         insertions,
         insertionResult,
+        savedTestCase,
         processingTime,
         tokenUsage: {
           promptTokens,
@@ -255,7 +314,7 @@ export class TestCaseGenerationService {
         timestamp: new Date().toISOString(),
       };
       
-      const summaryPath = path.join(debugDir, `${generationId}-summary.json`);
+      const summaryPath = path.join(debugDir, debugFiles.summary);
       fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
       this.logger.log(`📄 [${generationId}] Resumen guardado en: ${summaryPath}`);
 
@@ -264,6 +323,7 @@ export class TestCaseGenerationService {
         data: {
           newCode: parsedCode,
           insertions,
+          savedTestCase,
         },
         metadata: {
           processingTime,
@@ -302,7 +362,7 @@ export class TestCaseGenerationService {
           fs.mkdirSync(debugDir, { recursive: true });
         }
         
-        const errorPath = path.join(debugDir, `${generationId}-error.json`);
+        const errorPath = path.join(debugDir, debugFiles.error);
         fs.writeFileSync(errorPath, JSON.stringify(errorLog, null, 2));
         this.logger.log(`📄 [${generationId}] Error guardado en: ${errorPath}`);
       }
@@ -510,5 +570,79 @@ Genera SOLO el código necesario para completar la operación solicitada usando 
     }
     
     throw new Error(`Run timeout after ${maxAttempts} attempts`);
+  }
+
+  /**
+   * Extrae la información del test case generado del código feature.
+   */
+  private extractTestCaseFromGeneratedCode(featureCode: string, request: AIGenerationRequest): any {
+    try {
+      // Verificar que existe un @TC- en el código
+      if (!featureCode.includes('@TC-')) {
+        throw new Error('No se encontró un test case ID (@TC-) en la respuesta generada. La IA debe generar siempre un test case con formato @TC-{section}-{entity}-{number}');
+      }
+
+      // Extraer el test case ID específico (@TC-...)
+      const tcIdMatch = featureCode.match(/@TC-[^\s]+/);
+      if (!tcIdMatch) {
+        throw new Error('No se pudo extraer el test case ID (@TC-...) de la respuesta generada');
+      }
+      const testCaseId = tcIdMatch[0].substring(1); // Remover el @ del inicio
+
+      // Extraer todos los tags del feature code, excluyendo el @TC-
+      const tagMatches = featureCode.match(/@([^\s]+)/g);
+      const allTags = tagMatches ? tagMatches.map(tag => tag.trim()) : [];
+      
+      // Filtrar solo los tags funcionales (excluir @TC-)
+      const tags = allTags.filter(tag => !tag.startsWith('@TC-'));
+      
+      // Extraer nombre del escenario
+      const scenarioMatch = featureCode.match(/Scenario(?: Outline)?:\s*(.+?)(?:\n|$)/i);
+      const scenarioName = scenarioMatch ? scenarioMatch[1].trim() : 'AI Generated Test Case';
+      
+      // Extraer descripción del escenario
+      const description = scenarioName;
+      
+      // Determinar método basado en tags o requirements
+      let method = 'GET';
+      const requirementsLower = request.requirements.toLowerCase();
+      if (requirementsLower.includes('create') || tags.some(tag => tag.includes('create'))) {
+        method = 'POST';
+      } else if (requirementsLower.includes('update') || tags.some(tag => tag.includes('update'))) {
+        method = 'PUT';
+      } else if (requirementsLower.includes('delete') || tags.some(tag => tag.includes('delete'))) {
+        method = 'DELETE';
+      } else if (requirementsLower.includes('get') || requirementsLower.includes('retrieve') || requirementsLower.includes('fetch')) {
+        method = 'GET';
+      }
+      
+      // Determinar test type basado en tags
+      let testType = 'positive';
+      if (tags.some(tag => tag.includes('negative'))) {
+        testType = 'negative';
+      }
+      
+             // El featureCode ya está limpio del parsing, usarlo directamente
+       const cleanedScenario = featureCode.trim();
+      
+      const testCaseData = {
+        section: request.section,
+        entityName: request.entityName,
+        name: scenarioName,
+        description: description,
+        method: method,
+        testType: testType,
+        tags: tags,
+                 scenario: cleanedScenario,
+        testCaseId: testCaseId,
+      };
+
+      this.logger.log(`✅ Test case extraído exitosamente: ${testCaseId} - ${scenarioName}`);
+      return testCaseData;
+    } catch (error) {
+      this.logger.error(`❌ Error extrayendo información del test case: ${error.message}`);
+      this.logger.error(`❌ Feature code recibido: ${featureCode}`);
+      throw error; // Re-lanzar el error para que se maneje en el nivel superior
+    }
   }
 }

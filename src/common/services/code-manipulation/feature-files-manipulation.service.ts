@@ -27,6 +27,18 @@ export class FeatureFilesManipulationService {
     const lines = content.split('\n');
     this.logger.log(`📊 [${generationId}] Archivo feature tiene ${lines.length} líneas`);
     
+    // Extraer el test case ID del nuevo código para verificar si ya existe
+    const tcIdMatch = newFeatureCode.match(/@TC-[^\s]+/);
+    if (tcIdMatch) {
+      const testCaseId = tcIdMatch[0];
+      this.logger.log(`🔍 [${generationId}] Verificando si el test case ${testCaseId} ya existe...`);
+      
+      if (content.includes(testCaseId)) {
+        this.logger.warn(`⚠️ [${generationId}] El test case ${testCaseId} ya existe en el archivo. No se insertará.`);
+        return null; // No insertar si ya existe
+      }
+    }
+    
     // Buscar el último escenario
     const lastScenarioLine = this.findLastScenarioLine(lines, generationId);
     

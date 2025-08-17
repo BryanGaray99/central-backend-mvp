@@ -37,6 +37,28 @@ export class FeatureFileManagerService {
     }
   }
 
+  /**
+   * Returns the highest numeric suffix found in @TC-{section}-{entity}-{NN} tags inside the feature file
+   */
+  async getMaxNumberFromFeature(projectId: string, section: string, entityName: string): Promise<number> {
+    try {
+      const featurePath = await this.getFeatureFilePath(projectId, section, entityName);
+      const content = await this.readFeatureFile(featurePath);
+      const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`@TC-${esc(section)}-${esc(entityName)}-(\\d+)`, 'g');
+      let max = 0;
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(content)) !== null) {
+        const num = parseInt(m[1], 10);
+        if (!Number.isNaN(num) && num > max) max = num;
+      }
+      return max;
+    } catch (e) {
+      // If file doesn't exist yet, return 0
+      return 0;
+    }
+  }
+
   async updateTestCaseInFeature(
     projectId: string,
     section: string,
@@ -125,34 +147,101 @@ export class FeatureFileManagerService {
   }
 
   private generateScenarioFromTestCase(testCase: TestCase): string {
-    const tags = testCase.tags.map(tag => `@${tag}`).join(' ');
+    // Generar el escenario con la estructura correcta del archivo feature
+    const tags = testCase.tags.map(tag => tag.startsWith('@') ? tag : `@${tag}`).join(' ');
     const scenarioName = testCase.name;
     
-    // Ahora el scenario es un string, así que simplemente lo usamos directamente
-    // pero necesitamos agregar los tags y el nombre del escenario
+    // Estructura según el nuevo template: línea con @TC-{id}, líneas con otros tags, línea con Scenario, contenido del scenario
     const scenarioLines = testCase.scenario.split('\n');
     const indentedSteps = scenarioLines.map(line => `    ${line}`).join('\n');
     
-    return `\n  ${tags}\n  Scenario: ${scenarioName}\n${indentedSteps}\n`;
+    // Generar solo el contenido del escenario con tags en línea separada
+    const scenarioContent = `  @${testCase.testCaseId}\n  ${tags}\n  Scenario: ${scenarioName}\n${indentedSteps}`;
+    
+    // Debug: verificar el formato generado
+    this.logger.log(`Generated scenario content: ${scenarioContent.substring(0, 100)}...`);
+    
+    return scenarioContent;
   }
 
   private addScenarioToFeature(featureContent: string, newScenario: string): string {
-    return featureContent + newScenario;
+    let content = featureContent;
+    // Ensure file ends with a newline
+    if (!content.endsWith('\n')) content += '\n';
+    // Ensure a blank line before the new scenario for readability
+    content += '\n';
+    return content + newScenario;
   }
 
   private updateScenarioInFeature(featureContent: string, testCaseId: string, updatedScenario: string): string {
-    const scenarioRegex = new RegExp(`\\s*@.*\\n\\s*Scenario:.*${testCaseId}.*\\n[\\s\\S]*?(?=\\n\\s*@|\\n\\s*Scenario:|$)`, 'g');
+    // Buscar el tag específico del test case (ej: @TC-ecommerce-Product-7)
+    const escapedTestCaseId = testCaseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-    if (scenarioRegex.test(featureContent)) {
-      return featureContent.replace(scenarioRegex, updatedScenario);
+    // Buscar la línea exacta del test case ID
+    const testCaseIdLineRegex = new RegExp(
+      `(\\n\\s*@${escapedTestCaseId})`,
+      'g'
+    );
+    
+    if (testCaseIdLineRegex.test(featureContent)) {
+      // Extraer solo el contenido del escenario sin el test case ID
+      const scenarioLines = updatedScenario.split('\n');
+      // Saltar la primera línea (test case ID) y mantener el resto con el formato correcto
+      const scenarioContent = scenarioLines.slice(1).join('\n'); // Esto incluye los tags en línea separada
+      
+      // Buscar desde el test case ID hasta el siguiente test case ID o final del archivo
+      const fullScenarioRegex = new RegExp(
+        `(\\n\\s*@${escapedTestCaseId})[\\s\\S]*?(?=\\n\\s*@TC-|\\n\\s*Feature:|$)`,
+        'g'
+      );
+      
+      // Reemplazar manteniendo el test case ID original y agregando el nuevo contenido
+      const replacement = `$1\n${scenarioContent}`;
+      const updatedContent = featureContent.replace(fullScenarioRegex, replacement);
+      
+      this.logger.log(`Updated test case ${testCaseId} in feature file`);
+      this.logger.log(`Replacement: ${replacement.substring(0, 100)}...`);
+      
+      return updatedContent;
     }
     
     // If scenario not found, add it
+    this.logger.log(`Test case ${testCaseId} not found in feature file, adding new scenario`);
     return this.addScenarioToFeature(featureContent, updatedScenario);
   }
 
   private removeScenarioFromFeature(featureContent: string, testCaseId: string): string {
-    const scenarioRegex = new RegExp(`\\s*@.*\\n\\s*Scenario:.*${testCaseId}.*\\n[\\s\\S]*?(?=\\n\\s*@|\\n\\s*Scenario:|$)`, 'g');
-    return featureContent.replace(scenarioRegex, '');
+    // Buscar el tag específico del test case (ej: @TC-ecommerce-Product-7)
+    const escapedTestCaseId = testCaseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Regex que busca desde la línea que contiene @TC-{testCaseId} hasta el siguiente @TC- o final del archivo
+    // Estructura: línea con @TC-{id}, líneas con otros tags, línea con Scenario, contenido del scenario
+    const scenarioRegex = new RegExp(
+      `\\n\\s*@${escapedTestCaseId}\\s*\\n[\\s\\S]*?(?=\\n\\s*@TC-|\\n\\s*Feature:|$)`,
+      'g'
+    );
+    
+    // Debug: verificar si el regex encuentra algo
+    const matches = featureContent.match(scenarioRegex);
+    this.logger.log(`Found ${matches ? matches.length : 0} matches for test case ${testCaseId}`);
+    if (matches) {
+      this.logger.log(`Match found: ${matches[0].substring(0, 200)}...`);
+      this.logger.log(`Match length: ${matches[0].length}`);
+    } else {
+      this.logger.warn(`No matches found for test case ${testCaseId}`);
+      // Intentar con un regex más simple para debugging
+      const simpleRegex = new RegExp(`@${escapedTestCaseId}`, 'g');
+      const simpleMatches = featureContent.match(simpleRegex);
+      this.logger.log(`Simple search found ${simpleMatches ? simpleMatches.length : 0} matches for ${testCaseId}`);
+    }
+    
+    const updatedContent = featureContent.replace(scenarioRegex, '');
+    
+    // Log para debugging
+    this.logger.log(`Removing test case ${testCaseId} from feature file`);
+    this.logger.log(`Original content length: ${featureContent.length}`);
+    this.logger.log(`Updated content length: ${updatedContent.length}`);
+    
+    return updatedContent;
   }
 } 

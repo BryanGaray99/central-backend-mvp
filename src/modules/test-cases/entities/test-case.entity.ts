@@ -9,6 +9,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Project } from '../../projects/project.entity';
+import { Bug } from '../../bugs/entities/bug.entity';
 
 export enum TestCaseStatus {
   DRAFT = 'draft',
@@ -114,6 +115,10 @@ export class TestCase {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // Relations
+  @OneToMany(() => Bug, bug => bug.testCase)
+  bugs: Bug[];
 }
 
 export interface StepDefinition {

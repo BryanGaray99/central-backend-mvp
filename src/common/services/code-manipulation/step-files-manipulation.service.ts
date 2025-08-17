@@ -41,7 +41,7 @@ export class StepFilesManipulationService {
     this.logger.log(`📊 [${generationId}] - Then: ${stepBlocks.then ? 'SÍ' : 'NO'}`);
     
     // Insertar cada bloque en su ubicación correspondiente usando comentarios
-    if (stepBlocks.given && sectionComments.whenCommentLine >= 0) {
+    if (stepBlocks.given) {
       this.logger.log(`🔍 [${generationId}] Procesando inserción de Given...`);
       
       // Verificar si el step ya existe
@@ -50,18 +50,38 @@ export class StepFilesManipulationService {
         this.logger.warn(`⚠️ [${generationId}] Step ya existe: ${stepPattern}`);
         // No insertar el step duplicado
       } else {
-        this.logger.log(`📍 [${generationId}] Insertando Given antes del comentario "// When steps" en línea ${sectionComments.whenCommentLine + 1}`);
-        insertions.push({
-          file: filePath,
-          line: sectionComments.whenCommentLine + 1,
-          content: '\n' + stepBlocks.given,
-          type: 'step',
-          description: 'Insertar nuevo Given antes del comentario "// When steps"',
-        });
+        let insertLine = -1;
+        
+        // Intentar usar la marca "End of Given steps"
+        if (sectionComments.givenEndLine >= 0) {
+          insertLine = sectionComments.givenEndLine;
+          this.logger.log(`📍 [${generationId}] Insertando Given ANTES del comentario "// End of Given steps" en línea ${insertLine + 1}`);
+        } else {
+          // Método de contingencia: buscar el último Given
+          const lastGivenLine = this.findLastStepOfType(lines, 'Given', generationId);
+          if (lastGivenLine >= 0) {
+            insertLine = lastGivenLine + 1; // Insertar después del último Given
+            this.logger.log(`📍 [${generationId}] Insertando Given después del último Given existente en línea ${insertLine + 1}`);
+          } else {
+            // Si no hay ningún Given, insertar al final del archivo
+            insertLine = lines.length;
+            this.logger.log(`📍 [${generationId}] No se encontraron Given existentes, insertando al final del archivo en línea ${insertLine + 1}`);
+          }
+        }
+        
+        if (insertLine >= 0) {
+          insertions.push({
+            file: filePath,
+            line: insertLine + 1,
+            content: '\n' + stepBlocks.given,
+            type: 'step',
+            description: 'Insertar nuevo Given',
+          });
+        }
       }
     }
     
-    if (stepBlocks.when && sectionComments.thenCommentLine >= 0) {
+    if (stepBlocks.when) {
       this.logger.log(`🔍 [${generationId}] Procesando inserción de When...`);
       
       // Verificar si el step ya existe
@@ -70,27 +90,75 @@ export class StepFilesManipulationService {
         this.logger.warn(`⚠️ [${generationId}] Step ya existe: ${stepPattern}`);
         // No insertar el step duplicado
       } else {
-        this.logger.log(`📍 [${generationId}] Insertando When antes del comentario "// Then steps" en línea ${sectionComments.thenCommentLine + 1}`);
-        insertions.push({
-          file: filePath,
-          line: sectionComments.thenCommentLine + 1,
-          content: '\n' + stepBlocks.when,
-          type: 'step',
-          description: 'Insertar nuevo When antes del comentario "// Then steps"',
-        });
+        let insertLine = -1;
+        
+        // Intentar usar la marca "End of When steps"
+        if (sectionComments.whenEndLine >= 0) {
+          insertLine = sectionComments.whenEndLine;
+          this.logger.log(`📍 [${generationId}] Insertando When ANTES del comentario "// End of When steps" en línea ${insertLine + 1}`);
+        } else {
+          // Método de contingencia: buscar el último When
+          const lastWhenLine = this.findLastStepOfType(lines, 'When', generationId);
+          if (lastWhenLine >= 0) {
+            insertLine = lastWhenLine + 1; // Insertar después del último When
+            this.logger.log(`📍 [${generationId}] Insertando When después del último When existente en línea ${insertLine + 1}`);
+          } else {
+            // Si no hay ningún When, insertar al final del archivo
+            insertLine = lines.length;
+            this.logger.log(`📍 [${generationId}] No se encontraron When existentes, insertando al final del archivo en línea ${insertLine + 1}`);
+          }
+        }
+        
+        if (insertLine >= 0) {
+          insertions.push({
+            file: filePath,
+            line: insertLine + 1,
+            content: '\n' + stepBlocks.when,
+            type: 'step',
+            description: 'Insertar nuevo When',
+          });
+        }
       }
     }
     
     if (stepBlocks.then) {
       this.logger.log(`🔍 [${generationId}] Procesando inserción de Then...`);
-      this.logger.log(`📍 [${generationId}] Insertando Then al final del archivo en línea ${lines.length + 1}`);
-      insertions.push({
-        file: filePath,
-        line: lines.length + 1,
-        content: '\n' + stepBlocks.then,
-        type: 'step',
-        description: 'Insertar nuevo Then al final del archivo',
-      });
+      
+      // Verificar si el step ya existe
+      const stepPattern = stepBlocks.then.match(/Then\(['"`]([^'"`]+)['"`]/)?.[1];
+      if (stepPattern && this.stepExists(filePath, stepPattern)) {
+        this.logger.warn(`⚠️ [${generationId}] Step ya existe: ${stepPattern}`);
+        // No insertar el step duplicado
+      } else {
+        let insertLine = -1;
+        
+        // Intentar usar la marca "End of Then steps"
+        if (sectionComments.thenCommentLine >= 0) {
+          insertLine = sectionComments.thenCommentLine;
+          this.logger.log(`📍 [${generationId}] Insertando Then ANTES del comentario "// End of Then steps" en línea ${insertLine + 1}`);
+        } else {
+          // Método de contingencia: buscar el último Then
+          const lastThenLine = this.findLastStepOfType(lines, 'Then', generationId);
+          if (lastThenLine >= 0) {
+            insertLine = lastThenLine + 1; // Insertar después del último Then
+            this.logger.log(`📍 [${generationId}] Insertando Then después del último Then existente en línea ${insertLine + 1}`);
+          } else {
+            // Si no hay ningún Then, insertar al final del archivo
+            insertLine = lines.length;
+            this.logger.log(`📍 [${generationId}] No se encontraron Then existentes, insertando al final del archivo en línea ${insertLine + 1}`);
+          }
+        }
+        
+        if (insertLine >= 0) {
+          insertions.push({
+            file: filePath,
+            line: insertLine + 1,
+            content: '\n' + stepBlocks.then,
+            type: 'step',
+            description: 'Insertar nuevo Then',
+          });
+        }
+      }
     }
     
     this.logger.log(`📊 [${generationId}] Total de inserciones de steps: ${insertions.length}`);
@@ -107,27 +175,37 @@ export class StepFilesManipulationService {
   private findSectionComments(
     lines: string[], 
     generationId: string
-  ): { whenCommentLine: number; thenCommentLine: number } {
+  ): { whenCommentLine: number; thenCommentLine: number; givenEndLine: number; whenEndLine: number } {
     let whenCommentLine = -1;
     let thenCommentLine = -1;
+    let givenEndLine = -1;
+    let whenEndLine = -1;
     
     this.logger.log(`🔍 [${generationId}] Buscando comentarios de sección...`);
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (line === '// When steps') {
+      if (line === '// Beginning of When steps') {
         whenCommentLine = i;
-        this.logger.log(`🎯 [${generationId}] Comentario "// When steps" encontrado en línea ${i + 1}`);
-      } else if (line === '// Then steps') {
+        this.logger.log(`🎯 [${generationId}] Comentario "// Beginning of When steps" encontrado en línea ${i + 1}`);
+      } else if (line === '// End of Then steps') {
         thenCommentLine = i;
-        this.logger.log(`🎯 [${generationId}] Comentario "// Then steps" encontrado en línea ${i + 1}`);
+        this.logger.log(`🎯 [${generationId}] Comentario "// End of Then steps" encontrado en línea ${i + 1}`);
+      } else if (line === '// End of Given steps') {
+        givenEndLine = i;
+        this.logger.log(`🎯 [${generationId}] Comentario "// End of Given steps" encontrado en línea ${i + 1}`);
+      } else if (line === '// End of When steps') {
+        whenEndLine = i;
+        this.logger.log(`🎯 [${generationId}] Comentario "// End of When steps" encontrado en línea ${i + 1}`);
       }
     }
     
     this.logger.log(`📊 [${generationId}] Comentarios encontrados:`);
-    this.logger.log(`📊 [${generationId}] - "// When steps": línea ${whenCommentLine >= 0 ? whenCommentLine + 1 : 'NO ENCONTRADO'}`);
-    this.logger.log(`📊 [${generationId}] - "// Then steps": línea ${thenCommentLine >= 0 ? thenCommentLine + 1 : 'NO ENCONTRADO'}`);
+    this.logger.log(`📊 [${generationId}] - "// Beginning of When steps": línea ${whenCommentLine >= 0 ? whenCommentLine + 1 : 'NO ENCONTRADO'}`);
+    this.logger.log(`📊 [${generationId}] - "// End of Then steps": línea ${thenCommentLine >= 0 ? thenCommentLine + 1 : 'NO ENCONTRADO'}`);
+    this.logger.log(`📊 [${generationId}] - "// End of Given steps": línea ${givenEndLine >= 0 ? givenEndLine + 1 : 'NO ENCONTRADO'}`);
+    this.logger.log(`📊 [${generationId}] - "// End of When steps": línea ${whenEndLine >= 0 ? whenEndLine + 1 : 'NO ENCONTRADO'}`);
     
-    return { whenCommentLine, thenCommentLine };
+    return { whenCommentLine, thenCommentLine, givenEndLine, whenEndLine };
   }
 
   /**
@@ -251,5 +329,27 @@ export class StepFilesManipulationService {
    */
   writeStepsContent(filePath: string, content: string): void {
     fs.writeFileSync(filePath, content, 'utf-8');
+  }
+
+  /**
+   * Encuentra el último step de un tipo específico como método de contingencia
+   */
+  private findLastStepOfType(
+    lines: string[], 
+    stepType: 'Given' | 'When' | 'Then',
+    generationId: string
+  ): number {
+    this.logger.log(`🔍 [${generationId}] Buscando último ${stepType} como método de contingencia...`);
+    
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (line.startsWith(`${stepType}(`)) {
+        this.logger.log(`🎯 [${generationId}] Último ${stepType} encontrado en línea ${i + 1}: ${line.substring(0, 50)}...`);
+        return i;
+      }
+    }
+    
+    this.logger.warn(`⚠️ [${generationId}] No se encontró ningún ${stepType} en el archivo`);
+    return -1;
   }
 } 

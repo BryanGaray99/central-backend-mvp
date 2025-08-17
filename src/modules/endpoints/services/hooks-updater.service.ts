@@ -6,6 +6,7 @@ import * as path from 'path';
 import { Project } from '../../projects/project.entity';
 import { Endpoint } from '../endpoint.entity';
 import { TemplateService } from '../../projects/services/template.service';
+import { CommonHooksRegistrationService } from '../../test-cases/services/common-hooks-registration.service';
 
 @Injectable()
 export class HooksUpdaterService {
@@ -17,6 +18,7 @@ export class HooksUpdaterService {
     @InjectRepository(Endpoint)
     private readonly endpointRepository: Repository<Endpoint>,
     private readonly templateService: TemplateService,
+    private readonly commonHooksRegistrationService: CommonHooksRegistrationService,
   ) {}
 
   /**
@@ -102,6 +104,18 @@ export class HooksUpdaterService {
 
     // Write the file
     fs.writeFileSync(hooksPath, hooksContent, 'utf8');
+
+    // Register common hooks in the database
+    try {
+      const project = await this.projectRepository.findOne({ where: { path: projectPath } });
+      if (project) {
+        await this.commonHooksRegistrationService.updateCommonHooks(project.id, hooksPath);
+        this.logger.log(`✅ Common hooks registered in database for project ${project.name}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error registering common hooks: ${error.message}`);
+      // No throw error here to avoid breaking the hooks file generation
+    }
   }
 
   /**

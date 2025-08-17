@@ -18,7 +18,13 @@ import { TestCasesModule } from './modules/test-cases/test-cases.module';
 import { DatabaseMigrationModule } from './common/database-migration.module';
 import { AIAssistant } from './modules/ai/entities/ai-assistant.entity';
 import { AIThread } from './modules/ai/entities/ai-thread.entity';
+import { AISuggestion } from './modules/ai/entities/ai-suggestion.entity';
 import { AIModule } from './modules/ai/ai.module';
+import { Bug } from './modules/bugs/entities/bug.entity';
+import { TestSuite } from './modules/test-suites/entities/test-suite.entity';
+import { BugsModule } from './modules/bugs/bugs.module';
+import { TestSuitesModule } from './modules/test-suites/test-suites.module';
+import { SyncModule } from './modules/sync/sync.module';
 
 @Module({
   imports: [
@@ -45,6 +51,9 @@ import { AIModule } from './modules/ai/ai.module';
             AIGeneration,
             AIAssistant,
             AIThread,
+            AISuggestion,
+            Bug,
+            TestSuite,
           ],
           synchronize: false, // Desactivar synchronize ya que usamos migraciones
         };
@@ -58,6 +67,9 @@ import { AIModule } from './modules/ai/ai.module';
     TestExecutionModule,
     TestCasesModule,
     AIModule,
+    BugsModule,
+    TestSuitesModule,
+    SyncModule,
   ],
   controllers: [AppController],
   providers: [AppService],

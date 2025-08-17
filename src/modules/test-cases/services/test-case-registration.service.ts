@@ -145,18 +145,40 @@ export class TestCaseRegistrationService {
 
   private extractTagsForScenario(lines: string[], tagLineIndex: number): string[] {
     const tags: string[] = [];
+
+    const extractTokens = (line: string): string[] => {
+      // Soporta espacios y comas como separadores; ignora el tag de numeración @TC-
+      return line
+        .split(/[,\s]+/)
+        .map(t => t.trim())
+        .filter(t => t && t.startsWith('@') && !/^@TC-/i.test(t));
+    };
     
     // Buscar tags hacia arriba desde la línea del tag TC
     for (let i = tagLineIndex; i >= 0; i--) {
       const line = lines[i].trim();
       if (line === '') break; // Línea vacía marca el fin de los tags
       if (line.startsWith('@')) {
-        // Omitir tags de numeración
-        if (!line.match(/^@TC-/)) {
-          tags.unshift(line);
+        const tokens = extractTokens(line);
+        // Mantener el orden original usando unshift en orden inverso
+        for (let k = tokens.length - 1; k >= 0; k--) {
+          tags.unshift(tokens[k]);
         }
       } else if (!line.startsWith('Feature:') && !line.startsWith('Background:')) {
         break; // Si no es tag ni feature ni background, terminar
+      }
+    }
+    
+    // Buscar tags hacia abajo desde la línea del tag TC (nueva estructura del template)
+    for (let i = tagLineIndex + 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === '') break; // Línea vacía marca el fin de los tags
+      if (line.startsWith('Scenario:') || line.startsWith('Scenario Outline:')) {
+        break; // Si encontramos el escenario, terminar
+      }
+      if (line.startsWith('@')) {
+        const tokens = extractTokens(line);
+        tokens.forEach(t => tags.push(t));
       }
     }
     

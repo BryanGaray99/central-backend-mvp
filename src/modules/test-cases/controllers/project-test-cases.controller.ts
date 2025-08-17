@@ -26,6 +26,7 @@ import { StepType, StepStatus } from '../entities/test-step.entity';
 import { TestCaseGenerationService } from '../../ai/services/test-case-generation.service';
 import { AIGenerationRequest, AIGenerationResponse } from '../../ai/interfaces/ai-agent.interface';
 import { AIGenerationRequestDto } from '../../ai/dto/ai-generation-request.dto';
+import { CommonHooksRegistrationService } from '../services/common-hooks-registration.service';
 
 // Interfaces temporales para los métodos TODO
 interface StepTemplateStatisticsDto {
@@ -61,6 +62,7 @@ export class ProjectTestCasesController {
     private readonly stepTemplatesService: StepTemplatesService,
     private readonly testStepRegistrationService: TestStepRegistrationService,
     private readonly testCaseGenerationService: TestCaseGenerationService,
+    private readonly commonHooksRegistrationService: CommonHooksRegistrationService,
   ) {}
 
   // ✅ MÉTODOS CRUD BÁSICOS EN USO
@@ -305,6 +307,65 @@ export class ProjectTestCasesController {
     return this.testCasesService.updateTestCase(testCaseId, dto);
   }
 
+  @Put(':testCaseId/steps')
+  @ApiOperation({ 
+    summary: 'Update test case steps with organized step selection',
+    description: 'Update test case with new steps, tags, and scenario structure'
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Test case steps updated successfully',
+    type: TestCaseResponseDto,
+  })
+  async updateTestCaseSteps(
+    @Param('projectId') projectId: string,
+    @Param('testCaseId') testCaseId: string,
+    @Body() dto: {
+      tags: string[];
+      steps: {
+        type: 'Given' | 'When' | 'Then' | 'And';
+        stepId: string;
+        parameters?: Record<string, any>;
+      }[];
+      scenario: string;
+    },
+  ): Promise<TestCaseResponseDto> {
+    this.logger.log(`[CONTROLLER] Actualizando steps del test case: ${testCaseId}`);
+    this.logger.log(`[CONTROLLER] ProjectId: ${projectId}`);
+    this.logger.log(`[CONTROLLER] Steps DTO: ${JSON.stringify(dto, null, 2)}`);
+    
+    return await this.testCasesService.updateTestCaseSteps(projectId, testCaseId, dto);
+  }
+
+  @Put(':testCaseId/scenario')
+  @ApiOperation({ 
+    summary: 'Update test case scenario with complete text',
+    description: 'Update test case with complete scenario text including tags and steps'
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Test case scenario updated successfully',
+    type: TestCaseResponseDto,
+  })
+  async updateTestCaseScenario(
+    @Param('projectId') projectId: string,
+    @Param('testCaseId') testCaseId: string,
+    @Body() dto: {
+      tags: string[];
+      scenario: string;
+    },
+  ): Promise<TestCaseResponseDto> {
+    this.logger.log(`[CONTROLLER] Actualizando scenario del test case: ${testCaseId}`);
+    this.logger.log(`[CONTROLLER] ProjectId: ${projectId}`);
+    this.logger.log(`[CONTROLLER] Scenario DTO: ${JSON.stringify(dto, null, 2)}`);
+    
+    return await this.testCasesService.updateTestCaseScenario(projectId, testCaseId, dto);
+  }
+
   @Delete(':testCaseId')
   @ApiOperation({
     summary: 'Delete a test case',
@@ -346,27 +407,7 @@ export class ProjectTestCasesController {
     throw new Error('TODO: Implementar con IA - exportTestCase');
   }
 
-  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Duplicar test case
-  @Post(':testCaseId/duplicate')
-  @ApiOperation({
-    summary: 'Duplicate test case',
-    description: 'Duplicate a test case with modifications',
-  })
-  @ApiParam({ name: 'projectId', description: 'Project ID' })
-  @ApiParam({ name: 'testCaseId', description: 'Test case ID' })
-  @ApiResponse({
-    status: 201,
-    description: 'Test case duplicated successfully',
-    type: TestCaseResponseDto,
-  })
-  async duplicateTestCase(
-    @Param('projectId') projectId: string,
-    @Param('testCaseId') testCaseId: string,
-    @Body() dto: any,
-  ): Promise<TestCaseResponseDto> {
-    // TODO: Implementar con IA para duplicación inteligente
-    throw new Error('TODO: Implementar con IA - duplicateTestCase');
-  }
+
 
   // ✅ MÉTODOS DE STEP TEMPLATES EN USO
   @Post('step-templates')
@@ -403,6 +444,52 @@ export class ProjectTestCasesController {
     @Query() filters: any,
   ): Promise<TestStepResponseDto[]> {
     return this.stepTemplatesService.listStepTemplates(projectId, filters);
+  }
+
+  @Get('step-templates/organized')
+  @ApiOperation({ 
+    summary: 'Get step templates organized by type and category',
+    description: 'Get step templates organized by Given/When/Then with common and entity-specific steps'
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Step templates organized successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        Given: {
+          type: 'object',
+          properties: {
+            common: { type: 'array', items: { $ref: '#/components/schemas/TestStepResponseDto' } },
+            entity: { type: 'array', items: { $ref: '#/components/schemas/TestStepResponseDto' } }
+          }
+        },
+        When: {
+          type: 'object',
+          properties: {
+            common: { type: 'array', items: { $ref: '#/components/schemas/TestStepResponseDto' } },
+            entity: { type: 'array', items: { $ref: '#/components/schemas/TestStepResponseDto' } }
+          }
+        },
+        Then: {
+          type: 'object',
+          properties: {
+            common: { type: 'array', items: { $ref: '#/components/schemas/TestStepResponseDto' } },
+            entity: { type: 'array', items: { $ref: '#/components/schemas/TestStepResponseDto' } }
+          }
+        }
+      }
+    }
+  })
+  async getOrganizedStepTemplates(
+    @Param('projectId') projectId: string,
+  ): Promise<{
+    Given: { common: TestStepResponseDto[]; entity: TestStepResponseDto[] };
+    When: { common: TestStepResponseDto[]; entity: TestStepResponseDto[] };
+    Then: { common: TestStepResponseDto[]; entity: TestStepResponseDto[] };
+  }> {
+    return await this.stepTemplatesService.getOrganizedStepTemplates(projectId);
   }
 
   @Get('step-templates/statistics')
@@ -541,8 +628,7 @@ export class ProjectTestCasesController {
     @Param('projectId') projectId: string,
     @Param('type') type: string,
   ): Promise<TestStepResponseDto[]> {
-    // TODO: Implementar con IA para tipificación inteligente
-    throw new Error('TODO: Implementar con IA - getStepTemplatesByType');
+    return await this.stepTemplatesService.getStepTemplatesByType(projectId, type);
   }
 
   // ✅ ENDPOINT DE IA PARA GENERACIÓN DE TESTS
@@ -591,5 +677,38 @@ export class ProjectTestCasesController {
   }
 
   // ✅ ENDPOINTS DE TEST STEPS (DEBEN IR ANTES DE LOS ENDPOINTS CON PARÁMETROS DINÁMICOS)
+
+  // ✅ ENDPOINT DE PRUEBA PARA REGENERAR HOOKS
+  @Post('regenerate-hooks')
+  @ApiOperation({
+    summary: 'Regenerate hooks and register common steps',
+    description: 'Regenerate hooks.ts file and register common steps in database',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Hooks regenerated and common steps registered successfully',
+  })
+  async regenerateHooks(
+    @Param('projectId') projectId: string,
+  ): Promise<{ message: string; commonStepsCount: number }> {
+    this.logger.log(`🎯 [CONTROLLER] Regenerating hooks for project: ${projectId}`);
+    
+    // Usar el servicio de hooks registration directamente
+    const hooksFilePath = `playwright-workspaces/mi-proyecto-test-1/src/steps/hooks.ts`;
+    await this.commonHooksRegistrationService.updateCommonHooks(projectId, hooksFilePath);
+    
+    // Contar steps comunes registrados
+    const commonSteps = await this.stepTemplatesService.listStepTemplates(projectId, { 
+      search: 'common' 
+    });
+    
+    this.logger.log(`✅ [CONTROLLER] Hooks regenerated successfully. Common steps: ${commonSteps.length}`);
+    
+    return { 
+      message: 'Hooks regenerated and common steps registered successfully',
+      commonStepsCount: commonSteps.length
+    };
+  }
 
 } 

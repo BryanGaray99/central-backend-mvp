@@ -396,6 +396,15 @@ export class EndpointsService {
       endpoint.status = 'generating';
       await this.endpointRepository.save(endpoint);
 
+      // Update hooks.ts with all endpoints FIRST - before generating artifacts
+      if (endpoint.analysisResults) {
+        try {
+          await this.hooksUpdaterService.regenerateHooksFile(project.id);
+        } catch (error) {
+          this.logger.warn(`Failed to update hooks.ts: ${error.message}`);
+        }
+      }
+
       // Generate artifacts (types, schemas, fixtures, clients)
       await this.artifactsGenerationService.generate(
         project,
@@ -421,15 +430,6 @@ export class EndpointsService {
       };
       endpoint.status = 'ready';
       await this.endpointRepository.save(endpoint);
-
-      // Update hooks.ts with all endpoints - only if endpoint is ready
-      if (endpoint.status === 'ready' && endpoint.analysisResults) {
-        try {
-          await this.hooksUpdaterService.regenerateHooksFile(project.id);
-        } catch (error) {
-          this.logger.warn(`Failed to update hooks.ts: ${error.message}`);
-        }
-      }
 
       // Update api.config.ts with all endpoints - only if endpoint is ready
       if (endpoint.status === 'ready' && endpoint.analysisResults) {

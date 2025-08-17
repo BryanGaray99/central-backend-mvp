@@ -38,14 +38,7 @@ interface TestCaseExportDto {
   };
 }
 
-interface DuplicateTestCaseDto {
-  newName: string;
-  modifications?: {
-    tags?: string[];
-    metadata?: any;
-    scenario?: string;
-  };
-}
+
 
 @Injectable()
 export class TestCasesService {
@@ -60,32 +53,48 @@ export class TestCasesService {
   ) {}
 
   // ✅ MÉTODOS CRUD BÁSICOS EN USO
-  async createTestCase(projectId: string, dto: CreateTestCaseDto): Promise<TestCaseResponseDto> {
+  async createTestCase(projectId: string, dto: CreateTestCaseDto, skipFeatureInsertion: boolean = false): Promise<TestCaseResponseDto> {
     this.logger.log(`Creating test case for project ${projectId}`);
 
     try {
       // 1. Validar datos de entrada
       await this.validateTestCase(dto);
 
-      // 2. Generar ID único
-      const testCaseId = await this.generateTestCaseId(projectId, dto.section, dto.entityName);
+      // 2. Determinar el ID del test case
+      let testCaseId: string;
+      if (skipFeatureInsertion && dto.testCaseId) {
+        // Para test cases generados por IA, usar el ID que ya viene en el DTO
+        testCaseId = dto.testCaseId;
+        this.logger.log(`Using AI-generated test case ID: ${testCaseId}`);
+      } else {
+        // Para test cases normales, generar ID único (basado en BD existente)
+        testCaseId = await this.generateTestCaseId(projectId, dto.section, dto.entityName);
+      }
 
-      // 3. Crear test case en BD
+      // 3. Crear test case en BD (asegurar que projectId del path prevalezca)
       const testCase = this.testCaseRepository.create({
+        ...dto,
         testCaseId,
         projectId,
-        ...dto,
       });
 
       const savedTestCase = await this.testCaseRepository.save(testCase);
 
-      // 4. Actualizar archivos de feature - DISABLED
-      // await this.featureFileManagerService.addTestCaseToFeature(
-      //   projectId,
-      //   dto.section,
-      //   dto.entityName,
-      //   savedTestCase
-      // );
+      // 4. Append scenario to feature file (solo si no se saltó la inserción)
+      if (!skipFeatureInsertion) {
+        try {
+          await this.featureFileManagerService.addTestCaseToFeature(
+            projectId,
+            dto.section,
+            dto.entityName,
+            savedTestCase
+          );
+        } catch (featureError) {
+          this.logger.warn(`Warning: Could not append scenario to feature file: ${featureError.message}`);
+        }
+      } else {
+        this.logger.log(`Skipping feature file insertion for AI-generated test case: ${testCaseId}`);
+      }
 
       this.logger.log(`Test case created successfully: ${testCaseId}`);
       return this.toTestCaseResponseDto(savedTestCase);
@@ -110,13 +119,19 @@ export class TestCasesService {
         ...dto,
       });
 
-      // 3. Actualizar archivos de feature - DISABLED
-      // await this.featureFileManagerService.updateTestCaseInFeature(
-      //   testCase.projectId,
-      //   testCase.section,
-      //   testCase.entityName,
-      //   updatedTestCase
-      // );
+      // 3. Actualizar archivos de feature
+      try {
+        await this.featureFileManagerService.updateTestCaseInFeature(
+          testCase.projectId,
+          testCase.section,
+          testCase.entityName,
+          updatedTestCase
+        );
+        this.logger.log(`Test case updated in feature file: ${testCaseId}`);
+      } catch (featureError) {
+        this.logger.warn(`Warning: Could not update test case in feature file: ${featureError.message}`);
+        // No lanzar error aquí, solo loggear como warning
+      }
 
       this.logger.log(`Test case updated successfully: ${testCaseId}`);
       return this.toTestCaseResponseDto(updatedTestCase);
@@ -124,6 +139,139 @@ export class TestCasesService {
       this.logger.error('Error updating test case:', error);
       throw error;
     }
+  }
+
+  async updateTestCaseSteps(
+    projectId: string, 
+    testCaseId: string, 
+    dto: {
+      tags: string[];
+      steps: {
+        type: 'Given' | 'When' | 'Then' | 'And';
+        stepId: string;
+        parameters?: Record<string, any>;
+      }[];
+      scenario: string;
+    }
+  ): Promise<TestCaseResponseDto> {
+    this.logger.log(`Updating test case steps: ${testCaseId}`);
+
+    try {
+      const testCase = await this.findTestCaseEntityById(testCaseId);
+      
+      // 1. Reconstruir el escenario basado en los steps seleccionados
+      const scenarioSteps = dto.steps.map(step => {
+        const stepType = step.type === 'And' ? this.getPreviousStepType(dto.steps, dto.steps.indexOf(step)) : step.type;
+        return `${stepType} ${this.getStepDefinition(step.stepId, step.parameters)}`;
+      });
+
+      const newScenario = scenarioSteps.join('\n    ');
+
+      // 2. Actualizar test case con nuevos datos
+      const updatedTestCase = await this.testCaseRepository.save({
+        ...testCase,
+        tags: dto.tags,
+        scenario: newScenario,
+      });
+
+      // 3. Actualizar archivos de feature
+      try {
+        await this.featureFileManagerService.updateTestCaseInFeature(
+          testCase.projectId,
+          testCase.section,
+          testCase.entityName,
+          updatedTestCase
+        );
+        this.logger.log(`Test case steps updated in feature file: ${testCaseId}`);
+      } catch (featureError) {
+        this.logger.warn(`Warning: Could not update test case steps in feature file: ${featureError.message}`);
+      }
+
+      this.logger.log(`Test case steps updated successfully: ${testCaseId}`);
+      return this.toTestCaseResponseDto(updatedTestCase);
+    } catch (error) {
+      this.logger.error('Error updating test case steps:', error);
+      throw error;
+    }
+  }
+
+  async updateTestCaseScenario(
+    projectId: string, 
+    testCaseId: string, 
+    dto: {
+      tags: string[];
+      scenario: string;
+    }
+  ): Promise<TestCaseResponseDto> {
+    this.logger.log(`Updating test case scenario: ${testCaseId}`);
+
+    try {
+      const testCase = await this.findTestCaseEntityById(testCaseId);
+      
+      // Procesar tags - manejar tanto array de strings como array con string que contiene espacios
+      let processedTags = dto.tags;
+      if (Array.isArray(dto.tags) && dto.tags.length === 1 && typeof dto.tags[0] === 'string' && dto.tags[0].includes(' ')) {
+        // Si los tags vienen como ["@read @smoke"], separarlos
+        processedTags = dto.tags[0].split(' ').filter(tag => tag.trim() !== '');
+      }
+      
+      // 1. Validar datos de entrada (mismo patrón que updateTestCase)
+      await this.validateTestCase({ ...testCase, tags: processedTags, scenario: dto.scenario });
+
+      // 2. Actualizar en BD usando el mismo patrón que updateTestCase
+      const updatedTestCase = await this.testCaseRepository.save({
+        ...testCase,
+        tags: processedTags,
+        scenario: dto.scenario,
+      });
+
+      // 3. Actualizar archivos de feature
+      try {
+        await this.featureFileManagerService.updateTestCaseInFeature(
+          testCase.projectId,
+          testCase.section,
+          testCase.entityName,
+          updatedTestCase
+        );
+        this.logger.log(`Test case scenario updated in feature file: ${testCaseId}`);
+      } catch (featureError) {
+        this.logger.warn(`Warning: Could not update test case scenario in feature file: ${featureError.message}`);
+      }
+
+      this.logger.log(`Test case scenario updated successfully: ${testCaseId}`);
+      return this.toTestCaseResponseDto(updatedTestCase);
+    } catch (error) {
+      this.logger.error('Error updating test case scenario:', error);
+      throw error;
+    }
+  }
+
+  private getPreviousStepType(steps: any[], currentIndex: number): string {
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      if (steps[i].type !== 'And') {
+        return steps[i].type;
+      }
+    }
+    return 'Given'; // Default fallback
+  }
+
+  private async getStepDefinition(stepId: string, parameters?: Record<string, any>): Promise<string> {
+    // Buscar el step en la base de datos
+    const step = await this.testStepRepository.findOne({ where: { stepId } });
+    if (!step) {
+      throw new Error(`Step not found: ${stepId}`);
+    }
+
+    let definition = step.definition;
+    
+    // Reemplazar parámetros si existen
+    if (parameters) {
+      Object.entries(parameters).forEach(([key, value]) => {
+        definition = definition.replace(new RegExp(`{${key}}`, 'g'), String(value));
+      });
+    }
+
+    return definition;
   }
 
   async deleteTestCase(testCaseId: string): Promise<void> {
@@ -135,13 +283,19 @@ export class TestCasesService {
       // 1. Eliminar de BD
       await this.testCaseRepository.remove(testCase);
 
-      // 2. Actualizar archivos de feature - DISABLED
-      // await this.featureFileManagerService.removeTestCaseFromFeature(
-      //   testCase.projectId,
-      //   testCase.section,
-      //   testCase.entityName,
-      //   testCase
-      // );
+      // 2. Actualizar archivos de feature
+      try {
+        await this.featureFileManagerService.removeTestCaseFromFeature(
+          testCase.projectId,
+          testCase.section,
+          testCase.entityName,
+          testCase
+        );
+        this.logger.log(`Test case removed from feature file: ${testCaseId}`);
+      } catch (featureError) {
+        this.logger.warn(`Warning: Could not remove test case from feature file: ${featureError.message}`);
+        // No lanzar error aquí, solo loggear como warning
+      }
 
       this.logger.log(`Test case deleted successfully: ${testCaseId}`);
     } catch (error) {
@@ -264,14 +418,7 @@ export class TestCasesService {
     }
   }
 
-  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Duplicar test case con modificaciones inteligentes
-  async duplicateTestCase(projectId: string, testCaseId: string, dto: DuplicateTestCaseDto): Promise<TestCaseResponseDto> {
-    // TODO: Implementar con IA para duplicación inteligente
-    // - Análisis de patrones de modificación
-    // - Generación de variaciones automáticas
-    // - Optimización de cobertura
-    throw new Error('TODO: Implementar con IA - duplicateTestCase');
-  }
+
 
   // TODO: FUTURA IMPLEMENTACIÓN CON IA - Exportar test case con formato optimizado
   async exportTestCase(projectId: string, testCaseId: string): Promise<TestCaseExportDto> {
@@ -298,6 +445,7 @@ export class TestCasesService {
     });
 
     if (!testCase) {
+      this.logger.error(`Test case not found in database: ${testCaseId}`);
       throw new Error(`Test case not found: ${testCaseId}`);
     }
 
@@ -305,24 +453,31 @@ export class TestCasesService {
   }
 
   private async generateTestCaseId(projectId: string, section: string, entityName: string): Promise<string> {
-    // Buscar el patrón correcto: TC-{SECTION}-{ENTITYNAME}-{NUMBER}
-    const pattern = `TC-${section.toUpperCase()}-${entityName.toUpperCase()}-`;
+    // Pattern: @TC-{section}-{entity}-{NN} (section/entity case-sensitive per file examples)
+    const patternDb = `TC-${section}-${entityName}-`;
     const testCases = await this.testCaseRepository
       .createQueryBuilder('testCase')
       .where('testCase.projectId = :projectId', { projectId })
-      .andWhere('testCase.testCaseId LIKE :pattern', { pattern: `${pattern}%` })
+      .andWhere('testCase.testCaseId LIKE :pattern', { pattern: `${patternDb}%` })
       .getMany();
-    
-    let maxNumber = 0;
+
+    let maxDb = 0;
     for (const tc of testCases) {
-      const match = tc.testCaseId.match(new RegExp(`${pattern}(\\d+)`));
+      const match = tc.testCaseId.match(new RegExp(`^TC-${section}-${entityName}-(\\d+)$`));
       if (match) {
         const num = parseInt(match[1], 10);
-        if (num > maxNumber) maxNumber = num;
+        if (num > maxDb) maxDb = num;
       }
     }
-    
-    return `TC-${section.toUpperCase()}-${entityName.toUpperCase()}-${String(maxNumber + 1).padStart(2, '0')}`;
+
+    // Read from feature file as well
+    let maxFile = 0;
+    try {
+      maxFile = await this.featureFileManagerService.getMaxNumberFromFeature(projectId, section, entityName);
+    } catch {}
+
+    const next = Math.max(maxDb, maxFile) + 1;
+    return `TC-${section}-${entityName}-${String(next).padStart(2, '0')}`;
   }
 
   private async validateTestCase(dto: CreateTestCaseDto | (TestCase & UpdateTestCaseDto)): Promise<void> {

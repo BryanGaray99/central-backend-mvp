@@ -1,9 +1,11 @@
 import { Controller, Post, Param, Get, Delete, BadRequestException, Body, Logger } from '@nestjs/common';
 import { AssistantManagerService } from '../services/assistant-manager.service';
 import { ThreadManagerService } from '../services/thread-manager.service';
+import { TestCaseSuggestionService } from '../services/test-case-suggestion.service';
 import { AIAssistant } from '../entities/ai-assistant.entity';
 import { AIThread } from '../entities/ai-thread.entity';
-import { ApiTags } from '@nestjs/swagger';
+import { TestCaseSuggestionRequestDto, TestCaseSuggestionResponseDto } from '../dto/test-case-suggestion.dto';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('ai')
 @Controller('projects/:projectId/ai')
@@ -13,6 +15,7 @@ export class AIController {
   constructor(
     private readonly assistantManagerService: AssistantManagerService,
     private readonly threadManagerService: ThreadManagerService,
+    private readonly testCaseSuggestionService: TestCaseSuggestionService,
   ) {}
 
   @Get('assistant')
@@ -88,5 +91,95 @@ export class AIController {
   async deleteAllThreads(@Param('projectId') projectId: string): Promise<{ message: string }> {
     await this.threadManagerService.deleteAllProjectThreads(projectId);
     return { message: 'All threads deleted successfully' };
+  }
+
+  @Post('test-cases/suggest')
+  @ApiOperation({
+    summary: 'Generate test case suggestions using AI',
+    description: 'Generates 5 test case suggestions based on existing feature and steps files, avoiding duplicates'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Test case suggestions generated successfully',
+    type: TestCaseSuggestionResponseDto
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - missing assistant or invalid input'
+  })
+  async suggestTestCases(
+    @Param('projectId') projectId: string,
+    @Body() request: TestCaseSuggestionRequestDto
+  ): Promise<TestCaseSuggestionResponseDto> {
+    this.logger.log(`🚀 Generating test case suggestions for project ${projectId}, entity: ${request.entityName}`);
+    
+    try {
+      const suggestions = await this.testCaseSuggestionService.generateSuggestions(projectId, request);
+      
+      return {
+        suggestions,
+        totalSuggestions: suggestions.length,
+        message: 'Test case suggestions generated successfully'
+      };
+    } catch (error) {
+      this.logger.error(`❌ Error generating test case suggestions: ${error.message}`);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('suggestions')
+  @ApiOperation({
+    summary: 'Get all AI suggestions for a project',
+    description: 'Retrieves all saved AI suggestions for the specified project'
+  })
+  async getProjectSuggestions(@Param('projectId') projectId: string) {
+    const suggestions = await this.testCaseSuggestionService.getProjectSuggestions(projectId);
+    return {
+      success: true,
+      data: suggestions,
+      total: suggestions.length
+    };
+  }
+
+  @Get('suggestions/stats')
+  @ApiOperation({
+    summary: 'Get AI suggestions statistics for a project',
+    description: 'Retrieves statistics about AI suggestions for the specified project'
+  })
+  async getSuggestionStats(@Param('projectId') projectId: string) {
+    const stats = await this.testCaseSuggestionService.getSuggestionStats(projectId);
+    return {
+      success: true,
+      data: stats
+    };
+  }
+
+  @Get('suggestions/:suggestionId')
+  @ApiOperation({
+    summary: 'Get a specific AI suggestion by ID',
+    description: 'Retrieves a specific AI suggestion by its ID'
+  })
+  async getSuggestionById(@Param('projectId') projectId: string, @Param('suggestionId') suggestionId: string) {
+    const suggestion = await this.testCaseSuggestionService.getSuggestionById(suggestionId);
+    if (!suggestion) {
+      throw new BadRequestException('Suggestion not found');
+    }
+    return {
+      success: true,
+      data: suggestion
+    };
+  }
+
+  @Delete('suggestions/:suggestionId')
+  @ApiOperation({
+    summary: 'Delete a specific AI suggestion',
+    description: 'Deletes a specific AI suggestion by its ID'
+  })
+  async deleteSuggestion(@Param('projectId') projectId: string, @Param('suggestionId') suggestionId: string) {
+    await this.testCaseSuggestionService.deleteSuggestion(suggestionId);
+    return {
+      success: true,
+      message: 'Suggestion deleted successfully'
+    };
   }
 } 

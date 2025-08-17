@@ -16,18 +16,63 @@ export class CodeParsingService {
     // Buscar código usando el formato específico ***Features:*** y ***Steps:***
     const featuresMatch = generatedText.match(/\*\*\*Features:\*\*\*([\s\S]*?)(?=\*\*\*Steps:\*\*\*|$)/);
     if (featuresMatch) {
-      code.feature = featuresMatch[1].trim();
+      let featureContent = featuresMatch[1].trim();
+      
+      // Limpiar bloques de markdown si existen
+      if (featureContent.includes('```gherkin')) {
+        const gherkinMatch = featureContent.match(/```gherkin\s*([\s\S]*?)```/);
+        if (gherkinMatch) {
+          featureContent = gherkinMatch[1].trim();
+        }
+      } else if (featureContent.includes('```')) {
+        const codeMatch = featureContent.match(/```\s*([\s\S]*?)```/);
+        if (codeMatch) {
+          featureContent = codeMatch[1].trim();
+        }
+      }
+      
+      code.feature = featureContent;
       this.logger.log(`✅ Código feature encontrado (formato ***Features:***)`);
+      this.logger.log(`📄 Feature content (primeros 200 chars): ${featureContent.substring(0, 200)}...`);
     } else {
       this.logger.log(`⚠️ No se encontró código feature con formato ***Features:***`);
     }
     
     const stepsMatch = generatedText.match(/\*\*\*Steps:\*\*\*([\s\S]*?)(?=\*\*\*Features:\*\*\*|$)/);
     if (stepsMatch) {
-      code.steps = stepsMatch[1].trim();
+      let stepsContent = stepsMatch[1].trim();
+      
+      // Limpiar bloques de markdown si existen
+      if (stepsContent.includes('```typescript')) {
+        const typescriptMatch = stepsContent.match(/```typescript\s*([\s\S]*?)```/);
+        if (typescriptMatch) {
+          stepsContent = typescriptMatch[1].trim();
+        }
+      } else if (stepsContent.includes('```')) {
+        const codeMatch = stepsContent.match(/```\s*([\s\S]*?)```/);
+        if (codeMatch) {
+          stepsContent = codeMatch[1].trim();
+        }
+      }
+      
+      code.steps = stepsContent;
       this.logger.log(`✅ Código steps encontrado (formato ***Steps:***)`);
+      this.logger.log(`📄 Steps content (primeros 200 chars): ${stepsContent.substring(0, 200)}...`);
     } else {
       this.logger.log(`⚠️ No se encontró código steps con formato ***Steps:***`);
+    }
+    
+    // Validar que el feature contiene @TC-
+    if (code.feature && !code.feature.includes('@TC-')) {
+      this.logger.warn(`⚠️ El código feature no contiene @TC-: ${code.feature.substring(0, 100)}...`);
+    }
+    
+    // Validar que el steps contiene Given/When/Then
+    if (code.steps) {
+      const hasStepDefinition = code.steps.includes('Given(') || code.steps.includes('When(') || code.steps.includes('Then(');
+      if (!hasStepDefinition) {
+        this.logger.warn(`⚠️ El código steps no contiene definiciones Given/When/Then: ${code.steps.substring(0, 100)}...`);
+      }
     }
     
     // Fallback: buscar código de feature (múltiples formatos) si no se encontró con el formato específico

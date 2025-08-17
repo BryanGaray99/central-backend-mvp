@@ -13,6 +13,7 @@ export interface AIGenerationResponse {
     newCode: GeneratedCode;
     insertions: CodeInsertion[];
     context?: ProjectContext;
+    savedTestCase?: any;
   };
   error?: string;
   metadata?: {

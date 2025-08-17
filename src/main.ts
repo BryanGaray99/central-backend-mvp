@@ -72,7 +72,7 @@ async function bootstrap() {
       forbidUnknownValues: true,
       transform: true,
       transformOptions: {
-        enableImplicitConversion: false,
+        enableImplicitConversion: true,
       },
       errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
       skipMissingProperties: false,

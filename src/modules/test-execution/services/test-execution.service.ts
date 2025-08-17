@@ -3,6 +3,8 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +17,7 @@ import { TestRunnerService } from './test-runner.service';
 import { TestResultsListenerService } from './test-results-listener.service';
 import { ExecutionLoggerService } from './execution-logger.service';
 import { TestCaseUpdateService } from './test-case-update.service';
+import { TestSuitesService } from '../../test-suites/services/test-suites.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -32,6 +35,8 @@ export class TestExecutionService {
     private readonly testResultsListenerService: TestResultsListenerService,
     private readonly executionLoggerService: ExecutionLoggerService,
     private readonly testCaseUpdateService: TestCaseUpdateService,
+    @Inject(forwardRef(() => TestSuitesService))
+    private readonly testSuitesService: TestSuitesService,
   ) {}
 
   async executeTests(projectId: string, dto: ExecuteTestsDto) {
@@ -73,6 +78,7 @@ export class TestExecutionService {
         timeout: dto.timeout,
         retries: dto.retries,
         workers: dto.workers,
+        ...((dto as any).testSuiteId && { testSuiteId: (dto as any).testSuiteId }), // Para ejecuciones desde test suites
       },
     });
 
@@ -383,6 +389,29 @@ export class TestExecutionService {
         execution.entityName,
         testCaseResults,
       );
+
+      // ✅ NUEVO: Si la ejecución viene de una test suite, actualizar sus estadísticas
+      const metadata = execution.metadata as any;
+      if (metadata?.testSuiteId) {
+        this.logger.log(`Updating test suite stats for test suite ID: ${metadata.testSuiteId}`);
+        try {
+          await this.testSuitesService.updateTestSuiteExecutionStats(
+            project.id,
+            metadata.testSuiteId,
+            {
+              totalScenarios: results.totalScenarios,
+              passedScenarios: results.passedScenarios,
+              failedScenarios: results.failedScenarios,
+              executionTime: results.executionTime,
+            }
+          );
+          this.logger.log(`Test suite stats updated successfully for test suite ID: ${metadata.testSuiteId}`);
+        } catch (error) {
+          this.logger.warn(`Error updating test suite stats: ${error.message}`);
+        }
+      } else {
+        this.logger.log('No test suite ID found in metadata, skipping test suite stats update');
+      }
 
       // Registrar información de la ejecución completada
       await this.executionLoggerService.logExecutionCompleted(

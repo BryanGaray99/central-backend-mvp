@@ -57,7 +57,7 @@ export class TestCasesController {
               },
               hooks: { type: 'object' },
               examples: { type: 'object' },
-              metadata: { type: 'object' },
+        metadata: { type: 'object' },
             },
           },
         },

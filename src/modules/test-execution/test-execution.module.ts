@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TestExecutionController } from './controllers/test-execution.controller';
 import { GlobalTestExecutionController } from './controllers/global-test-execution.controller';
@@ -11,10 +11,12 @@ import { TestExecution } from './entities/test-execution.entity';
 import { TestResult } from './entities/test-result.entity';
 import { Project } from '../projects/project.entity';
 import { TestCase } from '../test-cases/entities/test-case.entity';
+import { TestSuitesModule } from '../test-suites/test-suites.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([TestExecution, TestResult, Project, TestCase]),
+    forwardRef(() => TestSuitesModule),
   ],
   controllers: [TestExecutionController, GlobalTestExecutionController],
   providers: [

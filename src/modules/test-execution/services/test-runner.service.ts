@@ -20,6 +20,13 @@ export class TestRunnerService {
     const results: any[] = [];
 
     try {
+      // Asegurar que el directorio test-results existe
+      const testResultsDir = path.join(projectPath, 'test-results');
+      try {
+        await fs.mkdir(testResultsDir, { recursive: true });
+      } catch (error) {
+        this.logger.warn(`No se pudo crear el directorio test-results: ${error.message}`);
+      }
       // Configurar variables de entorno para la ejecución
       const env = {
         ...process.env,
@@ -34,7 +41,9 @@ export class TestRunnerService {
         TEST_SAVE_PAYLOADS: dto.savePayloads?.toString(),
         TEST_TIMEOUT: dto.timeout?.toString(),
         TEST_RETRIES: dto.retries?.toString(),
-        TEST_WORKERS: dto.workers?.toString(),
+        // Configurar workers para Playwright (no para Cucumber)
+        WORKERS: dto.parallel && dto.workers ? dto.workers.toString() : '1',
+        CI: 'false', // Asegurar que no se ejecute en modo CI para permitir workers
       };
 
       // Construir comando de ejecución
@@ -50,6 +59,11 @@ export class TestRunnerService {
       const totalScenarios = parsedResults.length;
       const passedScenarios = parsedResults.filter(r => r.status === 'passed').length;
       const failedScenarios = parsedResults.filter(r => r.status === 'failed').length;
+
+      // Si no se pudieron parsear resultados pero el comando fue exitoso, asumir que pasó
+      if (totalScenarios === 0 && testResults) {
+        this.logger.log('No se pudieron parsear resultados específicos, pero la ejecución fue exitosa');
+      }
 
       const executionTime = Date.now() - startTime;
 
@@ -83,15 +97,23 @@ export class TestRunnerService {
       command += ' --require src/steps/hooks.ts';
     }
 
-    // Filtrar por tags
-    if (dto.tags && dto.tags.length > 0) {
-      const tagFilter = dto.tags.map(tag => `--tags "${tag}"`).join(' ');
-      command += ` ${tagFilter}`;
-    }
-
-    // Filtrar por escenario específico
+    // Filtrar por escenario específico (prioridad sobre tags)
     if (dto.specificScenario) {
-      command += ` --name "${dto.specificScenario}"`;
+      // Si hay múltiples escenarios separados por coma, crear múltiples filtros --name
+      const scenarios = dto.specificScenario.split(',').map(s => s.trim());
+      if (scenarios.length === 1) {
+        command += ` --name "${scenarios[0]}"`;
+      } else {
+        // Para múltiples escenarios, usar múltiples filtros --name
+        const nameFilters = scenarios.map(scenario => `--name "${scenario}"`).join(' ');
+        command += ` ${nameFilters}`;
+      }
+    } else {
+      // Solo usar tags si no hay escenarios específicos
+      if (dto.tags && dto.tags.length > 0) {
+        const tagFilter = dto.tags.map(tag => `--tags "${tag}"`).join(' ');
+        command += ` ${tagFilter}`;
+      }
     }
 
     // Configuración de retries (opción válida en Cucumber.js)
@@ -103,15 +125,22 @@ export class TestRunnerService {
     command += ' --format @cucumber/pretty-formatter';
     command += ' --format json:test-results/cucumber-report.json';
 
-    // Configuración de paralelismo (usar --parallel-workers en lugar de --parallel)
+    // Configuración de paralelismo (cucumber-js no soporta --parallel-workers, se maneja a través de configuración)
+    // El paralelismo se puede configurar a través de variables de entorno o configuración de Playwright
     if (dto.parallel && dto.workers && dto.workers > 1) {
-      command += ` --parallel-workers ${dto.workers}`;
+      // En lugar de usar --parallel-workers, configuramos a través de variables de entorno
+      // que serán leídas por la configuración de Playwright
+      this.logger.log(`Configurando ejecución paralela con ${dto.workers} workers`);
     }
 
     // Timeout se maneja a través de variables de entorno o configuración de Playwright
     // No se pasa como parámetro de línea de comandos a Cucumber
 
     this.logger.log(`Comando generado: ${command}`);
+    this.logger.log(`Filtros aplicados:`);
+    this.logger.log(`  - Specific scenarios: ${dto.specificScenario || 'none'}`);
+    this.logger.log(`  - Tags: ${dto.tags?.join(', ') || 'none'}`);
+    this.logger.log(`  - Entity: ${dto.entityName}`);
     return command;
   }
 
@@ -182,8 +211,9 @@ export class TestRunnerService {
       try {
         const jsonContent = await fs.readFile(jsonReportPath, 'utf8');
         const jsonOutput = JSON.parse(jsonContent);
-        const results: any[] = [];
+        const allResults: any[] = [];
 
+        // Primero, recolectar todos los resultados (incluyendo duplicados por examples)
         for (const feature of jsonOutput) {
           for (const element of feature.elements || []) {
             if (element.type === 'scenario') {
@@ -202,15 +232,20 @@ export class TestRunnerService {
                 },
               };
 
-              results.push(scenarioResult);
+              allResults.push(scenarioResult);
             }
           }
         }
 
-        this.logger.log(`Parseados ${results.length} escenarios del reporte JSON`);
-        return results;
+        // Deduplicar escenarios con el mismo nombre y calcular estadísticas consolidadas
+        const uniqueResults = this.deduplicateScenarios(allResults);
+
+        this.logger.log(`Parseados ${allResults.length} escenarios totales, ${uniqueResults.length} escenarios únicos del reporte JSON`);
+        return uniqueResults;
       } catch (fileError) {
         this.logger.warn(`No se pudo leer el archivo JSON de Cucumber: ${fileError.message}`);
+        // Si no se puede leer el archivo JSON, intentar parsear la salida stdout directamente
+        this.logger.log('Intentando parsear la salida stdout directamente...');
         return [];
       }
     } catch (error) {
@@ -275,5 +310,76 @@ export class TestRunnerService {
   private extractErrorMessage(steps: any[]): string | undefined {
     const failedStep = steps.find(step => step.result?.status === 'failed');
     return failedStep?.result?.error_message;
+  }
+
+  private deduplicateScenarios(allResults: any[]): any[] {
+    const scenarioGroups = new Map<string, any[]>();
+
+    // Agrupar escenarios por nombre
+    for (const result of allResults) {
+      const scenarioName = result.scenarioName;
+      if (!scenarioGroups.has(scenarioName)) {
+        scenarioGroups.set(scenarioName, []);
+      }
+      scenarioGroups.get(scenarioName)!.push(result);
+    }
+
+    // Consolidar cada grupo de escenarios
+    const uniqueResults: any[] = [];
+    for (const [scenarioName, scenarios] of scenarioGroups) {
+      if (scenarios.length === 1) {
+        // Solo un escenario, usar directamente
+        uniqueResults.push(scenarios[0]);
+      } else {
+        // Múltiples escenarios con el mismo nombre (por examples), consolidar
+        const consolidatedScenario = this.consolidateScenarioGroup(scenarios);
+        uniqueResults.push(consolidatedScenario);
+      }
+    }
+
+    return uniqueResults;
+  }
+
+  private consolidateScenarioGroup(scenarios: any[]): any {
+    const firstScenario = scenarios[0];
+    
+    // Determinar el estado consolidado: si al menos uno falló, el escenario falló
+    const hasAnyFailed = scenarios.some(s => s.status === 'failed');
+    const consolidatedStatus = hasAnyFailed ? 'failed' : 'passed';
+    
+    // Sumar duraciones
+    const totalDuration = scenarios.reduce((sum, s) => sum + s.duration, 0);
+    
+    // Consolidar mensajes de error
+    const errorMessages = scenarios
+      .filter(s => s.errorMessage)
+      .map(s => s.errorMessage)
+      .join('; ');
+    
+    // Consolidar steps (tomar los del primer escenario como representativo)
+    const consolidatedSteps = firstScenario.steps;
+    
+    // Consolidar metadata
+    const consolidatedMetadata = {
+      ...firstScenario.metadata,
+      totalExecutions: scenarios.length,
+      executionDetails: scenarios.map(s => ({
+        status: s.status,
+        duration: s.duration,
+        errorMessage: s.errorMessage,
+        scenarioId: s.metadata.scenarioId,
+        line: s.metadata.line,
+      })),
+    };
+
+    return {
+      scenarioName: firstScenario.scenarioName,
+      scenarioTags: firstScenario.scenarioTags,
+      status: consolidatedStatus,
+      duration: totalDuration,
+      steps: consolidatedSteps,
+      errorMessage: errorMessages || undefined,
+      metadata: consolidatedMetadata,
+    };
   }
 } 

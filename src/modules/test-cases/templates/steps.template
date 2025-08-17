@@ -250,7 +250,9 @@ When('I delete a {{../entityName}} with ID {string}', async function ({{../entit
 {{/if}}
 {{/each}}
 
-// Then steps
+// End of When steps
+// Beginning of Then steps
+
 {{#each methods}}
 {{#if (eq method "POST")}}
 Then('the {{../entityName}} should be created successfully', function () {

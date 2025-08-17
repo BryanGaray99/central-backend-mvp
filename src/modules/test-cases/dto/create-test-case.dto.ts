@@ -129,6 +129,22 @@ export class TestCaseMetadataDto {
 }
 
 export class CreateTestCaseDto {
+  @ApiPropertyOptional({
+    description: 'Project ID (ignored if provided in body; use path param instead)',
+    example: 'aa15e5fd-b5b7-4989-b33b-982bd2a38398',
+  })
+  @IsOptional()
+  @IsString()
+  projectId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Test Case ID (usado para test cases generados por IA)',
+    example: 'TC-ecommerce-Product-11',
+  })
+  @IsOptional()
+  @IsString()
+  testCaseId?: string;
+
   @ApiProperty({
     description: 'Nombre del caso de prueba',
     example: 'Create Product with valid data',
