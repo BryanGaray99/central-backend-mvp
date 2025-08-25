@@ -7,6 +7,7 @@ import { TestRunnerService } from './services/test-runner.service';
 import { TestResultsListenerService } from './services/test-results-listener.service';
 import { ExecutionLoggerService } from './services/execution-logger.service';
 import { TestCaseUpdateService } from './services/test-case-update.service';
+import { ExecutionEventsService } from './services/execution-events.service';
 import { TestExecution } from './entities/test-execution.entity';
 import { TestResult } from './entities/test-result.entity';
 import { Project } from '../projects/project.entity';
@@ -25,6 +26,7 @@ import { TestSuitesModule } from '../test-suites/test-suites.module';
     TestResultsListenerService,
     ExecutionLoggerService,
     TestCaseUpdateService,
+    ExecutionEventsService,
   ],
   exports: [
     TestExecutionService,
@@ -32,6 +34,7 @@ import { TestSuitesModule } from '../test-suites/test-suites.module';
     TestResultsListenerService,
     ExecutionLoggerService,
     TestCaseUpdateService,
+    ExecutionEventsService,
   ],
 })
 export class TestExecutionModule {} 

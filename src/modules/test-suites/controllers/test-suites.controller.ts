@@ -196,4 +196,23 @@ export class TestSuitesController {
     this.logger.log(`Getting execution history for test suite: ${suiteId}`);
     return await this.testSuitesService.getExecutionHistory(projectId, suiteId);
   }
+
+  @Get('test-sets/:section')
+  @ApiOperation({
+    summary: 'Get test sets by section for test plans',
+    description: 'Get all test sets for a specific section to use in test plans',
+  })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'section', description: 'Section name', type: 'string' })
+  @ApiResponse({
+    status: 200,
+    description: 'Test sets retrieved successfully',
+  })
+  async getTestSetsBySection(
+    @Param('projectId') projectId: string,
+    @Param('section') section: string,
+  ) {
+    this.logger.log(`Getting test sets for section: ${section} in project: ${projectId}`);
+    return await this.testSuitesService.getTestSetsBySection(projectId, section);
+  }
 }

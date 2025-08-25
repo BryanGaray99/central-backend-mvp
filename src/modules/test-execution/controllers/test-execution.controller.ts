@@ -7,7 +7,10 @@ import {
   Delete,
   Query,
   Logger,
+  Res,
+  Sse,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { TestExecutionService } from '../services/test-execution.service';
 import { ExecuteTestsDto } from '../dto/execute-tests.dto';
@@ -289,5 +292,19 @@ export class TestExecutionController {
     );
 
     return await this.testExecutionService.getExecutionSummary(projectId);
+  }
+
+  @Sse('execution-events')
+  @ApiOperation({
+    summary: 'Server-Sent Events para ejecuciones',
+    description: 'Endpoint SSE para recibir eventos de ejecución en tiempo real',
+  })
+  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
+  async executionEvents(@Param('projectId') projectId: string) {
+    this.logger.log(
+      `[CONTROLLER] Cliente SSE conectado para proyecto: ${projectId}`,
+    );
+
+    return this.testExecutionService.getExecutionEvents(projectId);
   }
 } 

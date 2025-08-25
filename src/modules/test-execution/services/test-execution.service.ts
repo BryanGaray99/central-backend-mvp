@@ -6,6 +6,8 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
+import { Observable, interval } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TestExecution, ExecutionStatus } from '../entities/test-execution.entity';
@@ -18,6 +20,7 @@ import { TestResultsListenerService } from './test-results-listener.service';
 import { ExecutionLoggerService } from './execution-logger.service';
 import { TestCaseUpdateService } from './test-case-update.service';
 import { TestSuitesService } from '../../test-suites/services/test-suites.service';
+import { ExecutionEventsService } from './execution-events.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -37,6 +40,7 @@ export class TestExecutionService {
     private readonly testCaseUpdateService: TestCaseUpdateService,
     @Inject(forwardRef(() => TestSuitesService))
     private readonly testSuitesService: TestSuitesService,
+    private readonly executionEventsService: ExecutionEventsService,
   ) {}
 
   async executeTests(projectId: string, dto: ExecuteTestsDto) {
@@ -83,6 +87,14 @@ export class TestExecutionService {
     });
 
     const savedExecution = await this.testExecutionRepository.save(execution);
+
+    // Emitir evento de inicio de ejecución
+    this.executionEventsService.emitExecutionStarted(
+      savedExecution.executionId,
+      projectId,
+      savedExecution.entityName,
+      (dto as any).testSuiteId
+    );
 
     // Ejecutar pruebas en background
     this.runTestsInBackground(savedExecution, project, dto);
@@ -425,6 +437,18 @@ export class TestExecutionService {
         }
       );
 
+      // Emitir evento de ejecución completada
+      this.executionEventsService.emitExecutionCompleted(
+        execution.executionId,
+        project.id,
+        {
+          totalScenarios: results.totalScenarios,
+          passedScenarios: results.passedScenarios,
+          failedScenarios: results.failedScenarios,
+          executionTime: results.executionTime,
+        }
+      );
+
       this.logger.log(`Ejecución ${execution.executionId} completada exitosamente`);
     } catch (error) {
       this.logger.error(`Error en ejecución ${execution.executionId}:`, error);
@@ -435,6 +459,13 @@ export class TestExecutionService {
       execution.executionTime = Date.now() - execution.startedAt.getTime();
 
       await this.testExecutionRepository.save(execution);
+
+      // Emitir evento de ejecución fallida
+      this.executionEventsService.emitExecutionFailed(
+        execution.executionId,
+        project.id,
+        error.message
+      );
     }
   }
 
@@ -470,5 +501,13 @@ export class TestExecutionService {
    */
   private async countAllTestCasesForProject(projectId: string): Promise<number> {
     return await this.testCaseUpdateService.getTestCasesCount(projectId);
+  }
+
+  /**
+   * Server-Sent Events para ejecuciones en tiempo real
+   */
+  getExecutionEvents(projectId: string): Observable<MessageEvent> {
+    this.logger.log(`SSE stream iniciado para proyecto: ${projectId}`);
+    return this.executionEventsService.getExecutionEvents(projectId);
   }
 } 
