@@ -13,11 +13,13 @@ import { TestResult } from './entities/test-result.entity';
 import { Project } from '../projects/project.entity';
 import { TestCase } from '../test-cases/entities/test-case.entity';
 import { TestSuitesModule } from '../test-suites/test-suites.module';
+import { BugsModule } from '../bugs/bugs.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([TestExecution, TestResult, Project, TestCase]),
     forwardRef(() => TestSuitesModule),
+    forwardRef(() => BugsModule),
   ],
   controllers: [TestExecutionController, GlobalTestExecutionController],
   providers: [

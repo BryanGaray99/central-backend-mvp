@@ -1,57 +1,30 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber } from 'class-validator';
-import { BugType, BugSeverity, BugPriority } from '../entities/bug.entity';
+import { BugType, BugSeverity, BugPriority, BugStatus } from '../entities/bug.entity';
 
-export class CreateBugDto {
+export class BugResponseDto {
   @ApiProperty({
-    description: 'Title of the bug',
-    example: 'Product creation fails with 500 error'
+    description: 'Bug ID',
+    example: 'BUG-001'
   })
-  @IsString()
-  @IsNotEmpty()
-  title: string;
+  id: string;
 
   @ApiProperty({
-    description: 'Detailed description of the bug',
-    example: 'When creating a product with valid data, the API returns a 500 internal server error instead of 201 Created.'
+    description: 'Unique bug identifier',
+    example: 'BUG-ECOMMERCE-001'
   })
-  @IsString()
-  @IsNotEmpty()
-  description: string;
+  bugId: string;
 
   @ApiProperty({
-    description: 'Type of bug',
-    enum: BugType,
-    example: BugType.TEST_FAILURE
+    description: 'Project ID',
+    example: 'proj-123'
   })
-  @IsEnum(BugType)
-  type: BugType;
-
-  @ApiProperty({
-    description: 'Severity of the bug',
-    enum: BugSeverity,
-    example: BugSeverity.HIGH
-  })
-  @IsEnum(BugSeverity)
-  severity: BugSeverity;
-
-  @ApiProperty({
-    description: 'Priority of the bug',
-    enum: BugPriority,
-    example: BugPriority.HIGH,
-    required: false
-  })
-  @IsEnum(BugPriority)
-  @IsOptional()
-  priority?: BugPriority;
+  projectId: string;
 
   @ApiProperty({
     description: 'Test case ID where the bug occurred',
     example: 'TC-ECOMMERCE-01',
     required: false
   })
-  @IsString()
-  @IsOptional()
   testCaseId?: string;
 
   @ApiProperty({
@@ -59,8 +32,6 @@ export class CreateBugDto {
     example: 'TS-001',
     required: false
   })
-  @IsString()
-  @IsOptional()
   testSuiteId?: string;
 
   @ApiProperty({
@@ -68,17 +39,25 @@ export class CreateBugDto {
     example: 'EXEC-2024-001',
     required: false
   })
-  @IsString()
-  @IsOptional()
   executionId?: string;
+
+  @ApiProperty({
+    description: 'Title of the bug',
+    example: 'Product creation fails with 500 error'
+  })
+  title: string;
+
+  @ApiProperty({
+    description: 'Detailed description of the bug',
+    example: 'When creating a product with valid data, the API returns a 500 internal server error instead of 201 Created.'
+  })
+  description: string;
 
   @ApiProperty({
     description: 'Name of the scenario that failed',
     example: 'Create product with valid data',
     required: false
   })
-  @IsString()
-  @IsOptional()
   scenarioName?: string;
 
   @ApiProperty({
@@ -86,17 +65,41 @@ export class CreateBugDto {
     example: 'TC-ECOMMERCE-01',
     required: false
   })
-  @IsString()
-  @IsOptional()
   testCaseName?: string;
+
+  @ApiProperty({
+    description: 'Type of bug',
+    enum: BugType,
+    example: BugType.TEST_FAILURE
+  })
+  type: BugType;
+
+  @ApiProperty({
+    description: 'Severity of the bug',
+    enum: BugSeverity,
+    example: BugSeverity.HIGH
+  })
+  severity: BugSeverity;
+
+  @ApiProperty({
+    description: 'Priority of the bug',
+    enum: BugPriority,
+    example: BugPriority.HIGH
+  })
+  priority: BugPriority;
+
+  @ApiProperty({
+    description: 'Status of the bug',
+    enum: BugStatus,
+    example: BugStatus.OPEN
+  })
+  status: BugStatus;
 
   @ApiProperty({
     description: 'Error message',
     example: 'Internal Server Error: 500',
     required: false
   })
-  @IsString()
-  @IsOptional()
   errorMessage?: string;
 
   @ApiProperty({
@@ -104,16 +107,12 @@ export class CreateBugDto {
     example: 'HTTPError',
     required: false
   })
-  @IsString()
-  @IsOptional()
   errorType?: string;
 
   @ApiProperty({
     description: 'Error stack trace',
     required: false
   })
-  @IsString()
-  @IsOptional()
   errorStack?: string;
 
   @ApiProperty({
@@ -121,8 +120,6 @@ export class CreateBugDto {
     example: '500',
     required: false
   })
-  @IsString()
-  @IsOptional()
   errorCode?: string;
 
   @ApiProperty({
@@ -130,8 +127,6 @@ export class CreateBugDto {
     example: 'ecommerce',
     required: false
   })
-  @IsString()
-  @IsOptional()
   section?: string;
 
   @ApiProperty({
@@ -139,8 +134,6 @@ export class CreateBugDto {
     example: 'Product',
     required: false
   })
-  @IsString()
-  @IsOptional()
   entity?: string;
 
   @ApiProperty({
@@ -148,8 +141,6 @@ export class CreateBugDto {
     example: 'POST',
     required: false
   })
-  @IsString()
-  @IsOptional()
   method?: string;
 
   @ApiProperty({
@@ -157,22 +148,18 @@ export class CreateBugDto {
     example: '/api/products',
     required: false
   })
-  @IsString()
-  @IsOptional()
   endpoint?: string;
 
   @ApiProperty({
     description: 'Request data that caused the error',
     required: false
   })
-  @IsOptional()
   requestData?: any;
 
   @ApiProperty({
     description: 'Response data received',
     required: false
   })
-  @IsOptional()
   responseData?: any;
 
   @ApiProperty({
@@ -180,24 +167,25 @@ export class CreateBugDto {
     example: 1500,
     required: false
   })
-  @IsNumber()
-  @IsOptional()
   executionTime?: number;
+
+  @ApiProperty({
+    description: 'Execution date',
+    example: '2024-01-15T10:30:00Z',
+    required: false
+  })
+  executionDate?: Date;
 
   @ApiProperty({
     description: 'Execution logs',
     required: false
   })
-  @IsString()
-  @IsOptional()
   executionLogs?: string;
 
   @ApiProperty({
     description: 'Console logs',
     required: false
   })
-  @IsString()
-  @IsOptional()
   consoleLogs?: string;
 
   @ApiProperty({
@@ -205,15 +193,30 @@ export class CreateBugDto {
     example: 'staging',
     required: false
   })
-  @IsString()
-  @IsOptional()
   environment?: string;
 
   @ApiProperty({
-    description: 'Execution date',
-    example: '2024-01-15T10:30:00Z',
+    description: 'Date when the bug was reported',
+    example: '2024-01-15T10:30:00Z'
+  })
+  reportedAt: Date;
+
+  @ApiProperty({
+    description: 'Date when the bug was resolved',
+    example: '2024-01-16T14:20:00Z',
     required: false
   })
-  @IsOptional()
-  executionDate?: Date;
+  resolvedAt?: Date;
+
+  @ApiProperty({
+    description: 'Date when the bug was created',
+    example: '2024-01-15T10:30:00Z'
+  })
+  createdAt: Date;
+
+  @ApiProperty({
+    description: 'Date when the bug was last updated',
+    example: '2024-01-15T10:30:00Z'
+  })
+  updatedAt: Date;
 }

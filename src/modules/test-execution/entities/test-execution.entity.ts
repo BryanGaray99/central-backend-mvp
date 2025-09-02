@@ -99,6 +99,12 @@ export class TestExecution {
     workers?: number;
   };
 
+  @Column({ nullable: true })
+  testCaseId?: string;
+
+  @Column({ nullable: true })
+  testSuiteId?: string;
+
   @OneToMany(() => TestResult, (result: TestResult) => result.execution, {
     cascade: true,
   })

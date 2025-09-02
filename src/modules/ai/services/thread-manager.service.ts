@@ -5,11 +5,12 @@ import { Repository } from 'typeorm';
 import OpenAI from 'openai';
 import { AIThread } from '../entities/ai-thread.entity';
 import { AIAssistant } from '../entities/ai-assistant.entity';
+import { OpenAIConfigService } from './openai-config.service';
 
 @Injectable()
 export class ThreadManagerService {
   private readonly logger = new Logger(ThreadManagerService.name);
-  private readonly openai: OpenAI;
+  private openai: OpenAI | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -17,10 +18,25 @@ export class ThreadManagerService {
     private readonly aiThreadRepository: Repository<AIThread>,
     @InjectRepository(AIAssistant)
     private readonly aiAssistantRepository: Repository<AIAssistant>,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
+    private readonly openAIConfigService: OpenAIConfigService,
+  ) {}
+
+  /**
+   * Configura la API key de OpenAI dinámicamente
+   */
+  private async configureOpenAI() {
+    const apiKey = await this.openAIConfigService.getOpenAIKey();
+    if (!apiKey) {
+      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+    }
+    
+    // Crear la instancia de OpenAI si no existe
+    if (!this.openai) {
+      this.openai = new OpenAI({ apiKey });
+    } else {
+      // Actualizar la instancia existente con la nueva API key
+      this.openai.apiKey = apiKey;
+    }
   }
 
   /**
@@ -28,6 +44,9 @@ export class ThreadManagerService {
    */
   async getThread(projectId: string, assistantId: string): Promise<AIThread | null> {
     this.logger.log(`🔍 Buscando thread activo para proyecto ${projectId}`);
+
+    // Configurar OpenAI antes de hacer la llamada
+    await this.configureOpenAI();
 
     // Buscar threads activos
     const activeThreads = await this.aiThreadRepository.find({
@@ -43,6 +62,9 @@ export class ThreadManagerService {
     // Reutilizar el thread más reciente que no esté lleno
     for (const thread of activeThreads) {
       try {
+        if (!this.openai) {
+          throw new Error('OpenAI client not configured');
+        }
         await this.openai.beta.threads.retrieve(thread.threadId);
         if (thread.messageCount < thread.maxMessages) {
           this.logger.log(`✅ Thread activo encontrado: ${thread.threadId}`);
@@ -67,6 +89,9 @@ export class ThreadManagerService {
   async createThread(projectId: string, assistantId: string): Promise<AIThread> {
     this.logger.log(`🚀 Creando nuevo thread para proyecto ${projectId}`);
 
+    // Configurar OpenAI antes de hacer la llamada
+    await this.configureOpenAI();
+
     // Limitar a máximo 1 thread activo por proyecto/assistant (optimización de tokens)
     const allThreads = await this.aiThreadRepository.find({
       where: { projectId, assistantId },
@@ -78,6 +103,9 @@ export class ThreadManagerService {
       for (const oldThread of allThreads) {
         this.logger.log(`♻️ Limpiando thread anterior: ${oldThread.threadId}`);
         try {
+          if (!this.openai) {
+            throw new Error('OpenAI client not configured');
+          }
           await this.openai.beta.threads.del(oldThread.threadId);
           this.logger.log(`🗑️ Thread eliminado de OpenAI: ${oldThread.threadId}`);
         } catch (err) {
@@ -98,6 +126,9 @@ export class ThreadManagerService {
     this.logger.log(`📋 Creando thread para proyecto: ${projectId}`);
 
     // Crear thread en OpenAI
+    if (!this.openai) {
+      throw new Error('OpenAI client not configured');
+    }
     const openaiThread = await this.openai.beta.threads.create();
     this.logger.log(`✅ Thread creado en OpenAI: ${openaiThread.id}`);
 
@@ -218,6 +249,9 @@ export class ThreadManagerService {
       for (const thread of threadsToDelete) {
         try {
           // Eliminar de OpenAI
+          if (!this.openai) {
+            throw new Error('OpenAI client not configured');
+          }
           await this.openai.beta.threads.del(thread.threadId);
           this.logger.log(`🗑️ Thread eliminado de OpenAI: ${thread.threadId}`);
         } catch (error) {
@@ -242,6 +276,9 @@ export class ThreadManagerService {
     for (const thread of threads) {
       try {
         // Eliminar de OpenAI
+        if (!this.openai) {
+          throw new Error('OpenAI client not configured');
+        }
         await this.openai.beta.threads.del(thread.threadId);
         this.logger.log(`🗑️ Thread eliminado de OpenAI: ${thread.threadId}`);
       } catch (error) {

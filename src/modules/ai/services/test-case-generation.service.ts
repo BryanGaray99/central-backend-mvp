@@ -23,13 +23,16 @@ import {
 } from '../../../common/services/code-manipulation';
 import { AssistantManagerService } from './assistant-manager.service';
 import { ThreadManagerService } from './thread-manager.service';
+import { OpenAIConfigService } from './openai-config.service';
 import { TestCasesService } from '../../test-cases/services/test-cases.service';
 import { TestStepRegistrationService } from '../../test-cases/services/test-step-registration.service';
+import { AIGenerationService } from './ai-generation.service';
+import { AIGenerationStatus } from '../../test-cases/entities/ai-generation.entity';
 
 @Injectable()
 export class TestCaseGenerationService {
   private readonly logger = new Logger(TestCaseGenerationService.name);
-  private readonly openai: OpenAI;
+  private openai: OpenAI | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -47,10 +50,26 @@ export class TestCaseGenerationService {
     @Inject(forwardRef(() => TestCasesService))
     private readonly testCasesService: TestCasesService,
     private readonly testStepRegistrationService: TestStepRegistrationService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
+    private readonly openAIConfigService: OpenAIConfigService,
+    private readonly aiGenerationService: AIGenerationService,
+  ) {}
+
+  /**
+   * Configura la API key de OpenAI dinámicamente
+   */
+  private async configureOpenAI() {
+    const apiKey = await this.openAIConfigService.getOpenAIKey();
+    if (!apiKey) {
+      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+    }
+    
+    // Crear la instancia de OpenAI si no existe
+    if (!this.openai) {
+      this.openai = new OpenAI({ apiKey });
+    } else {
+      // Actualizar la instancia existente con la nueva API key
+      this.openai.apiKey = apiKey;
+    }
   }
 
   /**
@@ -76,6 +95,31 @@ export class TestCaseGenerationService {
     this.logger.log(`📋 [${generationId}] Request: ${JSON.stringify(request, null, 2)}`);
     
     try {
+      // Crear registro en la tabla ai_generations
+      const aiGenerationDto = {
+        generationId,
+        projectId: request.projectId,
+        entityName: request.entityName,
+        method: 'POST', // Por defecto, se actualizará después
+        scenarioName: request.requirements.substring(0, 100), // Primeros 100 caracteres
+        section: request.section,
+        requestData: request,
+        metadata: {
+          operation: request.operation,
+          requirements: request.requirements,
+        }
+      };
+      
+      await this.aiGenerationService.create(aiGenerationDto);
+      this.logger.log(`💾 [${generationId}] Registro creado en tabla ai_generations`);
+      
+      // Configurar OpenAI antes de hacer la llamada
+      await this.configureOpenAI();
+      
+      // Actualizar status a processing
+      await this.aiGenerationService.updateStatus(generationId, AIGenerationStatus.PROCESSING);
+      this.logger.log(`🔄 [${generationId}] Status actualizado a PROCESSING`);
+      
       // Obtener el proyecto para usar su path
       const project = await this.projectRepository.findOneBy({ id: request.projectId });
       if (!project) {
@@ -116,6 +160,9 @@ export class TestCaseGenerationService {
 
       // Paso 4: Enviar mensaje al assistant
       this.logger.log(`💬 [${generationId}] PASO 4: Enviando mensaje al assistant...`);
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const message = await this.openai.beta.threads.messages.create(thread.threadId, {
         role: 'user',
         content: prompt
@@ -124,6 +171,9 @@ export class TestCaseGenerationService {
 
       // Paso 5: Ejecutar run con optimizaciones de tokens
       this.logger.log(`▶️ [${generationId}] PASO 5: Ejecutando run con optimizaciones...`);
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const run = await this.openai.beta.threads.runs.create(thread.threadId, {
         assistant_id: assistant.assistantId,
         tool_choice: 'auto',
@@ -148,6 +198,9 @@ export class TestCaseGenerationService {
         
         // Intentar obtener usage desde los steps del run
         try {
+          if (!this.openai) {
+            throw new Error('OpenAI client not configured');
+          }
           const runSteps = await this.openai.beta.threads.runs.steps.list(thread.threadId, run.id);
           this.logger.log(`🔍 [${generationId}] Analizando run steps para distribución de tokens...`);
           
@@ -164,6 +217,9 @@ export class TestCaseGenerationService {
             
             if (step.step_details?.type === 'message_creation' && step.step_details.message_creation?.message_id) {
               const messageId = step.step_details.message_creation.message_id;
+              if (!this.openai) {
+                throw new Error('OpenAI client not configured');
+              }
               const message = await this.openai.beta.threads.messages.retrieve(thread.threadId, messageId);
               if ((message as any).usage) {
                 promptTokens = (message as any).usage.prompt_tokens || 0;
@@ -181,6 +237,9 @@ export class TestCaseGenerationService {
 
       // Paso 7: Obtener respuesta
       this.logger.log(`📥 [${generationId}] PASO 7: Obteniendo respuesta...`);
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const messages = await this.openai.beta.threads.messages.list(thread.threadId);
       const lastMessage = messages.data[0]; // El más reciente
       
@@ -292,6 +351,35 @@ export class TestCaseGenerationService {
 
       this.logger.log(`🎉 [${generationId}] GENERACIÓN COMPLETADA en ${processingTime}ms`);
       this.logger.log(`💰 [${generationId}] TOKENS FINALES REALES: ${totalTokensUsed}`);
+      
+      // Actualizar status a completed en la tabla ai_generations
+      const finalMetadata = {
+        modelUsed: assistant.model,
+        processingTime,
+        tokensUsed: totalTokensUsed,
+        filesModified: insertionResult.modifiedFiles,
+        newScenarios: [parsedCode.feature ? 'feature' : null, parsedCode.steps ? 'steps' : null].filter(Boolean),
+        assistantId: assistant.assistantId,
+        threadId: thread.threadId,
+        runId: run.id,
+      };
+      
+      // Actualizar el método basado en el test case generado
+      if (savedTestCase && savedTestCase.method) {
+        try {
+          const aiGeneration = await this.aiGenerationService.findByGenerationId(generationId);
+          if (aiGeneration) {
+            aiGeneration.method = savedTestCase.method;
+            await this.aiGenerationService['aiGenerationRepository'].save(aiGeneration);
+            this.logger.log(`✅ [${generationId}] Método actualizado a ${savedTestCase.method} en tabla ai_generations`);
+          }
+        } catch (updateError) {
+          this.logger.warn(`⚠️ [${generationId}] Error actualizando método: ${updateError.message}`);
+        }
+      }
+      
+      await this.aiGenerationService.markAsCompleted(generationId, parsedCode, finalMetadata);
+      this.logger.log(`✅ [${generationId}] Status actualizado a COMPLETED en tabla ai_generations`);
 
       // Guardar resumen final con tokens reales
       const summary = {
@@ -339,6 +427,22 @@ export class TestCaseGenerationService {
       this.logger.error(`❌ [${generationId}] ERROR en generación de tests: ${error.message}`);
       this.logger.error(`❌ [${generationId}] Stack trace: ${error.stack}`);
       this.logger.error(`💰 [${generationId}] TOKENS CONSUMIDOS ANTES DEL ERROR: ${totalTokensUsed}`);
+      
+      // Actualizar status a failed en la tabla ai_generations
+      const errorMetadata = {
+        processingTime: Date.now() - startTime,
+        tokensUsed: totalTokensUsed,
+        modelUsed: 'gpt-4o-mini',
+        error: error.message,
+        stack: error.stack,
+      };
+      
+      try {
+        await this.aiGenerationService.markAsFailed(generationId, error.message, errorMetadata);
+        this.logger.log(`❌ [${generationId}] Status actualizado a FAILED en tabla ai_generations`);
+      } catch (dbError) {
+        this.logger.error(`❌ [${generationId}] Error actualizando status en BD: ${dbError.message}`);
+      }
       
       // Guardar error con tokens
       const errorLog = {
@@ -523,6 +627,9 @@ Genera SOLO el código necesario para completar la operación solicitada usando 
       attempts++;
       this.logger.log(`⏳ [${generationId}] Verificando run (intento ${attempts}/${maxAttempts})...`);
       
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const run = await this.openai.beta.threads.runs.retrieve(threadId, runId);
       
       this.logger.log(`📊 [${generationId}] Run status: ${run.status}`);

@@ -529,132 +529,85 @@ export class TestSuitesService {
 
     this.logger.log(`Found ${testSets.length} test sets to execute: ${testSets.map(ts => ts.suiteId).join(', ')}`);
 
-    // Ejecutar cada test set secuencialmente y recolectar resultados
+    // Crear una test execution para el test plan completo ANTES de ejecutar los test sets
+    const planExecutionDto = {
+      entityName: testPlan.entity,
+      method: dto?.method,
+      testType: dto?.testType || TestType.ALL,
+      tags: testPlan.tags,
+      environment: dto?.environment || testPlan.environment as TestEnvironment || TestEnvironment.LOCAL,
+      verbose: dto?.verbose ?? true,
+      saveLogs: dto?.saveLogs ?? true,
+      savePayloads: dto?.savePayloads ?? true,
+      parallel: dto?.parallel ?? true,
+      timeout: dto?.timeout || 30000,
+      retries: dto?.retries || 1,
+      workers: dto?.workers || 3,
+      testSuiteId: testPlan.suiteId, // Usar el ID del test plan
+    };
+
+    // Crear la test execution para el test plan
+    const planExecutionResult = await this.testExecutionService.executeTests(projectId, planExecutionDto);
+    this.logger.log(`Created test execution for test plan ${testPlan.suiteId} with ID: ${planExecutionResult.executionId}`);
+
+    // NO ejecutar test sets individuales - solo recolectar información para estadísticas
     const executionResults: Array<{
       testSetId: string;
       testSetName: string;
-      executionId?: string;
-      error?: string;
-      status: string;
-      passed?: number;
-      failed?: number;
-      skipped?: number;
-      executionTime?: number;
+      testCases: string[];
+      totalTestCases: number;
     }> = [];
     let totalTestCases = 0;
-    let totalPassed = 0;
-    let totalFailed = 0;
-    let totalSkipped = 0;
-    let totalExecutionTime = 0;
 
     for (const testSet of testSets) {
-      try {
-        this.logger.log(`Executing test set: ${testSet.suiteId}`);
-        
-        // Ejecutar el test set
-        const testSetResult = await this.executeTestSet(projectId, testSet, dto);
-        
-        // Esperar un poco para que se complete la ejecución
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Obtener el test set actualizado para ver los resultados
-        const updatedTestSet = await this.testSuiteRepository.findOne({
-          where: { projectId, suiteId: testSet.suiteId }
-        });
-        
-        if (updatedTestSet) {
-          executionResults.push({
-            testSetId: testSet.suiteId,
-            testSetName: testSet.name,
-            executionId: testSetResult.data.executionId,
-            status: updatedTestSet.status,
-            passed: updatedTestSet.passedTestCases || 0,
-            failed: updatedTestSet.failedTestCases || 0,
-            skipped: updatedTestSet.skippedTestCases || 0,
-            executionTime: updatedTestSet.executionTime || 0
-          });
-          
-          // Actualizar contadores del plan
-          totalTestCases += updatedTestSet.totalTestCases || 0;
-          totalPassed += updatedTestSet.passedTestCases || 0;
-          totalFailed += updatedTestSet.failedTestCases || 0;
-          totalSkipped += updatedTestSet.skippedTestCases || 0;
-          totalExecutionTime += updatedTestSet.executionTime || 0;
-          
-          this.logger.log(`Test set ${testSet.suiteId} completed with status: ${updatedTestSet.status}`);
-        } else {
-          executionResults.push({
-            testSetId: testSet.suiteId,
-            testSetName: testSet.name,
-            executionId: testSetResult.data.executionId,
-            status: 'unknown'
-          });
-        }
-        
-        // Esperar un poco entre ejecuciones para evitar sobrecarga
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-      } catch (error) {
-        this.logger.error(`Error executing test set ${testSet.suiteId}: ${error.message}`);
-        executionResults.push({
-          testSetId: testSet.suiteId,
-          testSetName: testSet.name,
-          error: error.message,
-          status: 'failed'
-        });
-        totalFailed += testSet.totalTestCases || 0;
-      }
+      // Solo recolectar información, NO ejecutar
+      const testCaseIds = testSet.testCases?.map(tc => tc.testCaseId) || [];
+      const testSetTotalTestCases = testCaseIds.length;
+      
+      executionResults.push({
+        testSetId: testSet.suiteId,
+        testSetName: testSet.name,
+        testCases: testCaseIds,
+        totalTestCases: testSetTotalTestCases
+      });
+      
+      totalTestCases += testSetTotalTestCases;
+      this.logger.log(`Test set ${testSet.suiteId} has ${testSetTotalTestCases} test cases: ${testCaseIds.join(', ')}`);
     }
 
     // Actualizar las estadísticas del test plan
     testPlan.totalTestCases = totalTestCases;
-    testPlan.passedTestCases = totalPassed;
-    testPlan.failedTestCases = totalFailed;
-    testPlan.skippedTestCases = totalSkipped;
-    testPlan.executionTime = totalExecutionTime;
+    testPlan.passedTestCases = 0; // Se actualizará cuando se complete la ejecución real
+    testPlan.failedTestCases = 0; // Se actualizará cuando se complete la ejecución real
+    testPlan.skippedTestCases = 0; // Se actualizará cuando se complete la ejecución real
+    testPlan.executionTime = 0; // Se actualizará cuando se complete la ejecución real
     testPlan.completedAt = new Date();
     
-    // Determinar el estado final del test plan
-    if (totalFailed > 0) {
-      testPlan.status = TestSuiteStatus.FAILED;
-    } else if (totalPassed > 0) {
-      testPlan.status = TestSuiteStatus.PASSED;
-    } else {
-      testPlan.status = TestSuiteStatus.SKIPPED;
-    }
+    // El estado se mantendrá como RUNNING hasta que se complete la ejecución real
+    testPlan.status = TestSuiteStatus.RUNNING;
 
     // Guardar los resultados de ejecución en el test plan
     testPlan.executionLogs = JSON.stringify({
       planExecutionId: `PLAN-EXEC-${testPlan.suiteId}-${Date.now()}`,
       testSetResults: executionResults,
       totalTestCases,
-      totalPassed,
-      totalFailed,
-      totalSkipped,
-      totalExecutionTime,
       startedAt: new Date().toISOString(),
       completedAt: testPlan.completedAt.toISOString()
     });
     
     await this.testSuiteRepository.save(testPlan);
 
-    // Generar un execution ID único para el test plan
-    const planExecutionId = `PLAN-EXEC-${testPlan.suiteId}-${Date.now()}`;
-
-    this.logger.log(`Test plan ${testPlan.suiteId} execution completed:`);
+    this.logger.log(`Test plan ${testPlan.suiteId} execution initiated:`);
     this.logger.log(`  - Total test cases: ${totalTestCases}`);
-    this.logger.log(`  - Passed: ${totalPassed}`);
-    this.logger.log(`  - Failed: ${totalFailed}`);
-    this.logger.log(`  - Skipped: ${totalSkipped}`);
-    this.logger.log(`  - Final status: ${testPlan.status}`);
-    this.logger.log(`  - Total execution time: ${totalExecutionTime}ms`);
+    this.logger.log(`  - Test sets: ${testSets.length}`);
+    this.logger.log(`  - Plan execution ID: ${planExecutionResult.executionId}`);
 
     return {
       success: true,
       data: {
-        executionId: planExecutionId,
-        status: 'completed',
-        message: `Test plan execution completed successfully with ${testSets.length} test sets and ${totalTestCases} total test cases`,
+        executionId: planExecutionResult.executionId,
+        status: 'started',
+        message: `Test plan execution initiated with ${testSets.length} test sets and ${totalTestCases} total test cases`,
         startedAt: new Date().toISOString()
       }
     };

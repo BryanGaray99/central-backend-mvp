@@ -54,7 +54,8 @@ export class TestResultsListenerService {
     if (scenarioData) {
       scenarioData.status = result.status;
       scenarioData.endTime = new Date();
-      scenarioData.duration = result.duration || 0;
+      // result.duration proviene de Cucumber (ns). Convertir a ms
+      scenarioData.duration = result.duration ? result.duration / 1_000_000 : 0;
       scenarioData.errorMessage = result.errorMessage;
       // Los screenshots y videos ya no se almacenan en la estructura simplificada
       scenarioData.steps = this.stepResults.get(scenarioKey) || [];
@@ -105,7 +106,8 @@ export class TestResultsListenerService {
     if (stepIndex >= 0) {
       const step = steps[stepIndex];
       step.status = result.status || StepStatus.PASSED;
-      step.duration = result.duration || 0;
+      // Convertir duración de step de ns a ms
+      step.duration = result.duration ? result.duration / 1_000_000 : 0;
       step.errorMessage = result.errorMessage;
       
       steps[stepIndex] = step;

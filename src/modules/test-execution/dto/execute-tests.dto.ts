@@ -142,4 +142,20 @@ export class ExecuteTestsDto {
   @Min(1)
   @Max(10)
   workers?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'ID del test case específico a ejecutar',
+    example: 'TC-ecommerce-Product-2',
+  })
+  @IsOptional()
+  @IsString()
+  testCaseId?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID del test suite específico a ejecutar',
+    example: 'SUITE-ECOMMERCE-PRODUCT-001',
+  })
+  @IsOptional()
+  @IsString()
+  testSuiteId?: string;
 } 

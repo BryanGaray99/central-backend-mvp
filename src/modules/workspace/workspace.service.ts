@@ -24,7 +24,26 @@ export class WorkspaceService {
       );
     }
     this.workspacesDir = dir;
-    this.init();
+    
+    // Initialize synchronously to ensure .env is created on startup
+    this.initSync();
+  }
+
+  private initSync() {
+    try {
+      // Create directory synchronously if it doesn't exist
+      if (!require('fs').existsSync(this.workspacesDir)) {
+        require('fs').mkdirSync(this.workspacesDir, { recursive: true });
+        this.logger.log(`Created workspaces directory: ${this.workspacesDir}`);
+      } else {
+        this.logger.log(`Using workspaces directory: ${this.workspacesDir}`);
+      }
+      
+      // Create .env file synchronously
+      this.createRootEnvFileSync();
+    } catch (error) {
+      this.logger.error(`Error during sync initialization: ${error.message}`);
+    }
   }
 
   private async init() {
@@ -37,6 +56,9 @@ export class WorkspaceService {
       );
       await fs.mkdir(this.workspacesDir, { recursive: true });
     }
+    
+    // Always ensure the .env file exists when the service initializes
+    await this.createRootEnvFile();
   }
 
   async createWorkspace(name: string): Promise<string> {
@@ -49,9 +71,97 @@ export class WorkspaceService {
       if (error.code === 'ENOENT') {
         await fs.mkdir(workspacePath, { recursive: true });
         this.logger.log(`Workspace created: ${workspacePath}`);
+        
+        // Create .env file in the root of playwright-workspaces if it doesn't exist
+        await this.createRootEnvFile();
+        
         return workspacePath;
       }
       throw error;
+    }
+  }
+
+  /**
+   * Creates a .env file in the root of playwright-workspaces with OpenAI API key variable (synchronous)
+   */
+  private createRootEnvFileSync(): void {
+    try {
+      const envFilePath = path.join(this.workspacesDir, '.env');
+      
+      // Check if .env already exists and has content
+      let shouldCreate = false;
+      try {
+        const stats = require('fs').statSync(envFilePath);
+        if (stats.size === 0) {
+          this.logger.log(`Root .env file exists but is empty, will recreate: ${envFilePath}`);
+          shouldCreate = true;
+        } else {
+          this.logger.log(`Root .env file already exists: ${envFilePath}`);
+          return;
+        }
+      } catch {
+        // File doesn't exist, create it
+        shouldCreate = true;
+      }
+      
+      if (shouldCreate) {
+        const envContent = `# OpenAI Configuration
+# Get your API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=your-api-key-here
+
+# Other environment variables can be added here
+# DATABASE_URL=your-database-url
+# REDIS_URL=your-redis-url
+`;
+        
+        require('fs').writeFileSync(envFilePath, envContent, 'utf-8');
+        this.logger.log(`Created root .env file: ${envFilePath}`);
+      }
+    } catch (error) {
+      this.logger.warn(`Could not create root .env file: ${error.message}`);
+      // Don't throw error, as this is not critical for workspace creation
+    }
+  }
+
+  /**
+   * Creates a .env file in the root of playwright-workspaces with OpenAI API key variable
+   */
+  private async createRootEnvFile(): Promise<void> {
+    try {
+      const envFilePath = path.join(this.workspacesDir, '.env');
+      
+      // Check if .env already exists and has content
+      let shouldCreate = false;
+      try {
+        const stats = await fs.stat(envFilePath);
+        if (stats.size === 0) {
+          this.logger.log(`Root .env file exists but is empty, will recreate: ${envFilePath}`);
+          shouldCreate = true;
+        } else {
+          this.logger.log(`Root .env file already exists: ${envFilePath}`);
+          return;
+        }
+      } catch {
+        // File doesn't exist, create it
+        shouldCreate = true;
+      }
+      
+      if (shouldCreate) {
+        const envContent = `# OpenAI Configuration
+# Get your API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=your-api-key-here
+
+# Other environment variables can be added here
+# DATABASE_URL=your-database-url
+# REDIS_URL=your-redis-url
+`;
+        
+        await fs.writeFile(envFilePath, envContent, 'utf-8');
+        this.logger.log(`Created root .env file: ${envFilePath}`);
+      }
+    } catch (error) {
+      this.logger.warn(`Could not create root .env file: ${error.message}`);
+      // Don't throw error, as this is not critical for workspace creation
     }
   }
 

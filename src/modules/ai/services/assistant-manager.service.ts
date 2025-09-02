@@ -6,11 +6,12 @@ import OpenAI from 'openai';
 import { AIAssistant } from '../entities/ai-assistant.entity';
 import { Project } from '../../projects/project.entity';
 import { ThreadManagerService } from './thread-manager.service';
+import { OpenAIConfigService } from './openai-config.service';
 
 @Injectable()
 export class AssistantManagerService {
   private readonly logger = new Logger(AssistantManagerService.name);
-  private readonly openai: OpenAI;
+  private openai: OpenAI | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -19,10 +20,25 @@ export class AssistantManagerService {
     @InjectRepository(Project)
     private readonly projectRepository: Repository<Project>,
     private readonly threadManagerService: ThreadManagerService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
+    private readonly openAIConfigService: OpenAIConfigService,
+  ) {}
+
+  /**
+   * Configura la API key de OpenAI dinámicamente
+   */
+  private async configureOpenAI() {
+    const apiKey = await this.openAIConfigService.getOpenAIKey();
+    if (!apiKey) {
+      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+    }
+    
+    // Crear la instancia de OpenAI si no existe
+    if (!this.openai) {
+      this.openai = new OpenAI({ apiKey });
+    } else {
+      // Actualizar la instancia existente con la nueva API key
+      this.openai.apiKey = apiKey;
+    }
   }
 
   /**
@@ -30,6 +46,9 @@ export class AssistantManagerService {
    */
   async getAssistant(projectId: string): Promise<AIAssistant | null> {
     this.logger.log(`🔍 Buscando assistant para proyecto ${projectId}`);
+
+    // Configurar OpenAI antes de hacer la llamada
+    await this.configureOpenAI();
 
     // Buscar assistant existente
     const assistant = await this.aiAssistantRepository.findOne({
@@ -46,6 +65,9 @@ export class AssistantManagerService {
     
     // Verificar que el assistant sigue activo en OpenAI
     try {
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       await this.openai.beta.assistants.retrieve(assistant.assistantId);
       this.logger.log(`✅ Assistant verificado en OpenAI`);
       return assistant;
@@ -76,6 +98,9 @@ export class AssistantManagerService {
    * Crea un nuevo assistant para un proyecto (método interno)
    */
   private async createAssistantInternal(projectId: string): Promise<AIAssistant> {
+    // Configurar OpenAI antes de hacer la llamada
+    await this.configureOpenAI();
+
     // Obtener información del proyecto
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
@@ -83,6 +108,9 @@ export class AssistantManagerService {
     }
 
     // Crear assistant en OpenAI (sin vector store)
+    if (!this.openai) {
+      throw new Error('OpenAI client not configured');
+    }
     const openaiAssistant = await this.openai.beta.assistants.create({
       name: `API-Test-Bot-${project.name}`,
       instructions: this.buildAssistantInstructions(project),
@@ -153,6 +181,9 @@ CONTEXTO: Los archivos actuales se proporcionan en el prompt para que puedas ana
 
     try {
       // Verificar que el assistant existe en OpenAI
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       await this.openai.beta.assistants.retrieve(assistant.assistantId);
       return true;
     } catch (error) {
@@ -198,6 +229,9 @@ CONTEXTO: Los archivos actuales se proporcionan en el prompt para que puedas ana
         // 3. ELIMINAR DE OPENAI
         this.logger.log(`🗑️ [DELETE] Paso 3: Eliminando de OpenAI...`);
         try {
+          if (!this.openai) {
+            throw new Error('OpenAI client not configured');
+          }
           await this.openai.beta.assistants.del(assistant.assistantId);
           this.logger.log(`✅ [DELETE] Assistant eliminado de OpenAI: ${assistant.assistantId}`);
         } catch (err) {

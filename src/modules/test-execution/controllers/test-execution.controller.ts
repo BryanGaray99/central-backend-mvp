@@ -307,4 +307,117 @@ export class TestExecutionController {
 
     return this.testExecutionService.getExecutionEvents(projectId);
   }
+
+  @Get('last-execution/test-suite/:testSuiteId')
+  @ApiOperation({
+    summary: 'Obtener la última ejecución de un test suite',
+    description: 'Obtiene la ejecución más reciente asociada a un test suite específico',
+  })
+  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
+  @ApiParam({ name: 'testSuiteId', description: 'ID del test suite', type: 'string' })
+  @ApiResponse({
+    status: 200,
+    description: 'Última ejecución obtenida exitosamente',
+    schema: {
+      type: 'object',
+      properties: {
+        executionId: { type: 'string' },
+        status: { type: 'string' },
+        startedAt: { type: 'string', format: 'date-time' },
+        completedAt: { type: 'string', format: 'date-time' },
+        executionTime: { type: 'number' },
+        totalScenarios: { type: 'number' },
+        passedScenarios: { type: 'number' },
+        failedScenarios: { type: 'number' },
+        entityName: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'No se encontró ejecución para el test suite' })
+  async getLastExecutionByTestSuite(
+    @Param('projectId') projectId: string,
+    @Param('testSuiteId') testSuiteId: string,
+  ) {
+    this.logger.log(
+      `[CONTROLLER] Obteniendo última ejecución para test suite: ${testSuiteId} en proyecto: ${projectId}`,
+    );
+
+    return await this.testExecutionService.getLastExecutionByTestSuite(projectId, testSuiteId);
+  }
+
+  @Get('last-execution/test-case/:testCaseId')
+  @ApiOperation({
+    summary: 'Obtener la última ejecución de un test case',
+    description: 'Obtiene la ejecución más reciente asociada a un test case específico',
+  })
+  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
+  @ApiParam({ name: 'testCaseId', description: 'ID del test case', type: 'string' })
+  @ApiResponse({
+    status: 200,
+    description: 'Última ejecución obtenida exitosamente',
+    schema: {
+      type: 'object',
+      properties: {
+        executionId: { type: 'string' },
+        status: { type: 'string' },
+        startedAt: { type: 'string', format: 'date-time' },
+        completedAt: { type: 'string', format: 'date-time' },
+        executionTime: { type: 'number' },
+        totalScenarios: { type: 'number' },
+        passedScenarios: { type: 'number' },
+        failedScenarios: { type: 'number' },
+        entityName: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'No se encontró ejecución para el test case' })
+  async getLastExecutionByTestCase(
+    @Param('projectId') projectId: string,
+    @Param('testCaseId') testCaseId: string,
+  ) {
+    this.logger.log(
+      `[CONTROLLER] Obteniendo última ejecución para test case: ${testCaseId} en proyecto: ${projectId}`,
+    );
+
+    return await this.testExecutionService.getLastExecutionByTestCase(projectId, testCaseId);
+  }
+
+  @Get('failed-executions/:testCaseId')
+  @ApiOperation({
+    summary: 'Obtener ejecuciones fallidas por test case ID',
+    description: 'Obtiene las ejecuciones fallidas asociadas a un test case específico',
+  })
+  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
+  @ApiParam({ name: 'testCaseId', description: 'ID del test case', type: 'string' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ejecuciones fallidas obtenidas exitosamente',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          executionId: { type: 'string' },
+          testCaseId: { type: 'string' },
+          testCaseName: { type: 'string' },
+          entityName: { type: 'string' },
+          section: { type: 'string' },
+          method: { type: 'string' },
+          endpoint: { type: 'string' },
+          errorMessage: { type: 'string' },
+          executionDate: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  })
+  async getFailedExecutionsByTestCaseId(
+    @Param('projectId') projectId: string,
+    @Param('testCaseId') testCaseId: string,
+  ) {
+    this.logger.log(
+      `[CONTROLLER] Obteniendo ejecuciones fallidas para test case: ${testCaseId} en proyecto: ${projectId}`,
+    );
+
+    return await this.testExecutionService.getFailedExecutionsByTestCaseId(projectId, testCaseId);
+  }
 } 

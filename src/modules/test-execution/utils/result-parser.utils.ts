@@ -80,7 +80,8 @@ export class ResultParserUtils {
       stepName: step.name,
       stepDefinition: step.keyword + step.name,
       status: this.mapStepStatus(step.result?.status),
-      duration: step.result?.duration || 0,
+      // Cucumber reporta duration en nanosegundos: convertir a milisegundos
+      duration: step.result?.duration ? step.result.duration / 1_000_000 : 0,
       errorMessage: step.result?.error_message,
       data: this.extractStepData(step),
       timestamp: new Date(),
@@ -164,9 +165,10 @@ export class ResultParserUtils {
    * Calcula la duración total del escenario
    */
   private static calculateScenarioDuration(steps: any[]): number {
+    // Convertir sumatoria de nanosegundos a milisegundos
     return steps.reduce((total, step) => {
       if (step.result?.duration) {
-        return total + step.result.duration;
+        return total + (step.result.duration / 1_000_000);
       }
       return total;
     }, 0);

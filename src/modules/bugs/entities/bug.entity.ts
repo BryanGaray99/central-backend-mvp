@@ -33,22 +33,22 @@ export enum BugStatus {
 
 @Entity('bugs')
 export class Bug {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ name: 'bug_id', unique: true })
+  @Column({ name: 'bugId', unique: true })
   bugId: string;
 
-  @Column({ name: 'project_id' })
+  @Column({ name: 'projectId' })
   projectId: string;
 
-  @Column({ name: 'test_case_id', nullable: true })
-  testCaseId: string;
+  @Column({ name: 'testCaseId', nullable: true })
+  testCaseId: string | null;
 
-  @Column({ name: 'test_suite_id', nullable: true })
-  testSuiteId: string;
+  @Column({ name: 'testSuiteId', nullable: true })
+  testSuiteId: string | null;
 
-  @Column({ name: 'execution_id', nullable: true })
+  @Column({ name: 'executionId', nullable: true })
   executionId: string;
 
   // Bug identification
@@ -58,10 +58,10 @@ export class Bug {
   @Column({ type: 'text' })
   description: string;
 
-  @Column({ name: 'scenario_name', nullable: true })
+  @Column({ name: 'scenarioName', nullable: true })
   scenarioName: string;
 
-  @Column({ name: 'test_case_name', nullable: true })
+  @Column({ name: 'testCaseName', nullable: true })
   testCaseName: string;
 
   // Bug classification
@@ -93,16 +93,16 @@ export class Bug {
   status: BugStatus;
 
   // Error details
-  @Column({ name: 'error_message', type: 'text', nullable: true })
+  @Column({ name: 'errorMessage', type: 'text', nullable: true })
   errorMessage: string;
 
-  @Column({ name: 'error_type', nullable: true })
+  @Column({ name: 'errorType', nullable: true })
   errorType: string;
 
-  @Column({ name: 'error_stack', type: 'text', nullable: true })
+  @Column({ name: 'errorStack', type: 'text', nullable: true })
   errorStack: string;
 
-  @Column({ name: 'error_code', nullable: true })
+  @Column({ name: 'errorCode', nullable: true })
   errorCode: string;
 
   // Execution context
@@ -118,23 +118,23 @@ export class Bug {
   @Column({ nullable: true })
   endpoint: string;
 
-  @Column({ name: 'request_data', type: 'json', nullable: true })
+  @Column({ name: 'requestData', type: 'json', nullable: true })
   requestData: any;
 
-  @Column({ name: 'response_data', type: 'json', nullable: true })
+  @Column({ name: 'responseData', type: 'json', nullable: true })
   responseData: any;
 
-  @Column({ name: 'execution_time', nullable: true })
+  @Column({ name: 'executionTime', nullable: true })
   executionTime: number; // in milliseconds
 
-  @Column({ name: 'execution_date', type: 'datetime', nullable: true })
+  @Column({ name: 'executionDate', type: 'datetime', nullable: true })
   executionDate: Date;
 
   // Logs
-  @Column({ name: 'execution_logs', type: 'text', nullable: true })
+  @Column({ name: 'executionLogs', type: 'text', nullable: true })
   executionLogs: string;
 
-  @Column({ name: 'console_logs', type: 'text', nullable: true })
+  @Column({ name: 'consoleLogs', type: 'text', nullable: true })
   consoleLogs: string;
 
   // Environment info
@@ -142,28 +142,28 @@ export class Bug {
   environment: string;
 
   // Timestamps
-  @Column({ name: 'reported_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ name: 'reportedAt', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   reportedAt: Date;
 
-  @Column({ name: 'resolved_at', type: 'datetime', nullable: true })
+  @Column({ name: 'resolvedAt', type: 'datetime', nullable: true })
   resolvedAt: Date;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
 
   // Relations
   @ManyToOne(() => Project, project => project.bugs)
-  @JoinColumn({ name: 'project_id' })
+  @JoinColumn({ name: 'projectId' })
   project: Project;
 
   @ManyToOne(() => TestCase, testCase => testCase.bugs)
-  @JoinColumn({ name: 'test_case_id' })
+  @JoinColumn({ name: 'testCaseId' })
   testCase: TestCase;
 
   @ManyToOne(() => TestSuite, testSuite => testSuite.bugsList)
-  @JoinColumn({ name: 'test_suite_id' })
+  @JoinColumn({ name: 'testSuiteId' })
   testSuite: TestSuite;
 }

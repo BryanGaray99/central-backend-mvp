@@ -10,12 +10,13 @@ import { Endpoint } from '../../endpoints/endpoint.entity';
 import { AISuggestion } from '../entities/ai-suggestion.entity';
 import { AssistantManagerService } from './assistant-manager.service';
 import { ThreadManagerService } from './thread-manager.service';
+import { OpenAIConfigService } from './openai-config.service';
 import { TestCaseSuggestionRequestDto, TestCaseSuggestionDto } from '../dto/test-case-suggestion.dto';
 
 @Injectable()
 export class TestCaseSuggestionService {
   private readonly logger = new Logger(TestCaseSuggestionService.name);
-  private readonly openai: OpenAI;
+  private openai: OpenAI | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -27,10 +28,25 @@ export class TestCaseSuggestionService {
     private readonly aiSuggestionRepository: Repository<AISuggestion>,
     private readonly assistantManagerService: AssistantManagerService,
     private readonly threadManagerService: ThreadManagerService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
+    private readonly openAIConfigService: OpenAIConfigService,
+  ) {}
+
+  /**
+   * Configura la API key de OpenAI dinámicamente
+   */
+  private async configureOpenAI() {
+    const apiKey = await this.openAIConfigService.getOpenAIKey();
+    if (!apiKey) {
+      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+    }
+    
+    // Crear la instancia de OpenAI si no existe
+    if (!this.openai) {
+      this.openai = new OpenAI({ apiKey });
+    } else {
+      // Actualizar la instancia existente con la nueva API key
+      this.openai.apiKey = apiKey;
+    }
   }
 
   /**
@@ -47,6 +63,9 @@ export class TestCaseSuggestionService {
     this.logger.log(`📋 [${suggestionId}] Request: ${JSON.stringify(request, null, 2)}`);
     
     try {
+      // Configurar OpenAI antes de hacer la llamada
+      await this.configureOpenAI();
+      
       // Obtener el proyecto para usar su path
       const project = await this.projectRepository.findOneBy({ id: projectId });
       if (!project) {
@@ -87,6 +106,9 @@ export class TestCaseSuggestionService {
 
       // Paso 4: Enviar mensaje al assistant
       this.logger.log(`💬 [${suggestionId}] PASO 4: Enviando mensaje al assistant...`);
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const message = await this.openai.beta.threads.messages.create(thread.threadId, {
         role: 'user',
         content: prompt
@@ -95,6 +117,9 @@ export class TestCaseSuggestionService {
 
       // Paso 5: Ejecutar run
       this.logger.log(`▶️ [${suggestionId}] PASO 5: Ejecutando run...`);
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const run = await this.openai.beta.threads.runs.create(thread.threadId, {
         assistant_id: assistant.assistantId,
         tool_choice: 'auto',
@@ -109,6 +134,9 @@ export class TestCaseSuggestionService {
 
       // Paso 7: Obtener respuesta
       this.logger.log(`📥 [${suggestionId}] PASO 7: Obteniendo respuesta...`);
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const messages = await this.openai.beta.threads.messages.list(thread.threadId);
       const lastMessage = messages.data[0]; // El más reciente
       
@@ -537,6 +565,9 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
       attempts++;
       this.logger.log(`⏳ [${suggestionId}] Verificando run (intento ${attempts}/${maxAttempts})...`);
       
+      if (!this.openai) {
+        throw new Error('OpenAI client not configured');
+      }
       const run = await this.openai.beta.threads.runs.retrieve(threadId, runId);
       
       this.logger.log(`📊 [${suggestionId}] Run status: ${run.status}`);

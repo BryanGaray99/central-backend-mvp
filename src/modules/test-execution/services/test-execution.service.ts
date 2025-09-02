@@ -13,6 +13,7 @@ import { Repository } from 'typeorm';
 import { TestExecution, ExecutionStatus } from '../entities/test-execution.entity';
 import { TestResult } from '../entities/test-result.entity';
 import { Project } from '../../projects/project.entity';
+import { TestCase } from '../../test-cases/entities/test-case.entity';
 import { ExecuteTestsDto } from '../dto/execute-tests.dto';
 import { ExecutionFiltersDto } from '../dto/execution-filters.dto';
 import { TestRunnerService } from './test-runner.service';
@@ -21,6 +22,8 @@ import { ExecutionLoggerService } from './execution-logger.service';
 import { TestCaseUpdateService } from './test-case-update.service';
 import { TestSuitesService } from '../../test-suites/services/test-suites.service';
 import { ExecutionEventsService } from './execution-events.service';
+import { BugsService } from '../../bugs/services/bugs.service';
+import { BugType, BugSeverity, BugPriority } from '../../bugs/entities/bug.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -34,6 +37,8 @@ export class TestExecutionService {
     private readonly testResultRepository: Repository<TestResult>,
     @InjectRepository(Project)
     private readonly projectRepository: Repository<Project>,
+    @InjectRepository(TestCase)
+    private readonly testCaseRepository: Repository<TestCase>,
     private readonly testRunnerService: TestRunnerService,
     private readonly testResultsListenerService: TestResultsListenerService,
     private readonly executionLoggerService: ExecutionLoggerService,
@@ -41,10 +46,12 @@ export class TestExecutionService {
     @Inject(forwardRef(() => TestSuitesService))
     private readonly testSuitesService: TestSuitesService,
     private readonly executionEventsService: ExecutionEventsService,
+    @Inject(forwardRef(() => BugsService))
+    private readonly bugsService: BugsService,
   ) {}
 
-  async executeTests(projectId: string, dto: ExecuteTestsDto) {
-    const entityName = dto.entityName || 'all';
+    async executeTests(projectId: string, dto: ExecuteTestsDto) {
+    let entityName = dto.entityName || 'all';
     this.logger.log(`Iniciando ejecución de pruebas para entidad: ${entityName}`);
 
     // Validar que el proyecto existe
@@ -52,6 +59,73 @@ export class TestExecutionService {
     if (!project) {
       throw new NotFoundException(`Proyecto con ID ${projectId} no encontrado`);
     }
+
+    // Si es un test plan, extraer todos los test cases de todos los test sets
+    let specificScenarios = dto.specificScenario;
+    
+          if (dto.testSuiteId && dto.testSuiteId.startsWith('PLAN-')) {
+        this.logger.log(`Detectado test plan: ${dto.testSuiteId}`);
+        
+        // Buscar el test plan para obtener los test sets y test cases
+        const testPlan = await this.testSuitesService.getTestSuite(projectId, dto.testSuiteId);
+        
+        if (testPlan && testPlan.testSets) {
+          const allTestCases: string[] = [];
+          let testPlanEntity = '';
+          
+          this.logger.log(`🔍 DEBUG Test Plan Structure:`);
+          this.logger.log(`  - Test Sets count: ${testPlan.testSets.length}`);
+          this.logger.log(`  - First test set: ${JSON.stringify(testPlan.testSets[0])}`);
+          
+          // Para test plans, necesitamos obtener los NOMBRES descriptivos de los test cases
+          // Los IDs están en testSets.testCases, pero necesitamos buscar los nombres en la base de datos
+          for (const testSet of testPlan.testSets) {
+            if (testSet.testCases && Array.isArray(testSet.testCases)) {
+              // Buscar cada test case en la base de datos para obtener su nombre descriptivo
+              for (const testCaseId of testSet.testCases) {
+                try {
+                  // Buscar el test case por ID para obtener su nombre descriptivo
+                  const testCase = await this.testCaseRepository.findOne({
+                    where: { testCaseId, projectId }
+                  });
+                  
+                  if (testCase && testCase.name) {
+                    allTestCases.push(testCase.name);
+                    this.logger.log(`🔍 DEBUG Test Case ${testCaseId} -> Name: ${testCase.name}`);
+                  } else {
+                    this.logger.warn(`⚠️ Test case ${testCaseId} no encontrado o sin nombre`);
+                    // Fallback: usar el ID si no se encuentra el nombre
+                    allTestCases.push(testCaseId);
+                  }
+                  
+                  // Determinar la entidad del test plan basada en el primer test case
+                  if (!testPlanEntity && testCase) {
+                    testPlanEntity = testCase.entityName;
+                  }
+                } catch (error) {
+                  this.logger.error(`Error buscando test case ${testCaseId}: ${error.message}`);
+                  // Fallback: usar el ID si hay error
+                  allTestCases.push(testCaseId);
+                }
+              }
+            }
+          }
+          
+          // Eliminar duplicados y contar solo test cases únicos
+          const uniqueTestCases = [...new Set(allTestCases)];
+          
+          if (uniqueTestCases.length > 0) {
+            specificScenarios = uniqueTestCases.join(',');
+            // Usar la entidad determinada del test plan en lugar de 'all'
+            if (testPlanEntity) {
+              entityName = testPlanEntity;
+              this.logger.log(`Test plan ${dto.testSuiteId} usa entidad: ${entityName}`);
+            }
+            this.logger.log(`Test plan ${dto.testSuiteId} contiene ${uniqueTestCases.length} test cases únicos: ${uniqueTestCases.join(', ')}`);
+            this.logger.log(`🔍 DEBUG Specific Scenarios para ejecución: ${specificScenarios}`);
+          }
+        }
+      }
 
     // Si se especifica una entidad, validar que tiene casos de prueba
     if (dto.entityName) {
@@ -67,12 +141,14 @@ export class TestExecutionService {
     const execution = this.testExecutionRepository.create({
       projectId,
       executionId: uuidv4(),
-      entityName: entityName, // Usar el valor calculado en lugar de dto.entityName
+      entityName: entityName, // Usar la entidad calculada (puede ser 'Product' en lugar de 'all' para test plans)
       method: dto.method,
       testType: dto.testType,
       tags: dto.tags,
-      specificScenario: dto.specificScenario,
+      specificScenario: specificScenarios, // Usar los test cases extraídos del test plan
       status: ExecutionStatus.PENDING,
+      testCaseId: dto.testCaseId,
+      testSuiteId: dto.testSuiteId,
       metadata: {
         environment: dto.environment,
         verbose: dto.verbose,
@@ -82,7 +158,6 @@ export class TestExecutionService {
         timeout: dto.timeout,
         retries: dto.retries,
         workers: dto.workers,
-        ...((dto as any).testSuiteId && { testSuiteId: (dto as any).testSuiteId }), // Para ejecuciones desde test suites
       },
     });
 
@@ -93,8 +168,17 @@ export class TestExecutionService {
       savedExecution.executionId,
       projectId,
       savedExecution.entityName,
-      (dto as any).testSuiteId
+      dto.testSuiteId,
+      dto.testCaseId
     );
+
+    // Log de debug para test plans
+    if (dto.testSuiteId && dto.testSuiteId.startsWith('PLAN-')) {
+      this.logger.log(`🔍 DEBUG Test Plan Execution:`);
+      this.logger.log(`  - Entity Name: ${savedExecution.entityName}`);
+      this.logger.log(`  - Specific Scenarios: ${savedExecution.specificScenario}`);
+      this.logger.log(`  - Test Suite ID: ${savedExecution.testSuiteId}`);
+    }
 
     // Ejecutar pruebas en background
     this.runTestsInBackground(savedExecution, project, dto);
@@ -219,20 +303,338 @@ export class TestExecutionService {
 
     const [executions, total] = await query.getManyAndCount();
 
+    // Enriquecer cada ejecución con información adicional de los resultados y test cases
+    const enrichedExecutions = await Promise.all(
+      executions.map(async (execution) => {
+        // Obtener todos los resultados para extraer información adicional
+        const allResults = await this.testResultRepository.find({
+          where: { executionId: execution.executionId },
+          order: { createdAt: 'ASC' }
+        });
+
+        // Obtener el primer resultado para información básica
+        const firstResult = allResults.length > 0 ? allResults[0] : null;
+
+        // Buscar el test case correspondiente usando el scenarioName base (sin Example)
+        let testCase: any = null;
+        if (firstResult) {
+          // Obtener el nombre base del scenario (sin sufijo de Example)
+          let baseScenarioName = firstResult.scenarioName || '';
+          if (baseScenarioName.includes('(Example')) {
+            baseScenarioName = baseScenarioName.split('(Example')[0].trim();
+          }
+          
+          testCase = await this.testExecutionRepository.manager
+            .createQueryBuilder()
+            .select('tc.*')
+            .from('test_cases', 'tc')
+            .where('tc.projectId = :projectId', { projectId })
+            .andWhere('tc.name = :scenarioName', { scenarioName: baseScenarioName })
+            .getRawOne();
+        }
+
+        // Extraer información de la metadata del resultado
+        let section = 'N/A';
+        let feature = 'N/A';
+        let tags: string[] = [];
+        let scenarioName = execution.specificScenario || 'N/A';
+        let testCaseId = execution.testCaseId || 'N/A';
+        let testCaseDescription = 'N/A';
+        let testCaseMethod = 'N/A';
+        let testCaseTestType = 'N/A';
+        let testSuiteId = execution.testSuiteId || 'N/A';
+        let testSuiteName = 'N/A';
+
+        // Obtener el nombre de la test suite si existe
+        if (testSuiteId && testSuiteId !== 'N/A') {
+          try {
+            // Usar el servicio de test suites para obtener el nombre
+            const testSuite = await this.testSuitesService.getTestSuite(projectId, testSuiteId);
+            if (testSuite && testSuite.name) {
+              testSuiteName = testSuite.name;
+              this.logger.log(`✅ Test suite name obtained: ${testSuiteName} for ${testSuiteId}`);
+            } else {
+              this.logger.warn(`⚠️ Test suite ${testSuiteId} found but no name available`);
+            }
+          } catch (error) {
+            this.logger.warn(`Error getting test suite name for ${testSuiteId}: ${error.message}`);
+            // Fallback: intentar obtener solo el nombre con una consulta directa
+            try {
+              const testSuite = await this.testExecutionRepository.manager
+                .createQueryBuilder()
+                .select('ts.name')
+                .from('test_suites', 'ts')
+                .where('ts.projectId = :projectId', { projectId })
+                .andWhere('ts.suiteId = :suiteId', { suiteId: testSuiteId })
+                .getRawOne();
+              
+              if (testSuite) {
+                testSuiteName = testSuite.name || 'N/A';
+                this.logger.log(`✅ Test suite name obtained via fallback: ${testSuiteName}`);
+              }
+            } catch (fallbackError) {
+              this.logger.error(`Fallback query also failed for ${testSuiteId}: ${fallbackError.message}`);
+            }
+          }
+        }
+
+        this.logger.log(`Using testCaseId from DB: ${testCaseId} for execution ${execution.executionId}`);
+        this.logger.log(`Using testSuiteId from DB: ${testSuiteId} for execution ${execution.executionId}`);
+        this.logger.log(`Using testSuiteName from DB: ${testSuiteName} for execution ${execution.executionId}`);
+
+        // Estadísticas de steps de todos los resultados
+        let totalSteps = 0;
+        let passedSteps = 0;
+        let failedSteps = 0;
+        let skippedSteps = 0;
+        let totalStepDuration = 0;
+        let allSteps: any[] = [];
+        let allScenarioTags: string[] = [];
+        let allErrorMessages: string[] = [];
+
+        if (firstResult) {
+          scenarioName = firstResult.scenarioName;
+          
+          // Parsear metadata si existe
+          if (firstResult.metadata) {
+            try {
+              const metadata = typeof firstResult.metadata === 'string' 
+                ? JSON.parse(firstResult.metadata) 
+                : firstResult.metadata;
+              
+              feature = metadata.feature || 'N/A';
+              tags = metadata.tags || [];
+            } catch (error) {
+              this.logger.warn(`Error parsing metadata for execution ${execution.executionId}: ${error.message}`);
+            }
+          }
+
+          // Parsear scenarioTags si existe
+          if (firstResult.scenarioTags) {
+            try {
+              const scenarioTagsString = typeof firstResult.scenarioTags === 'string' 
+                ? firstResult.scenarioTags 
+                : JSON.stringify(firstResult.scenarioTags);
+              const scenarioTags = scenarioTagsString.split(',').map(tag => tag.trim());
+              tags = [...new Set([...tags, ...scenarioTags])];
+            } catch (error) {
+              this.logger.warn(`Error parsing scenario tags for execution ${execution.executionId}: ${error.message}`);
+            }
+          }
+        }
+
+        // Crear estructura anidada de scenarios y examples
+        let scenariosStructure: any[] = [];
+        let allStepsFlat: any[] = []; // Para mantener compatibilidad con el formato actual
+        
+                // Agrupar resultados por scenario base
+        const scenarioGroups = new Map<string, any[]>();
+        
+        for (let i = 0; i < allResults.length; i++) {
+          const result = allResults[i];
+          
+          // Acumular scenario tags
+          if (result.scenarioTags) {
+            try {
+              const scenarioTagsString = typeof result.scenarioTags === 'string' 
+                ? result.scenarioTags 
+                : JSON.stringify(result.scenarioTags);
+              const scenarioTags = scenarioTagsString.split(',').map(tag => tag.trim());
+              allScenarioTags = [...new Set([...allScenarioTags, ...scenarioTags])];
+            } catch (error) {
+              this.logger.warn(`Error parsing scenario tags for result ${result.id}: ${error.message}`);
+            }
+          }
+
+          // Acumular error messages
+          if (result.errorMessage) {
+            allErrorMessages.push(result.errorMessage);
+          }
+
+          // Determinar el nombre base del scenario
+          let baseScenarioName = '';
+          
+          if (execution.testSuiteId && execution.testSuiteId !== 'N/A') {
+            // Para test suites, usar los nombres de specificScenario
+            const scenarioNames = execution.specificScenario?.split(',').map(s => s.trim()) || [];
+            
+            // Usar el nombre del scenario del resultado, pero limpiarlo para agrupar
+            let resultScenarioName = result.scenarioName || '';
+            
+            // Si el nombre del resultado incluye "(Example X)", extraer el nombre base
+            if (resultScenarioName.includes('(Example')) {
+              resultScenarioName = resultScenarioName.split('(Example')[0].trim();
+            }
+            
+            // Buscar el nombre base en la lista de scenarios del test execution
+            const matchingScenario = scenarioNames.find(name => 
+              resultScenarioName.includes(name) || name.includes(resultScenarioName)
+            );
+            
+            if (matchingScenario) {
+              baseScenarioName = matchingScenario;
+            } else {
+              // Si no encuentra coincidencia, usar el nombre del resultado
+              baseScenarioName = resultScenarioName || `Scenario ${scenarioGroups.size + 1}`;
+            }
+          } else {
+            // Para test cases individuales, usar el nombre del scenario sin el sufijo de Example
+            baseScenarioName = result.scenarioName || `Scenario ${i + 1}`;
+            if (baseScenarioName.includes('(Example')) {
+              baseScenarioName = baseScenarioName.split('(Example')[0].trim();
+            }
+          }
+          
+          // Agrupar por nombre base del scenario
+          if (!scenarioGroups.has(baseScenarioName)) {
+            scenarioGroups.set(baseScenarioName, []);
+          }
+          scenarioGroups.get(baseScenarioName)!.push(result);
+        }
+        
+        // Procesar cada grupo de scenarios
+        scenarioGroups.forEach((results, baseScenarioName) => {
+          const scenario = {
+            scenarioName: baseScenarioName,
+            examples: [] as any[]
+          };
+          
+          // Procesar cada resultado (Example) del scenario
+          results.forEach((result, exampleIndex) => {
+            const example = {
+              exampleName: result.scenarioName || `${baseScenarioName} (Example ${exampleIndex + 1})`,
+              steps: [] as any[],
+              status: result.status,
+              duration: result.duration,
+              errorMessage: result.errorMessage
+            };
+            
+            // Procesar steps del resultado
+            if (result.steps) {
+              try {
+                const steps = typeof result.steps === 'string' 
+                  ? JSON.parse(result.steps) 
+                  : result.steps;
+                
+                if (Array.isArray(steps)) {
+                  example.steps = steps;
+                  
+                  // Agregar steps al array plano para compatibilidad
+                  allStepsFlat.push(...steps);
+                  
+                  // Acumular estadísticas
+                  for (const step of steps) {
+                    totalSteps++;
+                    totalStepDuration += step.duration || 0;
+                    
+                    switch (step.status) {
+                      case 'passed':
+                        passedSteps++;
+                        break;
+                      case 'failed':
+                        failedSteps++;
+                        break;
+                      case 'skipped':
+                        skippedSteps++;
+                        break;
+                    }
+                  }
+                }
+              } catch (error) {
+                this.logger.warn(`Error parsing steps for result ${result.id}: ${error.message}`);
+              }
+            }
+            
+            scenario.examples.push(example);
+          });
+          
+                    scenariosStructure.push(scenario);
+        });
+        
+        // Usar steps planos para compatibilidad con el formato actual
+        allSteps = allStepsFlat;
+        
+        // Log de la estructura creada
+        this.logger.log(`🔍 Estructura de scenarios creada: ${scenariosStructure.length} scenarios, ${allResults.length} total results`);
+        this.logger.log(`🔍 Total scenarios esperados: ${execution.totalScenarios}`);
+        this.logger.log(`🔍 Specific scenarios: ${execution.specificScenario}`);
+        scenariosStructure.forEach((scenario, index) => {
+          this.logger.log(`  📋 Scenario ${index + 1}: "${scenario.scenarioName}" - ${scenario.examples.length} examples`);
+        });
+        
+        // Si hay estructura anidada, limpiar allSteps para evitar duplicación
+        if (scenariosStructure.length > 0) {
+          allSteps = [];
+        }
+
+        // Usar información del test case si está disponible
+        if (testCase) {
+          section = testCase.section || 'N/A';
+          testCaseId = testCase.testCaseId || 'N/A';
+          testCaseDescription = testCase.description || 'N/A';
+          testCaseMethod = testCase.method || 'N/A';
+          testCaseTestType = testCase.testType || 'N/A';
+          
+          // Si no hay tags del resultado, usar los del test case
+          if (tags.length === 0 && testCase.tags) {
+            try {
+              const testCaseTags = typeof testCase.tags === 'string' 
+                ? JSON.parse(testCase.tags) 
+                : testCase.tags;
+              tags = Array.isArray(testCaseTags) ? testCaseTags : [];
+            } catch (error) {
+              this.logger.warn(`Error parsing test case tags for execution ${execution.executionId}: ${error.message}`);
+            }
+          }
+        }
+
+        // Log final de los IDs que se están enviando
+        this.logger.log(`Final testCaseId for execution ${execution.executionId}: ${testCaseId}`);
+        this.logger.log(`Final testSuiteId for execution ${execution.executionId}: ${testSuiteId}`);
+        return {
+          executionId: execution.executionId,
+          entityName: execution.entityName,
+          status: execution.status,
+          startedAt: execution.startedAt,
+          completedAt: execution.completedAt,
+          executionTime: execution.executionTime,
+          totalScenarios: execution.totalScenarios,
+          passedScenarios: execution.passedScenarios,
+          failedScenarios: execution.failedScenarios,
+          // Información adicional
+          specificScenario: execution.specificScenario,
+          section: section,
+          feature: feature,
+          scenarioName: scenarioName,
+          tags: tags,
+          errorMessage: execution.errorMessage,
+          metadata: execution.metadata,
+          // Información del test case
+          testCaseId: testCaseId,
+          testCaseDescription: testCaseDescription,
+          testSuiteId: testSuiteId,
+          testSuiteName: testSuiteName,
+          // Estadísticas detalladas de steps
+          totalSteps: totalSteps,
+          passedSteps: passedSteps,
+          failedSteps: failedSteps,
+          skippedSteps: skippedSteps,
+          totalStepDuration: totalStepDuration,
+          averageStepDuration: totalSteps > 0 ? Math.round(totalStepDuration / totalSteps) : 0,
+          stepSuccessRate: totalSteps > 0 ? Math.round((passedSteps / totalSteps) * 100) : 0,
+          // Información adicional de resultados
+          allSteps: allSteps,
+          allScenarioTags: allScenarioTags,
+          allErrorMessages: allErrorMessages,
+          resultsCount: allResults.length,
+          // Estructura anidada de scenarios y examples
+          scenariosStructure: scenariosStructure,
+        };
+      })
+    );
+
     return {
-      executions: executions.map(execution => ({
-        executionId: execution.executionId,
-        entityName: execution.entityName,
-        method: execution.method,
-        testType: execution.testType,
-        status: execution.status,
-        startedAt: execution.startedAt,
-        completedAt: execution.completedAt,
-        executionTime: execution.executionTime,
-        totalScenarios: execution.totalScenarios,
-        passedScenarios: execution.passedScenarios,
-        failedScenarios: execution.failedScenarios,
-      })),
+      executions: enrichedExecutions,
       pagination: {
         page,
         limit,
@@ -354,76 +756,179 @@ export class TestExecutionService {
       execution.status = ExecutionStatus.RUNNING;
       await this.testExecutionRepository.save(execution);
 
-      // Crear un DTO modificado con el entityName correcto
+      // Crear un DTO modificado con el entityName correcto y specificScenario actualizado
       const modifiedDto = {
         ...dto,
         entityName: execution.entityName, // Usar el valor guardado en la ejecución
+        specificScenario: execution.specificScenario, // Usar el specificScenario actualizado de la ejecución
       };
 
-      // Ejecutar pruebas usando el servicio de runner
-      const results = await this.testRunnerService.runPlaywrightTests(project.path, modifiedDto);
+      let results: any = null;
+      let executionError: Error | null = null;
 
-      // Actualizar ejecución con resultados
-      execution.status = ExecutionStatus.COMPLETED;
+      try {
+        // Ejecutar pruebas usando el servicio de runner
+        results = await this.testRunnerService.runPlaywrightTests(project.path, modifiedDto);
+      } catch (error) {
+        executionError = error;
+        this.logger.error(`Error en ejecución de pruebas: ${error.message}`);
+        
+        // Intentar parsear resultados incluso si falló
+        try {
+          const parsedResults = await this.testRunnerService.parseCucumberOutput(project.path);
+          results = {
+            results: parsedResults,
+            totalScenarios: parsedResults.length,
+            passedScenarios: parsedResults.filter(r => r.status === 'passed').length,
+            failedScenarios: parsedResults.filter(r => r.status === 'failed').length,
+            executionTime: Date.now() - execution.startedAt.getTime(),
+          };
+          this.logger.log(`Se pudieron parsear ${parsedResults.length} resultados a pesar del error de ejecución`);
+        } catch (parseError) {
+          this.logger.warn(`No se pudieron parsear resultados: ${parseError.message}`);
+          results = { results: [], totalScenarios: 0, passedScenarios: 0, failedScenarios: 0, executionTime: 0 };
+        }
+      }
+
+      // Actualizar ejecución con resultados (incluso si hubo error)
+      if (executionError) {
+        execution.status = ExecutionStatus.FAILED;
+        execution.errorMessage = executionError.message;
+      } else {
+        execution.status = ExecutionStatus.COMPLETED;
+      }
+      
       execution.completedAt = new Date();
-      execution.executionTime = results.executionTime;
-      execution.totalScenarios = results.totalScenarios;
-      execution.passedScenarios = results.passedScenarios;
-      execution.failedScenarios = results.failedScenarios;
+      execution.executionTime = results.executionTime || (Date.now() - execution.startedAt.getTime());
+      execution.totalScenarios = results.totalScenarios || 0;
+      execution.passedScenarios = results.passedScenarios || 0;
+      execution.failedScenarios = results.failedScenarios || 0;
 
       await this.testExecutionRepository.save(execution);
 
-      // Guardar resultados individuales
-      for (const result of results.results) {
-        const testResult = this.testResultRepository.create({
-          executionId: execution.executionId,
-          scenarioName: result.scenarioName,
-          scenarioTags: result.scenarioTags,
-          status: result.status,
-          duration: result.duration,
-          steps: result.steps,
-          errorMessage: result.errorMessage,
-          metadata: result.metadata,
-        });
-        await this.testResultRepository.save(testResult);
+      // Guardar resultados individuales (siempre intentar, incluso si hubo error)
+      if (results.results && results.results.length > 0) {
+        for (const result of results.results) {
+          // Si el escenario tiene múltiples ejecuciones (examples), guardar cada una individualmente
+          if (result.hasMultipleExecutions && result.individualExecutions) {
+            this.logger.log(`🔍 Guardando ${result.individualExecutions.length} ejecuciones individuales para escenario: ${result.scenarioName}`);
+            
+            for (const individualExecution of result.individualExecutions) {
+              const testResult = this.testResultRepository.create({
+                executionId: execution.executionId,
+                scenarioName: individualExecution.scenarioInstanceName, // Nombre único por ejemplo
+                scenarioTags: individualExecution.scenarioTags,
+                status: individualExecution.status,
+                duration: individualExecution.duration,
+                steps: individualExecution.steps,
+                errorMessage: individualExecution.errorMessage,
+                metadata: {
+                  ...individualExecution.metadata,
+                  executionIndex: individualExecution.executionIndex,
+                  isExampleExecution: true,
+                  originalScenarioName: result.scenarioName,
+                  totalExampleExecutions: result.individualExecutions.length,
+                },
+              });
+              await this.testResultRepository.save(testResult);
+              this.logger.log(`   ✅ Guardada ejecución ${individualExecution.executionIndex}: ${individualExecution.scenarioInstanceName} - ${individualExecution.status}`);
+            }
+          } else {
+            // Escenario normal (sin examples), guardar como antes
+            const testResult = this.testResultRepository.create({
+              executionId: execution.executionId,
+              scenarioName: result.scenarioName,
+              scenarioTags: result.scenarioTags,
+              status: result.status,
+              duration: result.duration,
+              steps: result.steps,
+              errorMessage: result.errorMessage,
+              metadata: result.metadata,
+            });
+            await this.testResultRepository.save(testResult);
+          }
+        }
+
+        // ✅ NUEVO: Crear bugs automáticamente para todos los test cases fallidos
+        try {
+          const executionData = {
+            executionId: execution.executionId,
+            projectName: project.name,
+            entityName: execution.entityName,
+            method: execution.method,
+            environment: execution.metadata?.environment || 'default',
+            startedAt: execution.startedAt,
+          };
+
+          const createdBugs = await this.bugsService.createBugsFromExecutionResults(
+            project.id,
+            execution.executionId,
+            executionData,
+            results.results
+          );
+
+          this.logger.log(`Created ${createdBugs.length} bugs automatically from execution ${execution.executionId}`);
+        } catch (error) {
+          this.logger.warn(`Failed to create bugs automatically: ${error.message}`);
+        }
+
+        // ✅ NUEVO: Actualizar test cases con resultados de ejecución
+        const testCaseResults: any[] = [];
+        for (const result of results.results) {
+          if (result.hasMultipleExecutions && result.individualExecutions) {
+            // Para escenarios con examples, usar el estado consolidado pero incluir información de ejemplos
+            testCaseResults.push({
+              scenarioName: result.scenarioName,
+              status: result.status, // Estado consolidado (failed si al menos uno falló)
+              executionTime: result.duration, // Tiempo total
+              errorMessage: result.errorMessage,
+              hasExamples: true,
+              exampleExecutions: result.individualExecutions.map((exec: any) => ({
+                status: exec.status,
+                executionTime: exec.duration,
+                errorMessage: exec.errorMessage,
+              })),
+            });
+          } else {
+            testCaseResults.push({
+              scenarioName: result.scenarioName,
+              status: result.status,
+              executionTime: result.duration,
+              errorMessage: result.errorMessage,
+            });
+          }
+        }
+
+        await this.testCaseUpdateService.updateTestCasesWithExecutionResults(
+          project.id,
+          execution.entityName,
+          testCaseResults,
+        );
       }
 
-      // ✅ NUEVO: Actualizar test cases con resultados de ejecución
-      const testCaseResults = results.results.map(result => ({
-        scenarioName: result.scenarioName,
-        status: result.status,
-        executionTime: result.duration,
-        errorMessage: result.errorMessage,
-      }));
-
-      await this.testCaseUpdateService.updateTestCasesWithExecutionResults(
-        project.id,
-        execution.entityName,
-        testCaseResults,
-      );
-
       // ✅ NUEVO: Si la ejecución viene de una test suite, actualizar sus estadísticas
-      const metadata = execution.metadata as any;
-      if (metadata?.testSuiteId) {
-        this.logger.log(`Updating test suite stats for test suite ID: ${metadata.testSuiteId}`);
+      if (execution.testSuiteId) {
+        this.logger.log(`Updating test suite stats for test suite ID: ${execution.testSuiteId}`);
         try {
           await this.testSuitesService.updateTestSuiteExecutionStats(
             project.id,
-            metadata.testSuiteId,
+            execution.testSuiteId,
             {
-              totalScenarios: results.totalScenarios,
-              passedScenarios: results.passedScenarios,
-              failedScenarios: results.failedScenarios,
-              executionTime: results.executionTime,
+              totalScenarios: results.totalScenarios || 0,
+              passedScenarios: results.passedScenarios || 0,
+              failedScenarios: results.failedScenarios || 0,
+              executionTime: results.executionTime || 0,
             }
           );
-          this.logger.log(`Test suite stats updated successfully for test suite ID: ${metadata.testSuiteId}`);
+          this.logger.log(`Test suite stats updated successfully for test suite ID: ${execution.testSuiteId}`);
         } catch (error) {
           this.logger.warn(`Error updating test suite stats: ${error.message}`);
         }
       } else {
-        this.logger.log('No test suite ID found in metadata, skipping test suite stats update');
+        this.logger.log('No test suite ID found in execution, skipping test suite stats update');
       }
+
+
 
       // Registrar información de la ejecución completada
       await this.executionLoggerService.logExecutionCompleted(
@@ -433,34 +938,50 @@ export class TestExecutionService {
           executionId: execution.executionId,
           status: execution.status,
           summary: this.calculateSummary(execution),
-          results: results.results,
+          results: results.results || [],
         }
       );
 
-      // Emitir evento de ejecución completada
-      this.executionEventsService.emitExecutionCompleted(
-        execution.executionId,
-        project.id,
-        {
-          totalScenarios: results.totalScenarios,
-          passedScenarios: results.passedScenarios,
-          failedScenarios: results.failedScenarios,
-          executionTime: results.executionTime,
-        }
-      );
+      // Emitir evento de ejecución completada o fallida
+      if (executionError) {
+        this.executionEventsService.emitExecutionFailed(
+          execution.executionId,
+          project.id,
+          executionError.message
+        );
+      } else {
+        this.executionEventsService.emitExecutionCompleted(
+          execution.executionId,
+          project.id,
+          {
+            totalScenarios: results.totalScenarios,
+            passedScenarios: results.passedScenarios,
+            failedScenarios: results.failedScenarios,
+            executionTime: results.executionTime,
+          }
+        );
+      }
 
-      this.logger.log(`Ejecución ${execution.executionId} completada exitosamente`);
+      if (executionError) {
+        this.logger.log(`Ejecución ${execution.executionId} falló pero se guardaron los resultados disponibles`);
+        throw executionError; // Re-lanzar el error para que se maneje en el catch externo
+      } else {
+        this.logger.log(`Ejecución ${execution.executionId} completada exitosamente`);
+      }
     } catch (error) {
       this.logger.error(`Error en ejecución ${execution.executionId}:`, error);
 
-      execution.status = ExecutionStatus.FAILED;
-      execution.errorMessage = error.message;
-      execution.completedAt = new Date();
-      execution.executionTime = Date.now() - execution.startedAt.getTime();
+      // Solo actualizar si no se actualizó antes
+      if (execution.status !== ExecutionStatus.FAILED) {
+        execution.status = ExecutionStatus.FAILED;
+        execution.errorMessage = error.message;
+        execution.completedAt = new Date();
+        execution.executionTime = Date.now() - execution.startedAt.getTime();
 
-      await this.testExecutionRepository.save(execution);
+        await this.testExecutionRepository.save(execution);
+      }
 
-      // Emitir evento de ejecución fallida
+      // Emitir evento de ejecución fallida (solo si no se emitió antes)
       this.executionEventsService.emitExecutionFailed(
         execution.executionId,
         project.id,
@@ -509,5 +1030,146 @@ export class TestExecutionService {
   getExecutionEvents(projectId: string): Observable<MessageEvent> {
     this.logger.log(`SSE stream iniciado para proyecto: ${projectId}`);
     return this.executionEventsService.getExecutionEvents(projectId);
+  }
+
+  /**
+   * Obtener ejecuciones fallidas por test case ID
+   */
+  async getFailedExecutionsByTestCaseId(projectId: string, testCaseId: string): Promise<Array<{
+    executionId: string;
+    testCaseId: string;
+    testCaseName: string;
+    entityName: string;
+    section: string;
+    method: string;
+    endpoint: string;
+    errorMessage: string;
+    executionDate: Date;
+  }>> {
+    this.logger.log(`Getting failed executions for test case: ${testCaseId} in project: ${projectId}`);
+
+    // Buscar ejecuciones fallidas que contengan el test case ID en scenarioName
+    const failedExecutions = await this.testExecutionRepository
+      .createQueryBuilder('te')
+      .leftJoin('te.results', 'tr')
+      .where('te.projectId = :projectId', { projectId })
+      .andWhere('te.status = :status', { status: ExecutionStatus.FAILED })
+      .andWhere('te.testCaseId = :testCaseId', { testCaseId })
+      .orderBy('te.startedAt', 'DESC')
+      .getMany();
+
+    return failedExecutions.map(execution => ({
+      executionId: execution.executionId,
+      testCaseId: testCaseId,
+      testCaseName: testCaseId, // El nombre se puede obtener del test case si es necesario
+      entityName: execution.entityName,
+      section: '', // Se puede obtener del test case si es necesario
+      method: execution.method || '',
+      endpoint: '', // Se puede obtener del test case si es necesario
+      errorMessage: execution.errorMessage || 'Test execution failed',
+      executionDate: execution.startedAt,
+    }));
+  }
+
+  /**
+   * Obtener la última ejecución de un test suite específico
+   */
+  async getLastExecutionByTestSuite(projectId: string, testSuiteId: string): Promise<{
+    executionId: string;
+    status: string;
+    startedAt: Date;
+    completedAt?: Date;
+    executionTime: number;
+    totalScenarios: number;
+    passedScenarios: number;
+    failedScenarios: number;
+    entityName: string;
+  }> {
+    this.logger.log(`Getting last execution for test suite: ${testSuiteId} in project: ${projectId}`);
+
+    const lastExecution = await this.testExecutionRepository
+      .createQueryBuilder('te')
+      .where('te.projectId = :projectId', { projectId })
+      .andWhere('te.testSuiteId = :testSuiteId', { testSuiteId })
+      .orderBy('te.startedAt', 'DESC')
+      .getOne();
+
+    if (!lastExecution) {
+      throw new NotFoundException(`No execution found for test suite: ${testSuiteId}`);
+    }
+
+    return {
+      executionId: lastExecution.executionId,
+      status: lastExecution.status,
+      startedAt: lastExecution.startedAt,
+      completedAt: lastExecution.completedAt,
+      executionTime: lastExecution.executionTime,
+      totalScenarios: lastExecution.totalScenarios,
+      passedScenarios: lastExecution.passedScenarios,
+      failedScenarios: lastExecution.failedScenarios,
+      entityName: lastExecution.entityName,
+    };
+  }
+
+  /**
+   * Obtener la última ejecución de un test case específico
+   */
+  async getLastExecutionByTestCase(projectId: string, testCaseId: string): Promise<{
+    executionId: string;
+    status: string;
+    startedAt: Date;
+    completedAt?: Date;
+    executionTime: number;
+    totalScenarios: number;
+    passedScenarios: number;
+    failedScenarios: number;
+    entityName: string;
+  }> {
+    this.logger.log(`Getting last execution for test case: ${testCaseId} in project: ${projectId}`);
+
+    const lastExecution = await this.testExecutionRepository
+      .createQueryBuilder('te')
+      .where('te.projectId = :projectId', { projectId })
+      .andWhere('te.testCaseId = :testCaseId', { testCaseId })
+      .orderBy('te.startedAt', 'DESC')
+      .getOne();
+
+    if (!lastExecution) {
+      throw new NotFoundException(`No execution found for test case: ${testCaseId}`);
+    }
+
+    return {
+      executionId: lastExecution.executionId,
+      status: lastExecution.status,
+      startedAt: lastExecution.startedAt,
+      completedAt: lastExecution.completedAt,
+      executionTime: lastExecution.executionTime,
+      totalScenarios: lastExecution.totalScenarios,
+      passedScenarios: lastExecution.passedScenarios,
+      failedScenarios: lastExecution.failedScenarios,
+      entityName: lastExecution.entityName,
+    };
+  }
+
+  /**
+   * Obtener el nombre de una test suite por su ID
+   */
+  private async getTestSuiteName(projectId: string, testSuiteId: string): Promise<string | undefined> {
+    try {
+      // Por ahora, extraer el nombre del testSuiteId
+      // Los test suite IDs tienen formato como: SUITE-ECOMMERCE-PRODUCT-001
+      // Podemos extraer una parte más legible
+      const parts = testSuiteId.split('-');
+      if (parts.length >= 3) {
+        // Convertir SUITE-ECOMMERCE-PRODUCT-001 a "Ecommerce Product Test Suite"
+        const section = parts[1]?.charAt(0).toUpperCase() + parts[1]?.slice(1).toLowerCase();
+        const entity = parts[2]?.charAt(0).toUpperCase() + parts[2]?.slice(1).toLowerCase();
+        return `${section} ${entity} Test Suite`;
+      }
+      return testSuiteId;
+    } catch (error) {
+      this.logger.warn(`Could not get test suite name for ${testSuiteId}: ${error.message}`);
+      return testSuiteId;
+    }
   }
 } 

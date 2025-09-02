@@ -12,6 +12,7 @@ export interface ExecutionEvent {
   projectId: string;
   entityName?: string;
   testSuiteId?: string;
+  testCaseId?: string;
   results?: any;
 }
 
@@ -53,7 +54,7 @@ export class ExecutionEventsService {
   /**
    * Emitir evento de inicio de ejecución
    */
-  emitExecutionStarted(executionId: string, projectId: string, entityName?: string, testSuiteId?: string) {
+  emitExecutionStarted(executionId: string, projectId: string, entityName?: string, testSuiteId?: string, testCaseId?: string) {
     this.emitExecutionEvent({
       executionId,
       type: 'started',
@@ -63,6 +64,7 @@ export class ExecutionEventsService {
       projectId,
       entityName,
       testSuiteId,
+      testCaseId,
     });
   }
 
