@@ -8,4 +8,4 @@ import { DatabaseInitService } from './services/database-init.service';
   providers: [DatabaseMigrationService, DatabaseInitService],
   exports: [DatabaseMigrationService],
 })
-export class DatabaseMigrationModule {} 
+export class DatabaseModule {} 

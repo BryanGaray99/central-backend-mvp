@@ -87,38 +87,60 @@ export class AIGeneralController {
   }
 
   /**
-   * Health check para AI
+   * Verifica el estado de la API key desde el archivo .env y prueba la conexión
    */
-  @Get('health')
-  async getAIHealth() {
+  @Get('check-status')
+  async checkOpenAIStatus() {
     try {
       const apiKey = await this.openAIConfigService.getOpenAIKey();
-      const hasApiKey = !!apiKey;
+      
+      if (!apiKey) {
+        return {
+          success: false,
+          configured: false,
+          connected: false,
+          message: 'OpenAI API key no encontrada en el archivo .env',
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Probar la conexión con la API key encontrada
+      const openai = new OpenAI({ apiKey });
+      const response = await openai.models.list();
       
       return {
-        status: 'healthy',
-        ai: {
-          openai: {
-            configured: hasApiKey,
-            status: hasApiKey ? 'ready' : 'not_configured'
-          }
-        },
+        success: true,
+        configured: true,
+        connected: true,
+        message: 'OpenAI API key configurada y funcionando correctamente',
+        models: response.data.length,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
+      this.logger.error(`Error checking OpenAI status: ${error.message}`);
+      
+      // Si hay API key pero falla la conexión
+      const apiKey = await this.openAIConfigService.getOpenAIKey();
+      if (apiKey) {
+        return {
+          success: false,
+          configured: true,
+          connected: false,
+          message: `API key configurada pero error de conexión: ${error.message}`,
+          timestamp: new Date().toISOString()
+        };
+      }
+      
       return {
-        status: 'unhealthy',
-        ai: {
-          openai: {
-            configured: false,
-            status: 'error',
-            error: error.message
-          }
-        },
+        success: false,
+        configured: false,
+        connected: false,
+        message: 'OpenAI API key no configurada',
         timestamp: new Date().toISOString()
       };
     }
   }
+
 
 
 }

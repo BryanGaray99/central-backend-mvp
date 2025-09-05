@@ -10,8 +10,8 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TestType, Priority, Complexity } from '../entities/test-case.entity';
-import { StepDefinitionDto, ScenarioStructureDto, HooksDto, TestCaseMetadataDto } from './create-test-case.dto';
+import { TestType } from '../entities/test-case.entity';
+import { HooksDto, TestCaseMetadataDto } from './create-test-case.dto';
 
 export class UpdateTestCaseDto {
   @ApiPropertyOptional({

@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TestStep, StepType, StepTemplateType, StepStatus, Reusability } from '../entities/test-step.entity';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 
 @Injectable()
 export class CommonHooksRegistrationService {

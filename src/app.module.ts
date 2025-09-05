@@ -15,7 +15,7 @@ import { TestCase } from './modules/test-cases/entities/test-case.entity';
 import { TestStep } from './modules/test-cases/entities/test-step.entity';
 import { AIGeneration } from './modules/test-cases/entities/ai-generation.entity';
 import { TestCasesModule } from './modules/test-cases/test-cases.module';
-import { DatabaseMigrationModule } from './common/database-migration.module';
+import { DatabaseModule } from './common/database/database.module';
 import { AIAssistant } from './modules/ai/entities/ai-assistant.entity';
 import { AIThread } from './modules/ai/entities/ai-thread.entity';
 import { AISuggestion } from './modules/ai/entities/ai-suggestion.entity';
@@ -32,7 +32,7 @@ import { SyncModule } from './modules/sync/sync.module';
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule, DatabaseMigrationModule],
+      imports: [ConfigModule, DatabaseModule],
       useFactory: async (configService: ConfigService) => {
         // Usar la nueva ruta de la base de datos
         const workspacesPath = configService.get('PLAYWRIGHT_WORKSPACES_PATH') || '../playwright-workspaces';
@@ -60,7 +60,7 @@ import { SyncModule } from './modules/sync/sync.module';
       },
       inject: [ConfigService],
     }),
-    DatabaseMigrationModule,
+    DatabaseModule,
     WorkspaceModule,
     ProjectsModule,
     EndpointsModule,

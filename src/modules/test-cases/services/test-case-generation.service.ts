@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { FileSystemService } from '../../projects/services/file-system.service';
 import { TemplateService } from '../../projects/services/template.service';
-import { TestCasesService } from './test-cases.service';
-import { StepTemplatesService } from './step-templates.service';
-import { FeatureFileManagerService } from './feature-file-manager.service';
-import { StepsFileManagerService } from './steps-file-manager.service';
 import { TestCaseRegistrationService } from './test-case-registration.service';
 import { TestStepRegistrationService } from './test-step-registration.service';
 import { Project } from '../../projects/project.entity';
@@ -19,15 +15,10 @@ export class TestCaseGenerationService {
   constructor(
     private readonly fileSystemService: FileSystemService,
     private readonly templateService: TemplateService,
-    private readonly testCasesService: TestCasesService,
-    private readonly stepTemplatesService: StepTemplatesService,
-    private readonly featureFileManagerService: FeatureFileManagerService,
-    private readonly stepsFileManagerService: StepsFileManagerService,
     private readonly testCaseRegistrationService: TestCaseRegistrationService,
     private readonly testStepRegistrationService: TestStepRegistrationService,
   ) {}
 
-  // ✅ MÉTODO EN USO - Se llama desde endpoints para generar features y steps
   async generateTestCasesFromEndpoint(
     project: Project,
     dto: RegisterEndpointDto,
@@ -38,13 +29,10 @@ export class TestCaseGenerationService {
     );
 
     try {
-      // Build template variables for test case generation
       const templateVariables = this.buildTemplateVariables(dto, analysisResult, project);
 
-      // Generate feature and steps files
       await this.generateFeatureAndStepsFiles(project.path, dto.section, dto.entityName, templateVariables);
 
-      // ✅ HABILITADO: Registrar test cases en la base de datos
       await this.testCaseRegistrationService.processFeatureFileAndRegisterTestCases(
         project.id,
         dto.section,
@@ -52,7 +40,6 @@ export class TestCaseGenerationService {
         dto
       );
 
-      // ✅ NUEVO: Registrar test steps en la base de datos
       await this.testStepRegistrationService.processStepsFileAndRegisterSteps(
         project.id,
         dto.section,
@@ -70,7 +57,6 @@ export class TestCaseGenerationService {
     }
   }
 
-  // ✅ MÉTODOS DE SOPORTE EN USO - Para generar archivos feature y steps
   private buildTemplateVariables(dto: RegisterEndpointDto, analysisResult: any, project: Project) {
     // Extract fields from analysis result
     const fields = this.extractFieldsFromAnalysis(analysisResult);
@@ -260,42 +246,5 @@ export class TestCaseGenerationService {
       variables,
     );
     this.logger.log(`Steps file generated at: ${filePath}`);
-  }
-
-  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Crear test cases en base de datos
-  private async createTestCasesFromEndpoint(
-    projectId: string,
-    dto: RegisterEndpointDto,
-    templateVariables: any,
-  ) {
-    // TODO: Implementar con IA para generar test cases inteligentes
-    // - Analizar patrones de uso
-    // - Generar casos edge case
-    // - Crear casos de prueba negativos
-    // - Optimizar cobertura de testing
-    throw new Error('TODO: Implementar con IA - createTestCasesFromEndpoint');
-  }
-
-  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Crear test case para método específico
-  private async createTestCaseForMethod(
-    projectId: string,
-    dto: RegisterEndpointDto,
-    method: any,
-    templateVariables: any,
-  ) {
-    // TODO: Implementar con IA para generar test cases específicos por método
-    // - Análisis de parámetros del método
-    // - Generación de casos de prueba específicos
-    // - Validación de respuestas esperadas
-    throw new Error('TODO: Implementar con IA - createTestCaseForMethod');
-  }
-
-  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Construir escenario para método
-  private buildScenarioForMethod(method: any, templateVariables: any) {
-    // TODO: Implementar con IA para generar escenarios inteligentes
-    // - Análisis de flujo de datos
-    // - Generación de steps contextuales
-    // - Optimización de cobertura
-    throw new Error('TODO: Implementar con IA - buildScenarioForMethod');
   }
 } 

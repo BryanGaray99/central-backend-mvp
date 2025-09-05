@@ -4,6 +4,14 @@ import { BugType, BugSeverity, BugPriority, BugStatus } from '../entities/bug.en
 
 export class BugFiltersDto {
   @ApiProperty({
+    description: 'Project ID for filtering bugs',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  projectId?: string;
+
+  @ApiProperty({
     description: 'Search term for title or description',
     required: false
   })

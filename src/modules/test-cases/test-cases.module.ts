@@ -7,7 +7,6 @@ import { TestCase } from './entities/test-case.entity';
 import { TestStep } from './entities/test-step.entity';
 import { AIGeneration } from './entities/ai-generation.entity';
 import { StepTemplatesService } from './services/step-templates.service';
-import { StepsFileManagerService } from './services/steps-file-manager.service';
 import { FeatureFileManagerService } from './services/feature-file-manager.service';
 import { TestCaseGenerationService } from './services/test-case-generation.service';
 import { TestCaseRegistrationService } from './services/test-case-registration.service';
@@ -28,7 +27,6 @@ import { Bug } from '../bugs/entities/bug.entity';
   providers: [
     TestCasesService,
     StepTemplatesService,
-    StepsFileManagerService,
     FeatureFileManagerService,
     TestCaseGenerationService,
     TestCaseRegistrationService,
@@ -38,7 +36,6 @@ import { Bug } from '../bugs/entities/bug.entity';
   exports: [
     TestCasesService,
     StepTemplatesService,
-    StepsFileManagerService,
     FeatureFileManagerService,
     TestCaseGenerationService,
     TestCaseRegistrationService,

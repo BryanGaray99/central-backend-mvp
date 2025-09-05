@@ -7,7 +7,7 @@ import * as sqlite3 from 'sqlite3';
 @Injectable()
 export class DatabaseMigrationService {
   private readonly logger = new Logger(DatabaseMigrationService.name);
-  private readonly migrationsPath = path.join(__dirname, '..', 'db-migrations');
+  private readonly migrationsPath = path.join(__dirname, '..', 'migrations');
   private dbPath: string;
 
   constructor(private readonly configService: ConfigService) {

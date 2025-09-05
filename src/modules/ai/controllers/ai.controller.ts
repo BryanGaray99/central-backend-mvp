@@ -3,7 +3,6 @@ import { AssistantManagerService } from '../services/assistant-manager.service';
 import { ThreadManagerService } from '../services/thread-manager.service';
 import { TestCaseSuggestionService } from '../services/test-case-suggestion.service';
 import { AIAssistant } from '../entities/ai-assistant.entity';
-import { AIThread } from '../entities/ai-thread.entity';
 import { TestCaseSuggestionRequestDto, TestCaseSuggestionResponseDto } from '../dto/test-case-suggestion.dto';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
@@ -58,39 +57,6 @@ export class AIController {
       }
       throw err;
     }
-  }
-
-  @Post('thread')
-  async createThread(@Param('projectId') projectId: string): Promise<AIThread> {
-    // Primero obtener assistant existente
-    const assistant = await this.assistantManagerService.getAssistant(projectId);
-    if (!assistant) {
-      throw new BadRequestException('No existe un assistant para este proyecto. Inicializa el contexto IA primero.');
-    }
-    
-    // Obtener thread existente o crear uno nuevo
-    let thread = await this.threadManagerService.getThread(projectId, assistant.assistantId);
-    if (!thread) {
-      thread = await this.threadManagerService.createThread(projectId, assistant.assistantId);
-    }
-    
-    return thread;
-  }
-
-  @Get('threads/stats')
-  async getThreadStats(@Param('projectId') projectId: string): Promise<{
-    total: number;
-    active: number;
-    inactive: number;
-    totalMessages: number;
-  }> {
-    return await this.threadManagerService.getThreadStats(projectId);
-  }
-
-  @Delete('threads')
-  async deleteAllThreads(@Param('projectId') projectId: string): Promise<{ message: string }> {
-    await this.threadManagerService.deleteAllProjectThreads(projectId);
-    return { message: 'All threads deleted successfully' };
   }
 
   @Post('test-cases/suggest')
@@ -167,19 +133,6 @@ export class AIController {
     return {
       success: true,
       data: suggestion
-    };
-  }
-
-  @Delete('suggestions/:suggestionId')
-  @ApiOperation({
-    summary: 'Delete a specific AI suggestion',
-    description: 'Deletes a specific AI suggestion by its ID'
-  })
-  async deleteSuggestion(@Param('projectId') projectId: string, @Param('suggestionId') suggestionId: string) {
-    await this.testCaseSuggestionService.deleteSuggestion(suggestionId);
-    return {
-      success: true,
-      message: 'Suggestion deleted successfully'
     };
   }
 } 
