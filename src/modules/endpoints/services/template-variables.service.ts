@@ -2,19 +2,48 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Project } from '../../projects/project.entity';
 import { RegisterEndpointDto } from '../dto/register-endpoint.dto';
 
+/**
+ * Service responsible for building template variables for artifact generation.
+ * 
+ * This service processes endpoint analysis results and DTOs to create comprehensive
+ * template variables that are used by Handlebars templates to generate testing
+ * artifacts. It handles field extraction, validation rules, type mapping, and
+ * business logic detection.
+ * 
+ * @class TemplateVariablesService
+ * @since 1.0.0
+ */
 @Injectable()
 export class TemplateVariablesService {
   private readonly logger = new Logger(TemplateVariablesService.name);
 
+  /**
+   * Builds comprehensive template variables for artifact generation.
+   * 
+   * This method processes endpoint analysis results and DTOs to create a complete
+   * set of template variables including entity information, field definitions,
+   * validation rules, business logic flags, and method configurations.
+   * 
+   * @param dto - The endpoint registration data containing entity and method information
+   * @param analysisResult - The analysis results from endpoint exploration
+   * @param project - The project configuration and metadata
+   * @returns Comprehensive template variables object for Handlebars templates
+   * 
+   * @example
+   * ```typescript
+   * const variables = templateVariables.buildTemplateVariables(dto, analysis, project);
+   * // Use variables in Handlebars template rendering
+   * ```
+   */
   buildTemplateVariables(
     dto: RegisterEndpointDto,
     analysisResult: any,
     project: Project,
   ): any {
-    // console.log('🔍 === INICIO buildTemplateVariables ===');
-    // console.log('📋 DTO recibido:', JSON.stringify(dto, null, 2));
-    // console.log('🔬 AnalysisResult recibido:', JSON.stringify(analysisResult, null, 2));
-    // console.log('📁 Project recibido:', JSON.stringify(project, null, 2));
+    // console.log('🔍 === START buildTemplateVariables ===');
+    // console.log('📋 DTO received:', JSON.stringify(dto, null, 2));
+    // console.log('🔬 AnalysisResult received:', JSON.stringify(analysisResult, null, 2));
+    // console.log('📁 Project received:', JSON.stringify(project, null, 2));
 
     // Basic variables
     const entityName = dto.entityName;
@@ -22,7 +51,7 @@ export class TemplateVariablesService {
     const entityLower = entityName.toLowerCase();
     const entityLowerPlural = entityNamePlural.toLowerCase();
 
-    // console.log('🏷️ Variables básicas generadas:');
+    // console.log('🏷️ Basic variables generated:');
     // console.log('  - entityName:', entityName);
     // console.log('  - entityNamePlural:', entityNamePlural);
     // console.log('  - entityLower:', entityLower);
@@ -33,21 +62,21 @@ export class TemplateVariablesService {
       (method) => analysisResult.analysisResults[method]?.success,
     );
 
-    // console.log('✅ Métodos exitosos encontrados:', successfulMethods);
+    // console.log('✅ Successful methods found:', successfulMethods);
 
     // Select method for entity (prioritize POST for creation)
     const methodForEntity = successfulMethods.includes('POST') ? 'POST' : successfulMethods[0];
-    // console.log('🎯 Método para entidad seleccionado:', methodForEntity);
+    // console.log('🎯 Method for entity selected:', methodForEntity);
 
     const methodAnalysis = analysisResult.analysisResults[methodForEntity];
-    // console.log('📊 Schema del método para entidad:', JSON.stringify(methodAnalysis?.inferredResponseSchema, null, 2));
+    // console.log('📊 Schema for entity method:', JSON.stringify(methodAnalysis?.inferredResponseSchema, null, 2));
 
     // Extract fields from response schema
     const fields = this.extractFieldsFromSchema(
       methodAnalysis?.inferredResponseSchema,
       entityName,
     );
-    // console.log('📝 Campos extraídos del schema de respuesta:', JSON.stringify(fields, null, 2));
+    // console.log('📝 Fields extracted from response schema:', JSON.stringify(fields, null, 2));
 
     // Extract create fields from POST request body
     const createFields = successfulMethods.includes('POST')
@@ -57,7 +86,7 @@ export class TemplateVariablesService {
           'create',
         )
       : [];
-    // console.log('📝 Campos extraídos del requestBodyDefinition (POST):', JSON.stringify(createFields, null, 2));
+    // console.log('📝 Fields extracted from requestBodyDefinition (POST):', JSON.stringify(createFields, null, 2));
 
     // Extract update fields from PATCH/PUT request body
     const updateFields = successfulMethods.includes('PATCH')
@@ -73,7 +102,7 @@ export class TemplateVariablesService {
           'update',
         )
       : [];
-    // console.log('📝 Campos extraídos del requestBodyDefinition (PATCH):', JSON.stringify(updateFields, null, 2));
+    // console.log('📝 Fields extracted from requestBodyDefinition (PATCH):', JSON.stringify(updateFields, null, 2));
 
     // Build template variables
     const templateVariables = {
@@ -135,11 +164,22 @@ export class TemplateVariablesService {
     };
 
     // console.log('🔧 === FINAL buildTemplateVariables ===');
-    // console.log('📦 Variables de template generadas:', JSON.stringify(templateVariables, null, 2));
+    // console.log('📦 Template variables generated:', JSON.stringify(templateVariables, null, 2));
 
     return templateVariables;
   }
 
+  /**
+   * Extracts field definitions from API response schema.
+   * 
+   * This private method processes JSON schema objects to extract field definitions
+   * including types, validation rules, and metadata for template generation.
+   * 
+   * @private
+   * @param schema - The JSON schema object from API analysis
+   * @param entityName - The name of the entity being processed
+   * @returns Array of field definition objects
+   */
   private extractFieldsFromSchema(schema: any, entityName: string): any[] {
     if (!schema?.properties) return [];
     
@@ -178,6 +218,18 @@ export class TemplateVariablesService {
       });
   }
 
+  /**
+   * Extracts field definitions from request body definitions.
+   * 
+   * This private method processes request body field definitions to extract
+   * field information for create and update operations.
+   * 
+   * @private
+   * @param definition - Array of request body field definitions
+   * @param entityName - The name of the entity being processed
+   * @param type - The type of operation (create or update)
+   * @returns Array of field definition objects
+   */
   private extractFieldsFromRequestBody(definition: any[], entityName: string, type: string): any[] {
     if (!definition) return [];
     
@@ -379,6 +431,16 @@ export class TemplateVariablesService {
     return map[method] || 200;
   }
 
+  /**
+   * Converts a word to its plural form for template variable generation.
+   * 
+   * This private method handles basic English pluralization rules for
+   * generating plural entity names in templates.
+   * 
+   * @private
+   * @param word - The word to pluralize
+   * @returns The plural form of the word
+   */
   private pluralize(word: string): string {
     if (word.endsWith('y')) {
       return word.slice(0, -1) + 'ies';

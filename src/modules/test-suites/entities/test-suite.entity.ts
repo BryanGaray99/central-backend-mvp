@@ -2,11 +2,17 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDa
 import { Project } from '../../projects/project.entity';
 import { Bug } from '../../bugs/entities/bug.entity';
 
+/**
+ * Type of test suite.
+ */
 export enum TestSuiteType {
   TEST_SET = 'test_set',
   TEST_PLAN = 'test_plan'
 }
 
+/**
+ * Execution status for test suites.
+ */
 export enum TestSuiteStatus {
   PENDING = 'pending',
   RUNNING = 'running',
@@ -15,6 +21,9 @@ export enum TestSuiteStatus {
   SKIPPED = 'skipped'
 }
 
+/**
+ * Generic execution lifecycle statuses.
+ */
 export enum ExecutionStatus {
   PENDING = 'pending',
   RUNNING = 'running',
@@ -23,6 +32,9 @@ export enum ExecutionStatus {
   CANCELLED = 'cancelled'
 }
 
+/**
+ * Lightweight reference to a test case for suite reporting.
+ */
 export interface TestCaseReference {
   testCaseId: string;
   testCaseName: string;
@@ -32,6 +44,9 @@ export interface TestCaseReference {
   executedAt?: Date;
 }
 
+/**
+ * Lightweight reference to a test set for plans.
+ */
 export interface TestSetReference {
   testSuiteId: string;
   testSuiteName: string;
@@ -41,6 +56,9 @@ export interface TestSetReference {
   failedTestCases: number;
 }
 
+/**
+ * Error shape captured for executions.
+ */
 export interface ExecutionError {
   testCaseId: string;
   testCaseName: string;
@@ -52,6 +70,12 @@ export interface ExecutionError {
 }
 
 @Entity('test_suites')
+/**
+ * Entity: TestSuite
+ *
+ * Represents a collection of test cases (Test Set) or a collection of test sets (Test Plan)
+ * with execution statistics and metadata.
+ */
 export class TestSuite {
   @PrimaryGeneratedColumn('uuid')
   id: string;

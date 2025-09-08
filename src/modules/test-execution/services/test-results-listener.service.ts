@@ -10,17 +10,22 @@ export class TestResultsListenerService {
   private stepResults: Map<string, StepResult[]> = new Map();
 
   /**
-   * Inicializa el listener para una nueva ejecución
+   * Initializes the listener for a new execution.
+   *
+   * @param executionId - Execution identifier to correlate captured data
    */
   initializeExecution(executionId: string): void {
     this.currentExecutionId = executionId;
     this.scenarioResults.clear();
     this.stepResults.clear();
-    this.logger.log(`Listener inicializado para ejecución: ${executionId}`);
+    this.logger.log(`Listener initialized for execution: ${executionId}`);
   }
 
   /**
-   * Captura el inicio de un escenario
+   * Captures the start of a scenario.
+   *
+   * @param scenarioName - Scenario name
+   * @param tags - Associated scenario tags
    */
   captureScenarioStart(scenarioName: string, tags: string[] = []): void {
     this.currentScenario = scenarioName;
@@ -41,11 +46,14 @@ export class TestResultsListenerService {
 
     this.stepResults.set(scenarioKey, []);
     
-    this.logger.debug(`Escenario iniciado: ${scenarioName}`);
+    this.logger.debug(`Scenario started: ${scenarioName}`);
   }
 
   /**
-   * Captura el resultado de un escenario
+   * Captures the result of a scenario upon completion.
+   *
+   * @param scenarioName - Scenario name
+   * @param result - Result payload including status and timing
    */
   captureScenarioResult(scenarioName: string, result: any): void {
     const scenarioKey = this.getScenarioKey(scenarioName);
@@ -62,16 +70,18 @@ export class TestResultsListenerService {
       
       this.scenarioResults.set(scenarioKey, scenarioData);
       
-      this.logger.debug(`Escenario completado: ${scenarioName} - ${result.status}`);
+      this.logger.debug(`Scenario completed: ${scenarioName} - ${result.status}`);
     }
   }
 
   /**
-   * Captura el inicio de un paso
+   * Captures the start of a step within the current scenario.
+   *
+   * @param stepName - Step identifier/name
    */
   captureStepStart(stepName: string): void {
     if (!this.currentScenario) {
-      this.logger.warn('Intento de capturar step sin escenario activo');
+      this.logger.warn('Attempted to capture step without active scenario');
       return;
     }
 
@@ -87,15 +97,18 @@ export class TestResultsListenerService {
     steps.push(stepResult);
     this.stepResults.set(scenarioKey, steps);
     
-    this.logger.debug(`Step iniciado: ${stepName}`);
+    this.logger.debug(`Step started: ${stepName}`);
   }
 
   /**
-   * Captura el resultado de un paso
+   * Captures the result for a previously started step.
+   *
+   * @param stepName - Step identifier/name
+   * @param result - Result payload including status and error message
    */
   captureStepResult(stepName: string, result: any): void {
     if (!this.currentScenario) {
-      this.logger.warn('Intento de capturar resultado de step sin escenario activo');
+      this.logger.warn('Attempted to capture step result without active scenario');
       return;
     }
 
@@ -113,28 +126,27 @@ export class TestResultsListenerService {
       steps[stepIndex] = step;
       this.stepResults.set(scenarioKey, steps);
       
-      this.logger.debug(`Step completado: ${stepName} - ${result.status}`);
+      this.logger.debug(`Step completed: ${stepName} - ${result.status}`);
     }
   }
 
   /**
-   * Captura datos adicionales de un paso (deprecated - mantenido por compatibilidad)
+   * Captures additional data for a step (deprecated - kept for compatibility).
    */
   captureStepData(stepName: string, data: any): void {
     if (!this.currentScenario) {
       return;
     }
 
-    // Los datos ya no se almacenan en la estructura simplificada
-    // Solo se registra en el log para debugging
-    this.logger.debug(`Datos capturados para step ${stepName}: ${JSON.stringify(data)}`);
+    // Data is no longer stored; only logged for debugging.
+    this.logger.debug(`Captured data for step ${stepName}: ${JSON.stringify(data)}`);
   }
 
   /**
-   * Captura un error durante la ejecución
+   * Captures an error during execution.
    */
   captureError(error: Error, context?: string): void {
-    this.logger.error(`Error capturado${context ? ` en ${context}` : ''}: ${error.message}`);
+    this.logger.error(`Captured error${context ? ` in ${context}` : ''}: ${error.message}`);
     
     if (this.currentScenario) {
       const scenarioKey = this.getScenarioKey(this.currentScenario);
@@ -149,32 +161,32 @@ export class TestResultsListenerService {
   }
 
   /**
-   * Captura metadatos de la ejecución
+   * Captures execution metadata (for debug/tracing purposes only).
    */
   captureExecutionMetadata(metadata: any): void {
-    this.logger.debug(`Metadatos de ejecución capturados: ${JSON.stringify(metadata)}`);
+    this.logger.debug(`Captured execution metadata: ${JSON.stringify(metadata)}`);
   }
 
   /**
-   * Obtiene todos los resultados capturados
+   * Returns all captured results in memory.
    */
   getCapturedResults(): any[] {
     return Array.from(this.scenarioResults.values());
   }
 
   /**
-   * Limpia los datos del listener
+   * Cleans up all in-memory data and resets state.
    */
   cleanup(): void {
     this.currentExecutionId = null;
     this.currentScenario = null;
     this.scenarioResults.clear();
     this.stepResults.clear();
-    this.logger.debug('Listener limpiado');
+    this.logger.debug('Listener cleaned up');
   }
 
   /**
-   * Obtiene el estado actual del listener
+   * Returns the current listener status.
    */
   getStatus(): any {
     return {

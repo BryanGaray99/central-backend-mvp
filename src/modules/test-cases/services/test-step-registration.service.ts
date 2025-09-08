@@ -6,6 +6,16 @@ import { Project } from '../../projects/project.entity';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+/**
+ * Test Step Registration Service
+ *
+ * This service handles the registration of test steps from step definition files.
+ * It processes Playwright step definition files, extracts step functions, and
+ * registers them as reusable test steps in the database with proper metadata.
+ *
+ * @class TestStepRegistrationService
+ * @since 1.0.0
+ */
 @Injectable()
 export class TestStepRegistrationService {
   private readonly logger = new Logger(TestStepRegistrationService.name);
@@ -17,6 +27,23 @@ export class TestStepRegistrationService {
     private readonly projectRepository: Repository<Project>,
   ) {}
 
+  /**
+   * Processes a steps file and registers all test steps found in it.
+   *
+   * This method reads a Playwright step definition file, extracts step functions,
+   * and registers each one in the database as a reusable test step.
+   *
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The entity name
+   * @returns Promise that resolves when all steps are registered
+   * @throws Error when file processing or database operations fail
+   *
+   * @example
+   * ```typescript
+   * await service.processStepsFileAndRegisterSteps('project-123', 'ecommerce', 'Product');
+   * ```
+   */
   async processStepsFileAndRegisterSteps(
     projectId: string,
     section: string,
@@ -50,6 +77,19 @@ export class TestStepRegistrationService {
     }
   }
 
+  /**
+   * Extracts test step definitions from a file's lines.
+   *
+   * This private method processes file lines to extract Playwright step definitions,
+   * including their complete implementation, parameters, and metadata.
+   *
+   * @private
+   * @param lines - Array of file lines to process
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The entity name
+   * @returns Array of extracted step objects with metadata
+   */
   private extractStepsFromFile(
     lines: string[],
     projectId: string,
@@ -83,24 +123,23 @@ export class TestStepRegistrationService {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
 
-      // Buscar definiciones de steps (Given, When, Then, And, But)
       const stepMatch = line.match(/^(Given|When|Then|And|But)\s*\(\s*['"`]([^'"`]+)['"`]/);
       if (stepMatch) {
         const stepType = stepMatch[1] as StepType;
         const stepName = stepMatch[2];
         const stepId = `ST-${section.toUpperCase()}-${entityName.toUpperCase()}-${String(stepNumber).padStart(2, '0')}`;
 
-        // Extraer la implementación completa del step
+        // Extract the complete implementation of the step
         let implementation = '';
         let definition = '';
         let braceCount = 0;
         let startIndex = i;
 
-        // Buscar desde la línea actual hasta encontrar el cierre del step
+        // Search from the current line until finding the step closure
         for (let j = i; j < lines.length; j++) {
           const funcLine = lines[j];
           
-          // Contar llaves de apertura y cierre
+          // Count opening and closing braces
           for (let char of funcLine) {
             if (char === '{') {
               braceCount++;
@@ -109,16 +148,15 @@ export class TestStepRegistrationService {
             }
           }
 
-          // Si encontramos el cierre del step (});)
           if (funcLine.includes('});') && braceCount === 0) {
-            // Extraer toda la implementación desde la línea de definición hasta el cierre
+            // Extract the entire implementation from the definition line to the closure
             implementation = lines.slice(i, j + 1).join('\n');
-            definition = implementation; // La definición completa es igual a la implementación
+            definition = implementation; // The complete definition equals the implementation
             break;
           }
         }
 
-        // Si no se encontró implementación, crear una básica
+        // If no implementation was found, create a basic one
         if (!implementation) {
           implementation = `function () { }`;
           definition = `${stepType}('${stepName}', function () { });`;
@@ -144,17 +182,27 @@ export class TestStepRegistrationService {
     return steps;
   }
 
+  /**
+   * Extracts parameters from a step name definition.
+   *
+   * This private method analyzes a step name to extract parameter definitions
+   * in the format {parameterName} and returns them as parameter objects.
+   *
+   * @private
+   * @param stepName - The step name containing parameter definitions
+   * @returns Array of parameter objects with name, type, and metadata
+   */
   private extractParametersFromStepName(stepName: string): any[] {
     const parameters: any[] = [];
     
-    // Buscar parámetros en el formato {string}, {number}, etc.
+    // Search for parameters in the format {string}, {number}, etc.
     const paramMatches = stepName.match(/\{([^}]+)\}/g);
     if (paramMatches) {
       paramMatches.forEach((match, index) => {
         const paramName = match.replace(/\{|\}/g, '');
         parameters.push({
           name: paramName,
-          type: 'string', // Por defecto string, se puede mejorar
+          type: 'string',
           required: true,
           defaultValue: undefined,
         });
@@ -164,6 +212,16 @@ export class TestStepRegistrationService {
     return parameters;
   }
 
+  /**
+   * Creates a test step entity from extracted step data and saves it to the database.
+   *
+   * This private method creates a new TestStep entity with the provided step data
+   * and saves it to the database, skipping if a step with the same ID already exists.
+   *
+   * @private
+   * @param stepData - The step data object containing all step information
+   * @returns Promise that resolves when the step is saved to the database
+   */
   private async createStepFromFile(stepData: {
     projectId: string;
     section: string;
@@ -175,7 +233,7 @@ export class TestStepRegistrationService {
     implementation: string;
     parameters: any[];
   }): Promise<void> {
-    // Verificar si el step ya existe
+
     const existingStep = await this.testStepRepository.findOne({
       where: { stepId: stepData.stepId },
     });
@@ -203,6 +261,23 @@ export class TestStepRegistrationService {
     this.logger.log(`Registered step: ${stepData.stepId} - ${stepData.name}`);
   }
 
+  /**
+   * Gets the next available step number for a given project, section, and entity.
+   *
+   * This method searches for existing test steps with the pattern ST-{SECTION}-{ENTITYNAME}-{NUMBER}
+   * and returns the next sequential number to use for a new test step.
+   *
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The entity name
+   * @returns Promise resolving to the next available step number
+   *
+   * @example
+   * ```typescript
+   * const nextNumber = await service.getNextStepNumber('project-123', 'ecommerce', 'Product');
+   * // Returns 6 if ST-ECOMMERCE-PRODUCT-5 is the highest existing number
+   * ```
+   */
   async getNextStepNumber(projectId: string, section: string, entityName: string): Promise<number> {
     const pattern = `ST-${section.toUpperCase()}-${entityName.toUpperCase()}-`;
     const steps = await this.testStepRepository
@@ -222,6 +297,23 @@ export class TestStepRegistrationService {
     return maxNumber + 1;
   }
 
+  /**
+   * Deletes all test steps for a specific project, section, and entity combination.
+   *
+   * This method removes all test steps that match the specified project ID,
+   * section, and entity name from the database.
+   *
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The entity name
+   * @returns Promise that resolves when all matching test steps are deleted
+   * @throws Error when database operations fail
+   *
+   * @example
+   * ```typescript
+   * await service.deleteTestStepsByProjectSectionEntity('project-123', 'ecommerce', 'Product');
+   * ```
+   */
   async deleteTestStepsByProjectSectionEntity(projectId: string, section: string, entityName: string): Promise<void> {
     this.logger.log(`Deleting all test steps for projectId=${projectId}, section=${section}, entityName=${entityName}`);
     try {
@@ -233,6 +325,29 @@ export class TestStepRegistrationService {
     }
   }
 
+  /**
+   * Lists test steps for a project with filtering and pagination.
+   *
+   * This method retrieves test steps for a specific project with support for
+   * filtering by various criteria and pagination. It applies filters for
+   * section, entity name, type, status, and search terms.
+   *
+   * @param projectId - The ID of the project to list test steps for
+   * @param filters - Filtering and pagination criteria
+   * @returns Promise resolving to paginated list of test steps with metadata
+   * @throws Error when database operations fail
+   *
+   * @example
+   * ```typescript
+   * const result = await service.listTestSteps('project-123', {
+   *   page: 1,
+   *   limit: 20,
+   *   section: 'ecommerce',
+   *   type: 'Given',
+   *   search: 'create'
+   * });
+   * ```
+   */
   async listTestSteps(
     projectId: string,
     filters: any,
@@ -252,7 +367,7 @@ export class TestStepRegistrationService {
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
     
-    // Construir query con filtros
+    // Build query with filters
     const queryBuilder = this.testStepRepository
       .createQueryBuilder('step')
       .where('step.projectId = :projectId', { projectId });
@@ -280,18 +395,18 @@ export class TestStepRegistrationService {
       );
     }
 
-    // Contar total
+    // Count total
     const total = await queryBuilder.getCount();
 
-    // Aplicar ordenamiento
+    // Apply sorting
     const sortBy = filters.sortBy || 'createdAt';
     const sortOrder = filters.sortOrder || 'DESC';
     queryBuilder.orderBy(`step.${sortBy}`, sortOrder);
 
-    // Aplicar paginación
+    // Apply pagination
     queryBuilder.skip(skip).take(limit);
 
-    // Ejecutar query
+    // Execute query
     const testSteps = await queryBuilder.getMany();
 
     const totalPages = Math.ceil(total / limit);
@@ -308,6 +423,23 @@ export class TestStepRegistrationService {
     };
   }
 
+  /**
+   * Gets comprehensive statistics for test steps in a project.
+   *
+   * This method provides detailed statistics about test steps including counts
+   * by type, section, entity, status, and last update information.
+   *
+   * @param projectId - The ID of the project to get statistics for
+   * @returns Promise resolving to comprehensive step statistics
+   * @throws Error when database operations fail
+   *
+   * @example
+   * ```typescript
+   * const stats = await service.getStatistics('project-123');
+   * console.log(`Total steps: ${stats.totalSteps}`);
+   * console.log(`Active steps: ${stats.activeSteps}`);
+   * ```
+   */
   async getStatistics(projectId: string): Promise<{
     totalSteps: number;
     activeSteps: number;
@@ -332,7 +464,7 @@ export class TestStepRegistrationService {
       .groupBy('step.type')
       .getRawMany();
 
-    // Steps por sección
+    // Steps by section
     const stepsBySection = await this.testStepRepository
       .createQueryBuilder('step')
       .select('step.section', 'section')
@@ -341,7 +473,7 @@ export class TestStepRegistrationService {
       .groupBy('step.section')
       .getRawMany();
 
-    // Steps por entidad
+    // Steps by entity
     const stepsByEntity = await this.testStepRepository
       .createQueryBuilder('step')
       .select('step.entityName', 'entityName')
@@ -350,7 +482,7 @@ export class TestStepRegistrationService {
       .groupBy('step.entityName')
       .getRawMany();
 
-    // Última actualización
+    // Last update
     const lastUpdated = await this.testStepRepository
       .createQueryBuilder('step')
       .select('MAX(step.updatedAt)', 'lastUpdated')
@@ -377,6 +509,20 @@ export class TestStepRegistrationService {
     };
   }
 
+  /**
+   * Finds a test step by its ID.
+   *
+   * This method retrieves a test step from the database by its unique step ID.
+   *
+   * @param stepId - The unique identifier of the test step
+   * @returns Promise resolving to the test step entity
+   * @throws Error when test step is not found
+   *
+   * @example
+   * ```typescript
+   * const step = await service.findByStepId('ST-ECOMMERCE-01');
+   * ```
+   */
   async findByStepId(stepId: string): Promise<any> {
     this.logger.log(`Finding test step by stepId=${stepId}`);
     
@@ -391,6 +537,20 @@ export class TestStepRegistrationService {
     return testStep;
   }
 
+  /**
+   * Deletes a test step by its ID.
+   *
+   * This method removes a test step from the database by its unique step ID.
+   *
+   * @param stepId - The unique identifier of the test step to delete
+   * @returns Promise that resolves when the test step is deleted
+   * @throws Error when test step is not found or deletion fails
+   *
+   * @example
+   * ```typescript
+   * await service.deleteTestStep('ST-ECOMMERCE-01');
+   * ```
+   */
   async deleteTestStep(stepId: string): Promise<void> {
     this.logger.log(`Deleting test step with stepId=${stepId}`);
     

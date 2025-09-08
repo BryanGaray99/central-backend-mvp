@@ -16,6 +16,14 @@ import { Endpoint } from '../endpoints/endpoint.entity';
 import { ConfigService } from '@nestjs/config';
 import { TestCasesModule } from '../test-cases/test-cases.module';
 
+/**
+ * AI Module
+ * 
+ * Provides AI-powered test case generation and suggestion services using OpenAI's Assistant API.
+ * This module handles assistant management, thread management, and AI generation workflows.
+ * 
+ * @module AIModule
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Project, AIAssistant, AIThread, AISuggestion, AIGeneration, Endpoint]),

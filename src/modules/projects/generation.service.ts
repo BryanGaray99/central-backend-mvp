@@ -12,10 +12,31 @@ import {
   TEMPLATE_FILES,
 } from './constants/project-structure';
 
+/**
+ * Service for generating complete testing projects.
+ * 
+ * This service orchestrates the entire project generation process, including
+ * Playwright initialization, directory structure creation, template processing,
+ * and health checks. It coordinates with various specialized services to
+ * create fully functional testing projects.
+ * 
+ * @class GenerationService
+ * @since 1.0.0
+ */
 @Injectable()
 export class GenerationService {
+  /** Logger instance for this service */
   private readonly logger = new Logger(GenerationService.name);
 
+  /**
+   * Creates an instance of GenerationService.
+   * 
+   * @param projectRepo - TypeORM repository for Project entity
+   * @param fileSystemService - Service for file system operations
+   * @param templateService - Service for template processing
+   * @param playwrightService - Service for Playwright operations
+   * @param cleanupService - Service for cleanup operations
+   */
   constructor(
     @InjectRepository(Project)
     private readonly projectRepo: Repository<Project>,
@@ -25,6 +46,27 @@ export class GenerationService {
     private readonly cleanupService: CleanupService,
   ) {}
 
+  /**
+   * Generates a complete testing project.
+   * 
+   * This method orchestrates the entire project generation process:
+   * 1. Initializes Playwright project structure
+   * 2. Creates BDD directory structure
+   * 3. Generates files from templates
+   * 4. Runs health checks
+   * 5. Updates project status
+   * 
+   * @param project - The project to generate
+   * @returns Promise that resolves when generation is complete
+   * @throws {Error} When generation fails
+   * 
+   * @example
+   * ```typescript
+   * const project = await projectRepo.findOne({ where: { id: 'project-id' } });
+   * await generationService.generateProject(project);
+   * console.log('Project generated successfully');
+   * ```
+   */
   async generateProject(project: Project): Promise<void> {
     try {
       await this.updateProjectStatus(project.id, ProjectStatus.PENDING);
@@ -62,6 +104,16 @@ export class GenerationService {
     }
   }
 
+  /**
+   * Generates all project files from templates.
+   * 
+   * This method creates all necessary files for a testing project using
+   * predefined templates with project-specific variables.
+   * 
+   * @param project - The project for which to generate files
+   * @returns Promise that resolves when all files are generated
+   * @private
+   */
   private async generateProjectFiles(project: Project): Promise<void> {
     const templateVariables = {
       name: project.name,
@@ -156,6 +208,14 @@ export class GenerationService {
     );
   }
 
+  /**
+   * Updates the status of a project.
+   * 
+   * @param id - The unique identifier of the project
+   * @param status - The new status to set
+   * @returns Promise that resolves when the status is updated
+   * @private
+   */
   private async updateProjectStatus(
     id: string,
     status: ProjectStatus,

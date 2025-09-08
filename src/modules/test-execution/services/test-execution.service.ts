@@ -27,6 +27,12 @@ import { BugType, BugSeverity, BugPriority } from '../../bugs/entities/bug.entit
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
+/**
+ * Service: TestExecutionService
+ *
+ * Orchestrates the end-to-end test execution lifecycle: validation, creation of
+ * execution records, background run, result persistence, statistics and SSE events.
+ */
 export class TestExecutionService {
   private readonly logger = new Logger(TestExecutionService.name);
 
@@ -50,23 +56,29 @@ export class TestExecutionService {
     private readonly bugsService: BugsService,
   ) {}
 
-    async executeTests(projectId: string, dto: ExecuteTestsDto) {
+  /**
+   * Triggers a new test execution for a project.
+   *
+   * Creates the execution record, emits a start event, kicks off background run,
+   * and returns a receipt with execution info.
+   */
+  async executeTests(projectId: string, dto: ExecuteTestsDto) {
     let entityName = dto.entityName || 'all';
-    this.logger.log(`Iniciando ejecución de pruebas para entidad: ${entityName}`);
+    this.logger.log(`Starting test execution for entity: ${entityName}`);
 
-    // Validar que el proyecto existe
+    // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
-      throw new NotFoundException(`Proyecto con ID ${projectId} no encontrado`);
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
 
-    // Si es un test plan, extraer todos los test cases de todos los test sets
+    // If it's a test plan, extract test cases from all test sets
     let specificScenarios = dto.specificScenario;
     
           if (dto.testSuiteId && dto.testSuiteId.startsWith('PLAN-')) {
-        this.logger.log(`Detectado test plan: ${dto.testSuiteId}`);
+        this.logger.log(`Detected test plan: ${dto.testSuiteId}`);
         
-        // Buscar el test plan para obtener los test sets y test cases
+        // Fetch the test plan to obtain test sets and test cases
         const testPlan = await this.testSuitesService.getTestSuite(projectId, dto.testSuiteId);
         
         if (testPlan && testPlan.testSets) {
@@ -77,14 +89,13 @@ export class TestExecutionService {
           this.logger.log(`  - Test Sets count: ${testPlan.testSets.length}`);
           this.logger.log(`  - First test set: ${JSON.stringify(testPlan.testSets[0])}`);
           
-          // Para test plans, necesitamos obtener los NOMBRES descriptivos de los test cases
-          // Los IDs están en testSets.testCases, pero necesitamos buscar los nombres en la base de datos
+          // For test plans, obtain descriptive NAMES of test cases (IDs are in testSets.testCases)
           for (const testSet of testPlan.testSets) {
             if (testSet.testCases && Array.isArray(testSet.testCases)) {
-              // Buscar cada test case en la base de datos para obtener su nombre descriptivo
+              // Lookup each test case in DB to obtain its descriptive name
               for (const testCaseId of testSet.testCases) {
                 try {
-                  // Buscar el test case por ID para obtener su nombre descriptivo
+                  // Find test case by ID to obtain its descriptive name
                   const testCase = await this.testCaseRepository.findOne({
                     where: { testCaseId, projectId }
                   });
@@ -93,59 +104,57 @@ export class TestExecutionService {
                     allTestCases.push(testCase.name);
                     this.logger.log(`🔍 DEBUG Test Case ${testCaseId} -> Name: ${testCase.name}`);
                   } else {
-                    this.logger.warn(`⚠️ Test case ${testCaseId} no encontrado o sin nombre`);
-                    // Fallback: usar el ID si no se encuentra el nombre
+                    this.logger.warn(`⚠️ Test case ${testCaseId} not found or missing name`);
+                    // Fallback: use the ID if the name is not found
                     allTestCases.push(testCaseId);
                   }
                   
-                  // Determinar la entidad del test plan basada en el primer test case
+                  // Determine entity of the test plan based on the first test case
                   if (!testPlanEntity && testCase) {
                     testPlanEntity = testCase.entityName;
                   }
                 } catch (error) {
-                  this.logger.error(`Error buscando test case ${testCaseId}: ${error.message}`);
-                  // Fallback: usar el ID si hay error
+                  this.logger.error(`Error fetching test case ${testCaseId}: ${error.message}`);
+                  // Fallback: use the ID if there is an error
                   allTestCases.push(testCaseId);
                 }
               }
             }
           }
           
-          // Eliminar duplicados y contar solo test cases únicos
+          // Remove duplicates and keep unique test cases only
           const uniqueTestCases = [...new Set(allTestCases)];
           
           if (uniqueTestCases.length > 0) {
             specificScenarios = uniqueTestCases.join(',');
-            // Usar la entidad determinada del test plan en lugar de 'all'
+            // Use the entity determined by the test plan instead of 'all'
             if (testPlanEntity) {
               entityName = testPlanEntity;
-              this.logger.log(`Test plan ${dto.testSuiteId} usa entidad: ${entityName}`);
+              this.logger.log(`Test plan ${dto.testSuiteId} uses entity: ${entityName}`);
             }
-            this.logger.log(`Test plan ${dto.testSuiteId} contiene ${uniqueTestCases.length} test cases únicos: ${uniqueTestCases.join(', ')}`);
-            this.logger.log(`🔍 DEBUG Specific Scenarios para ejecución: ${specificScenarios}`);
+            this.logger.log(`Test plan ${dto.testSuiteId} contains ${uniqueTestCases.length} unique test cases: ${uniqueTestCases.join(', ')}`);
+            this.logger.log(`🔍 DEBUG Specific scenarios for execution: ${specificScenarios}`);
           }
         }
       }
 
-    // Si se especifica una entidad, validar que tiene casos de prueba
+    // If an entity is specified, validate it has test cases
     if (dto.entityName) {
       const hasTestCases = await this.validateEntityHasTestCases(project.path, dto.entityName);
       if (!hasTestCases) {
-        throw new BadRequestException(
-          `No se encontraron casos de prueba para la entidad '${dto.entityName}'. Verifique que la entidad esté registrada y tenga casos de prueba generados.`
-        );
+        throw new BadRequestException(`No test cases found for entity '${dto.entityName}'. Ensure it is registered and has generated test cases.`);
       }
     }
 
-    // Crear registro de ejecución
+    // Create execution record
     const execution = this.testExecutionRepository.create({
       projectId,
       executionId: uuidv4(),
-      entityName: entityName, // Usar la entidad calculada (puede ser 'Product' en lugar de 'all' para test plans)
+      entityName: entityName, // Use resolved entity (can be 'Product' instead of 'all' for test plans)
       method: dto.method,
       testType: dto.testType,
       tags: dto.tags,
-      specificScenario: specificScenarios, // Usar los test cases extraídos del test plan
+      specificScenario: specificScenarios, // Use test cases extracted from the test plan
       status: ExecutionStatus.PENDING,
       testCaseId: dto.testCaseId,
       testSuiteId: dto.testSuiteId,
@@ -163,7 +172,7 @@ export class TestExecutionService {
 
     const savedExecution = await this.testExecutionRepository.save(execution);
 
-    // Emitir evento de inicio de ejecución
+    // Emit execution started event
     this.executionEventsService.emitExecutionStarted(
       savedExecution.executionId,
       projectId,
@@ -172,7 +181,7 @@ export class TestExecutionService {
       dto.testCaseId
     );
 
-    // Log de debug para test plans
+    // Debug log for test plans
     if (dto.testSuiteId && dto.testSuiteId.startsWith('PLAN-')) {
       this.logger.log(`🔍 DEBUG Test Plan Execution:`);
       this.logger.log(`  - Entity Name: ${savedExecution.entityName}`);
@@ -180,10 +189,10 @@ export class TestExecutionService {
       this.logger.log(`  - Test Suite ID: ${savedExecution.testSuiteId}`);
     }
 
-    // Ejecutar pruebas en background
+    // Execute tests in background
     this.runTestsInBackground(savedExecution, project, dto);
 
-    // Contar test cases que se van a actualizar
+    // Count test cases to be updated
     const testCasesToUpdate = dto.entityName 
       ? await this.countTestCasesForEntity(projectId, dto.entityName)
       : await this.countAllTestCasesForProject(projectId);
@@ -192,14 +201,20 @@ export class TestExecutionService {
       executionId: savedExecution.executionId,
       status: savedExecution.status,
       message: entityName === 'all'
-        ? `Ejecución de pruebas iniciada para todos los test cases del proyecto`
-        : `Ejecución de pruebas iniciada para entidad '${entityName}'`,
+        ? `Test execution started for all project test cases`
+        : `Test execution started for entity '${entityName}'`,
       startedAt: savedExecution.startedAt,
       testCasesToUpdate,
       entityName: savedExecution.entityName,
     };
   }
 
+  /**
+   * Retrieves detailed results for a specific execution.
+   *
+   * @param executionId - Execution identifier
+   * @returns Detailed execution payload including summary and enriched results
+   */
   async getResults(executionId: string) {
     const execution = await this.testExecutionRepository.findOne({
       where: { executionId },
@@ -207,12 +222,12 @@ export class TestExecutionService {
     });
 
     if (!execution) {
-      throw new NotFoundException(`Ejecución con ID ${executionId} no encontrada`);
+      throw new NotFoundException(`Execution with ID ${executionId} not found`);
     }
 
     const summary = this.calculateSummary(execution);
 
-    // Enriquecer los resultados con información adicional
+    // Enrich results with additional information
     const enrichedResults = execution.results.map(result => ({
       id: result.id,
       scenarioName: result.scenarioName,
@@ -223,12 +238,11 @@ export class TestExecutionService {
       errorMessage: result.errorMessage,
       metadata: result.metadata || {},
       createdAt: result.createdAt,
-      // Información adicional calculada
       stepCount: result.steps?.length || 0,
       passedSteps: result.steps?.filter(step => step.status === 'passed').length || 0,
       failedSteps: result.steps?.filter(step => step.status === 'failed').length || 0,
       skippedSteps: result.steps?.filter(step => step.status === 'skipped').length || 0,
-      // Estadísticas excluyendo hooks
+      // Statistics excluding hooks
       actualStepCount: result.steps?.filter(step => !step.isHook).length || 0,
       passedActualSteps: result.steps?.filter(step => !step.isHook && step.status === 'passed').length || 0,
       failedActualSteps: result.steps?.filter(step => !step.isHook && step.status === 'failed').length || 0,
@@ -250,7 +264,7 @@ export class TestExecutionService {
       results: enrichedResults,
       metadata: execution.metadata,
       errorMessage: execution.errorMessage,
-      // Información adicional de la ejecución
+      // Additional execution information
       entityName: execution.entityName,
       method: execution.method,
       testType: execution.testType,
@@ -265,11 +279,12 @@ export class TestExecutionService {
   }
 
   async listResults(projectId: string, filters: ExecutionFiltersDto) {
+    // Build base query with project filter
     const query = this.testExecutionRepository.createQueryBuilder('execution')
       .where('execution.projectId = :projectId', { projectId })
       .orderBy('execution.startedAt', 'DESC');
 
-    // Aplicar filtros
+    // Apply filters
     if (filters.entityName) {
       query.andWhere('execution.entityName = :entityName', { entityName: filters.entityName });
     }
@@ -294,7 +309,7 @@ export class TestExecutionService {
       query.andWhere('execution.startedAt <= :dateTo', { dateTo: filters.dateTo });
     }
 
-    // Paginación
+    // Pagination
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const offset = (page - 1) * limit;
@@ -303,22 +318,22 @@ export class TestExecutionService {
 
     const [executions, total] = await query.getManyAndCount();
 
-    // Enriquecer cada ejecución con información adicional de los resultados y test cases
+    // Enrich each execution with additional info from results and test cases
     const enrichedExecutions = await Promise.all(
       executions.map(async (execution) => {
-        // Obtener todos los resultados para extraer información adicional
+        // Get all results to extract additional information
         const allResults = await this.testResultRepository.find({
           where: { executionId: execution.executionId },
           order: { createdAt: 'ASC' }
         });
 
-        // Obtener el primer resultado para información básica
+        // Get first result for basic information
         const firstResult = allResults.length > 0 ? allResults[0] : null;
 
-        // Buscar el test case correspondiente usando el scenarioName base (sin Example)
+        // Find corresponding test case using base scenario name (without Example)
         let testCase: any = null;
         if (firstResult) {
-          // Obtener el nombre base del scenario (sin sufijo de Example)
+          // Get the base scenario name (without Example suffix)
           let baseScenarioName = firstResult.scenarioName || '';
           if (baseScenarioName.includes('(Example')) {
             baseScenarioName = baseScenarioName.split('(Example')[0].trim();
@@ -333,7 +348,7 @@ export class TestExecutionService {
             .getRawOne();
         }
 
-        // Extraer información de la metadata del resultado
+        // Extract information from result metadata
         let section = 'N/A';
         let feature = 'N/A';
         let tags: string[] = [];
@@ -345,10 +360,10 @@ export class TestExecutionService {
         let testSuiteId = execution.testSuiteId || 'N/A';
         let testSuiteName = 'N/A';
 
-        // Obtener el nombre de la test suite si existe
+        // Get the test suite name if it exists
         if (testSuiteId && testSuiteId !== 'N/A') {
           try {
-            // Usar el servicio de test suites para obtener el nombre
+            // Use test suites service to get the name
             const testSuite = await this.testSuitesService.getTestSuite(projectId, testSuiteId);
             if (testSuite && testSuite.name) {
               testSuiteName = testSuite.name;
@@ -358,7 +373,7 @@ export class TestExecutionService {
             }
           } catch (error) {
             this.logger.warn(`Error getting test suite name for ${testSuiteId}: ${error.message}`);
-            // Fallback: intentar obtener solo el nombre con una consulta directa
+            // Fallback: try to get only the name with a direct query
             try {
               const testSuite = await this.testExecutionRepository.manager
                 .createQueryBuilder()
@@ -382,7 +397,7 @@ export class TestExecutionService {
         this.logger.log(`Using testSuiteId from DB: ${testSuiteId} for execution ${execution.executionId}`);
         this.logger.log(`Using testSuiteName from DB: ${testSuiteName} for execution ${execution.executionId}`);
 
-        // Estadísticas de steps de todos los resultados
+        // Step statistics across all results
         let totalSteps = 0;
         let passedSteps = 0;
         let failedSteps = 0;
@@ -395,7 +410,7 @@ export class TestExecutionService {
         if (firstResult) {
           scenarioName = firstResult.scenarioName;
           
-          // Parsear metadata si existe
+          // Parse metadata if present
           if (firstResult.metadata) {
             try {
               const metadata = typeof firstResult.metadata === 'string' 
@@ -409,7 +424,7 @@ export class TestExecutionService {
             }
           }
 
-          // Parsear scenarioTags si existe
+          // Parse scenarioTags if present
           if (firstResult.scenarioTags) {
             try {
               const scenarioTagsString = typeof firstResult.scenarioTags === 'string' 
@@ -423,17 +438,17 @@ export class TestExecutionService {
           }
         }
 
-        // Crear estructura anidada de scenarios y examples
+        // Create nested structure of scenarios and examples
         let scenariosStructure: any[] = [];
-        let allStepsFlat: any[] = []; // Para mantener compatibilidad con el formato actual
+        let allStepsFlat: any[] = []; // For compatibility with current format
         
-                // Agrupar resultados por scenario base
+        // Group results by base scenario
         const scenarioGroups = new Map<string, any[]>();
         
         for (let i = 0; i < allResults.length; i++) {
           const result = allResults[i];
           
-          // Acumular scenario tags
+          // Accumulate scenario tags
           if (result.scenarioTags) {
             try {
               const scenarioTagsString = typeof result.scenarioTags === 'string' 
@@ -446,27 +461,27 @@ export class TestExecutionService {
             }
           }
 
-          // Acumular error messages
+          // Accumulate error messages
           if (result.errorMessage) {
             allErrorMessages.push(result.errorMessage);
           }
 
-          // Determinar el nombre base del scenario
+          // Determine base scenario name
           let baseScenarioName = '';
           
           if (execution.testSuiteId && execution.testSuiteId !== 'N/A') {
-            // Para test suites, usar los nombres de specificScenario
+            // For test suites, use specificScenario names
             const scenarioNames = execution.specificScenario?.split(',').map(s => s.trim()) || [];
             
-            // Usar el nombre del scenario del resultado, pero limpiarlo para agrupar
+            // Use result scenario name, clean to group
             let resultScenarioName = result.scenarioName || '';
             
-            // Si el nombre del resultado incluye "(Example X)", extraer el nombre base
+            // If result name includes "(Example X)", extract base name
             if (resultScenarioName.includes('(Example')) {
               resultScenarioName = resultScenarioName.split('(Example')[0].trim();
             }
             
-            // Buscar el nombre base en la lista de scenarios del test execution
+            // Find base name in the specific scenarios list
             const matchingScenario = scenarioNames.find(name => 
               resultScenarioName.includes(name) || name.includes(resultScenarioName)
             );
@@ -474,32 +489,32 @@ export class TestExecutionService {
             if (matchingScenario) {
               baseScenarioName = matchingScenario;
             } else {
-              // Si no encuentra coincidencia, usar el nombre del resultado
+              // Fallback to result name if no match
               baseScenarioName = resultScenarioName || `Scenario ${scenarioGroups.size + 1}`;
             }
           } else {
-            // Para test cases individuales, usar el nombre del scenario sin el sufijo de Example
+            // For individual test cases, use scenario name without Example suffix
             baseScenarioName = result.scenarioName || `Scenario ${i + 1}`;
             if (baseScenarioName.includes('(Example')) {
               baseScenarioName = baseScenarioName.split('(Example')[0].trim();
             }
           }
           
-          // Agrupar por nombre base del scenario
+          // Group by base scenario name
           if (!scenarioGroups.has(baseScenarioName)) {
             scenarioGroups.set(baseScenarioName, []);
           }
           scenarioGroups.get(baseScenarioName)!.push(result);
         }
         
-        // Procesar cada grupo de scenarios
+        // Process each scenario group
         scenarioGroups.forEach((results, baseScenarioName) => {
           const scenario = {
             scenarioName: baseScenarioName,
             examples: [] as any[]
           };
           
-          // Procesar cada resultado (Example) del scenario
+          // Process each result (Example) of the scenario
           results.forEach((result, exampleIndex) => {
             const example = {
               exampleName: result.scenarioName || `${baseScenarioName} (Example ${exampleIndex + 1})`,
@@ -509,7 +524,7 @@ export class TestExecutionService {
               errorMessage: result.errorMessage
             };
             
-            // Procesar steps del resultado
+            // Process steps from the result
             if (result.steps) {
               try {
                 const steps = typeof result.steps === 'string' 
@@ -519,10 +534,10 @@ export class TestExecutionService {
                 if (Array.isArray(steps)) {
                   example.steps = steps;
                   
-                  // Agregar steps al array plano para compatibilidad
+                  // Add steps to flat array for compatibility
                   allStepsFlat.push(...steps);
                   
-                  // Acumular estadísticas
+                  // Accumulate step statistics
                   for (const step of steps) {
                     totalSteps++;
                     totalStepDuration += step.duration || 0;
@@ -548,26 +563,26 @@ export class TestExecutionService {
             scenario.examples.push(example);
           });
           
-                    scenariosStructure.push(scenario);
+          scenariosStructure.push(scenario);
         });
         
-        // Usar steps planos para compatibilidad con el formato actual
+        // Use flat steps for compatibility with current format
         allSteps = allStepsFlat;
         
-        // Log de la estructura creada
-        this.logger.log(`🔍 Estructura de scenarios creada: ${scenariosStructure.length} scenarios, ${allResults.length} total results`);
-        this.logger.log(`🔍 Total scenarios esperados: ${execution.totalScenarios}`);
+        // Log created structure
+        this.logger.log(`🔍 Scenario structure created: ${scenariosStructure.length} scenarios, ${allResults.length} total results`);
+        this.logger.log(`🔍 Expected total scenarios: ${execution.totalScenarios}`);
         this.logger.log(`🔍 Specific scenarios: ${execution.specificScenario}`);
         scenariosStructure.forEach((scenario, index) => {
           this.logger.log(`  📋 Scenario ${index + 1}: "${scenario.scenarioName}" - ${scenario.examples.length} examples`);
         });
         
-        // Si hay estructura anidada, limpiar allSteps para evitar duplicación
+        // If nested structure exists, clear allSteps to avoid duplication
         if (scenariosStructure.length > 0) {
           allSteps = [];
         }
 
-        // Usar información del test case si está disponible
+        // Use test case information if available
         if (testCase) {
           section = testCase.section || 'N/A';
           testCaseId = testCase.testCaseId || 'N/A';
@@ -575,7 +590,7 @@ export class TestExecutionService {
           testCaseMethod = testCase.method || 'N/A';
           testCaseTestType = testCase.testType || 'N/A';
           
-          // Si no hay tags del resultado, usar los del test case
+          // If there are no result tags, use those from the test case
           if (tags.length === 0 && testCase.tags) {
             try {
               const testCaseTags = typeof testCase.tags === 'string' 
@@ -588,7 +603,7 @@ export class TestExecutionService {
           }
         }
 
-        // Log final de los IDs que se están enviando
+        // Final log of the IDs that are being sent
         this.logger.log(`Final testCaseId for execution ${execution.executionId}: ${testCaseId}`);
         this.logger.log(`Final testSuiteId for execution ${execution.executionId}: ${testSuiteId}`);
         return {
@@ -601,7 +616,6 @@ export class TestExecutionService {
           totalScenarios: execution.totalScenarios,
           passedScenarios: execution.passedScenarios,
           failedScenarios: execution.failedScenarios,
-          // Información adicional
           specificScenario: execution.specificScenario,
           section: section,
           feature: feature,
@@ -609,12 +623,12 @@ export class TestExecutionService {
           tags: tags,
           errorMessage: execution.errorMessage,
           metadata: execution.metadata,
-          // Información del test case
+          // Test case information
           testCaseId: testCaseId,
           testCaseDescription: testCaseDescription,
           testSuiteId: testSuiteId,
           testSuiteName: testSuiteName,
-          // Estadísticas detalladas de steps
+          // Detailed step statistics
           totalSteps: totalSteps,
           passedSteps: passedSteps,
           failedSteps: failedSteps,
@@ -622,12 +636,12 @@ export class TestExecutionService {
           totalStepDuration: totalStepDuration,
           averageStepDuration: totalSteps > 0 ? Math.round(totalStepDuration / totalSteps) : 0,
           stepSuccessRate: totalSteps > 0 ? Math.round((passedSteps / totalSteps) * 100) : 0,
-          // Información adicional de resultados
+          // Additional results information
           allSteps: allSteps,
           allScenarioTags: allScenarioTags,
           allErrorMessages: allErrorMessages,
           resultsCount: allResults.length,
-          // Estructura anidada de scenarios y examples
+          // Nested structure of scenarios and examples
           scenariosStructure: scenariosStructure,
         };
       })
@@ -650,18 +664,24 @@ export class TestExecutionService {
     });
 
     if (!execution) {
-      throw new NotFoundException(`Ejecución con ID ${executionId} no encontrada`);
+      throw new NotFoundException(`Execution with ID ${executionId} not found`);
     }
 
-    // Eliminar resultados asociados
+    // Delete related results
     await this.testResultRepository.delete({ executionId: execution.executionId });
 
-    // Eliminar ejecución
+    // Delete execution
     await this.testExecutionRepository.remove(execution);
 
-    this.logger.log(`Ejecución ${executionId} eliminada exitosamente`);
+    this.logger.log(`Execution ${executionId} deleted successfully`);
   }
 
+  /**
+   * Retrieves the last 10 executions for a specific entity in a project.
+   *
+   * @param projectId - Project identifier
+   * @param entityName - Entity name
+   */
   async getExecutionHistory(projectId: string, entityName: string) {
     const executions = await this.testExecutionRepository.find({
       where: { projectId, entityName },
@@ -684,6 +704,11 @@ export class TestExecutionService {
     }));
   }
 
+  /**
+   * Aggregates a summary of executions for a project.
+   *
+   * @param projectId - Project identifier
+   */
   async getExecutionSummary(projectId: string) {
     const [executions, totalExecutions] = await this.testExecutionRepository.findAndCount({
       where: { projectId },
@@ -711,6 +736,9 @@ export class TestExecutionService {
     };
   }
 
+  /**
+   * Aggregates a global summary across all projects.
+   */
   async getGlobalExecutionSummary() {
     const [executions, totalExecutions] = await this.testExecutionRepository.findAndCount({
       order: { startedAt: 'DESC' },
@@ -738,8 +766,14 @@ export class TestExecutionService {
     };
   }
 
+  /**
+   * Validates the presence of feature files for the given entity.
+   *
+   * @param projectPath - Project filesystem path
+   * @param entityName - Entity name
+   */
   private async validateEntityHasTestCases(projectPath: string, entityName: string): Promise<boolean> {
-    // Verificar que existe el archivo de feature para la entidad
+    // Verify that the feature file exists for the entity
     const featurePath = `${projectPath}/src/features/ecommerce/${entityName.toLowerCase()}.feature`;
     
     try {
@@ -750,30 +784,36 @@ export class TestExecutionService {
     }
   }
 
+  /**
+   * Executes tests asynchronously and persists the results.
+   *
+   * Updates execution status/progress, stores result details, creates bugs,
+   * updates test suites, logs completion, and emits SSE events.
+   */
   private async runTestsInBackground(execution: TestExecution, project: Project, dto: ExecuteTestsDto) {
     try {
-      // Actualizar estado a running
+      // Update status to running
       execution.status = ExecutionStatus.RUNNING;
       await this.testExecutionRepository.save(execution);
 
-      // Crear un DTO modificado con el entityName correcto y specificScenario actualizado
+      // Create a modified DTO with the correct entityName and updated specificScenario
       const modifiedDto = {
         ...dto,
-        entityName: execution.entityName, // Usar el valor guardado en la ejecución
-        specificScenario: execution.specificScenario, // Usar el specificScenario actualizado de la ejecución
+        entityName: execution.entityName, // Use the value stored on the execution
+        specificScenario: execution.specificScenario, // Use the updated specificScenario from the execution
       };
 
       let results: any = null;
       let executionError: Error | null = null;
 
       try {
-        // Ejecutar pruebas usando el servicio de runner
+        // Execute tests using the runner service
         results = await this.testRunnerService.runPlaywrightTests(project.path, modifiedDto);
       } catch (error) {
         executionError = error;
-        this.logger.error(`Error en ejecución de pruebas: ${error.message}`);
+        this.logger.error(`Error during test execution: ${error.message}`);
         
-        // Intentar parsear resultados incluso si falló
+        // Attempt to parse results even if it failed
         try {
           const parsedResults = await this.testRunnerService.parseCucumberOutput(project.path);
           results = {
@@ -783,14 +823,14 @@ export class TestExecutionService {
             failedScenarios: parsedResults.filter(r => r.status === 'failed').length,
             executionTime: Date.now() - execution.startedAt.getTime(),
           };
-          this.logger.log(`Se pudieron parsear ${parsedResults.length} resultados a pesar del error de ejecución`);
+          this.logger.log(`Parsed ${parsedResults.length} results despite the execution error`);
         } catch (parseError) {
-          this.logger.warn(`No se pudieron parsear resultados: ${parseError.message}`);
+          this.logger.warn(`Could not parse results: ${parseError.message}`);
           results = { results: [], totalScenarios: 0, passedScenarios: 0, failedScenarios: 0, executionTime: 0 };
         }
       }
 
-      // Actualizar ejecución con resultados (incluso si hubo error)
+      // Update execution with results (even if there was an error)
       if (executionError) {
         execution.status = ExecutionStatus.FAILED;
         execution.errorMessage = executionError.message;
@@ -806,17 +846,17 @@ export class TestExecutionService {
 
       await this.testExecutionRepository.save(execution);
 
-      // Guardar resultados individuales (siempre intentar, incluso si hubo error)
+      // Persist individual results (always attempt, even on errors)
       if (results.results && results.results.length > 0) {
         for (const result of results.results) {
-          // Si el escenario tiene múltiples ejecuciones (examples), guardar cada una individualmente
+          // If the scenario has multiple executions (examples), save each individually
           if (result.hasMultipleExecutions && result.individualExecutions) {
-            this.logger.log(`🔍 Guardando ${result.individualExecutions.length} ejecuciones individuales para escenario: ${result.scenarioName}`);
+            this.logger.log(`🔍 Saving ${result.individualExecutions.length} individual executions for scenario: ${result.scenarioName}`);
             
             for (const individualExecution of result.individualExecutions) {
               const testResult = this.testResultRepository.create({
                 executionId: execution.executionId,
-                scenarioName: individualExecution.scenarioInstanceName, // Nombre único por ejemplo
+                scenarioName: individualExecution.scenarioInstanceName, // Unique name per example
                 scenarioTags: individualExecution.scenarioTags,
                 status: individualExecution.status,
                 duration: individualExecution.duration,
@@ -831,10 +871,10 @@ export class TestExecutionService {
                 },
               });
               await this.testResultRepository.save(testResult);
-              this.logger.log(`   ✅ Guardada ejecución ${individualExecution.executionIndex}: ${individualExecution.scenarioInstanceName} - ${individualExecution.status}`);
+              this.logger.log(`   ✅ Saved execution ${individualExecution.executionIndex}: ${individualExecution.scenarioInstanceName} - ${individualExecution.status}`);
             }
           } else {
-            // Escenario normal (sin examples), guardar como antes
+            // Normal scenario (no examples), save as before
             const testResult = this.testResultRepository.create({
               executionId: execution.executionId,
               scenarioName: result.scenarioName,
@@ -848,8 +888,6 @@ export class TestExecutionService {
             await this.testResultRepository.save(testResult);
           }
         }
-
-        // ✅ NUEVO: Crear bugs automáticamente para todos los test cases fallidos
         try {
           const executionData = {
             executionId: execution.executionId,
@@ -872,15 +910,14 @@ export class TestExecutionService {
           this.logger.warn(`Failed to create bugs automatically: ${error.message}`);
         }
 
-        // ✅ NUEVO: Actualizar test cases con resultados de ejecución
         const testCaseResults: any[] = [];
         for (const result of results.results) {
           if (result.hasMultipleExecutions && result.individualExecutions) {
-            // Para escenarios con examples, usar el estado consolidado pero incluir información de ejemplos
+            // For scenarios with examples, use consolidated status but include example information
             testCaseResults.push({
               scenarioName: result.scenarioName,
-              status: result.status, // Estado consolidado (failed si al menos uno falló)
-              executionTime: result.duration, // Tiempo total
+              status: result.status, // Consolidated status (failed if at least one failed)
+              executionTime: result.duration, // Total time
               errorMessage: result.errorMessage,
               hasExamples: true,
               exampleExecutions: result.individualExecutions.map((exec: any) => ({
@@ -906,7 +943,6 @@ export class TestExecutionService {
         );
       }
 
-      // ✅ NUEVO: Si la ejecución viene de una test suite, actualizar sus estadísticas
       if (execution.testSuiteId) {
         this.logger.log(`Updating test suite stats for test suite ID: ${execution.testSuiteId}`);
         try {
@@ -930,7 +966,7 @@ export class TestExecutionService {
 
 
 
-      // Registrar información de la ejecución completada
+      // Log information for the completed execution
       await this.executionLoggerService.logExecutionCompleted(
         project.id,
         execution.entityName,
@@ -942,7 +978,7 @@ export class TestExecutionService {
         }
       );
 
-      // Emitir evento de ejecución completada o fallida
+      // Emit execution completed or failed event
       if (executionError) {
         this.executionEventsService.emitExecutionFailed(
           execution.executionId,
@@ -963,15 +999,15 @@ export class TestExecutionService {
       }
 
       if (executionError) {
-        this.logger.log(`Ejecución ${execution.executionId} falló pero se guardaron los resultados disponibles`);
-        throw executionError; // Re-lanzar el error para que se maneje en el catch externo
+        this.logger.log(`Execution ${execution.executionId} failed but available results were saved`);
+        throw executionError; // Re-throw the error to be handled by the outer catch
       } else {
-        this.logger.log(`Ejecución ${execution.executionId} completada exitosamente`);
+        this.logger.log(`Execution ${execution.executionId} completed successfully`);
       }
     } catch (error) {
-      this.logger.error(`Error en ejecución ${execution.executionId}:`, error);
+      this.logger.error(`Error in execution ${execution.executionId}:`, error);
 
-      // Solo actualizar si no se actualizó antes
+      // Only update if not already updated
       if (execution.status !== ExecutionStatus.FAILED) {
         execution.status = ExecutionStatus.FAILED;
         execution.errorMessage = error.message;
@@ -981,7 +1017,7 @@ export class TestExecutionService {
         await this.testExecutionRepository.save(execution);
       }
 
-      // Emitir evento de ejecución fallida (solo si no se emitió antes)
+      // Emit failed execution event (only if not already emitted)
       this.executionEventsService.emitExecutionFailed(
         execution.executionId,
         project.id,
@@ -990,6 +1026,9 @@ export class TestExecutionService {
     }
   }
 
+  /**
+   * Calculates summary statistics for an execution.
+   */
   private calculateSummary(execution: TestExecution) {
     const successRate = execution.totalScenarios > 0 
       ? (execution.passedScenarios / execution.totalScenarios) * 100 
@@ -1009,31 +1048,30 @@ export class TestExecutionService {
   }
 
 
-
   /**
-   * Cuenta test cases para una entidad específica
+   * Counts test cases for a specific entity in a project.
    */
   private async countTestCasesForEntity(projectId: string, entityName: string): Promise<number> {
     return await this.testCaseUpdateService.getTestCasesCount(projectId, entityName);
   }
 
   /**
-   * Cuenta todos los test cases de un proyecto
+   * Counts all test cases for a project.
    */
   private async countAllTestCasesForProject(projectId: string): Promise<number> {
     return await this.testCaseUpdateService.getTestCasesCount(projectId);
   }
 
   /**
-   * Server-Sent Events para ejecuciones en tiempo real
+   * Server-Sent Events: provides a real-time execution event stream.
    */
   getExecutionEvents(projectId: string): Observable<MessageEvent> {
-    this.logger.log(`SSE stream iniciado para proyecto: ${projectId}`);
+    this.logger.log(`SSE stream started for project: ${projectId}`);
     return this.executionEventsService.getExecutionEvents(projectId);
   }
 
   /**
-   * Obtener ejecuciones fallidas por test case ID
+   * Retrieves failed executions by test case ID.
    */
   async getFailedExecutionsByTestCaseId(projectId: string, testCaseId: string): Promise<Array<{
     executionId: string;
@@ -1048,7 +1086,7 @@ export class TestExecutionService {
   }>> {
     this.logger.log(`Getting failed executions for test case: ${testCaseId} in project: ${projectId}`);
 
-    // Buscar ejecuciones fallidas que contengan el test case ID en scenarioName
+    // Look for failed executions matching the provided testCaseId
     const failedExecutions = await this.testExecutionRepository
       .createQueryBuilder('te')
       .leftJoin('te.results', 'tr')
@@ -1061,18 +1099,18 @@ export class TestExecutionService {
     return failedExecutions.map(execution => ({
       executionId: execution.executionId,
       testCaseId: testCaseId,
-      testCaseName: testCaseId, // El nombre se puede obtener del test case si es necesario
+      testCaseName: testCaseId,
       entityName: execution.entityName,
-      section: '', // Se puede obtener del test case si es necesario
+      section: '',
       method: execution.method || '',
-      endpoint: '', // Se puede obtener del test case si es necesario
+      endpoint: '',
       errorMessage: execution.errorMessage || 'Test execution failed',
       executionDate: execution.startedAt,
     }));
   }
 
   /**
-   * Obtener la última ejecución de un test suite específico
+   * Gets the last execution for a specific test suite.
    */
   async getLastExecutionByTestSuite(projectId: string, testSuiteId: string): Promise<{
     executionId: string;
@@ -1112,7 +1150,7 @@ export class TestExecutionService {
   }
 
   /**
-   * Obtener la última ejecución de un test case específico
+   * Gets the last execution for a specific test case.
    */
   async getLastExecutionByTestCase(projectId: string, testCaseId: string): Promise<{
     executionId: string;
@@ -1152,16 +1190,12 @@ export class TestExecutionService {
   }
 
   /**
-   * Obtener el nombre de una test suite por su ID
+   * Attempts to derive a human-readable test suite name from its ID.
    */
   private async getTestSuiteName(projectId: string, testSuiteId: string): Promise<string | undefined> {
     try {
-      // Por ahora, extraer el nombre del testSuiteId
-      // Los test suite IDs tienen formato como: SUITE-ECOMMERCE-PRODUCT-001
-      // Podemos extraer una parte más legible
       const parts = testSuiteId.split('-');
       if (parts.length >= 3) {
-        // Convertir SUITE-ECOMMERCE-PRODUCT-001 a "Ecommerce Product Test Suite"
         const section = parts[1]?.charAt(0).toUpperCase() + parts[1]?.slice(1).toLowerCase();
         const entity = parts[2]?.charAt(0).toUpperCase() + parts[2]?.slice(1).toLowerCase();
         return `${section} ${entity} Test Suite`;

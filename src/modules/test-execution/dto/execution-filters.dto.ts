@@ -2,9 +2,12 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum, IsArray, IsDateString } from 'class-validator';
 import { TestType } from './execute-tests.dto';
 
+/**
+ * DTO: Filters for listing execution results.
+ */
 export class ExecutionFiltersDto {
   @ApiPropertyOptional({
-    description: 'Filtrar por nombre de entidad',
+    description: 'Filter by entity name',
     example: 'Product',
   })
   @IsOptional()
@@ -12,7 +15,7 @@ export class ExecutionFiltersDto {
   entityName?: string;
 
   @ApiPropertyOptional({
-    description: 'Filtrar por método HTTP',
+    description: 'Filter by HTTP method',
     example: 'POST',
   })
   @IsOptional()
@@ -20,7 +23,7 @@ export class ExecutionFiltersDto {
   method?: string;
 
   @ApiPropertyOptional({
-    description: 'Filtrar por tipo de prueba',
+    description: 'Filter by test type',
     enum: TestType,
   })
   @IsOptional()
@@ -28,7 +31,7 @@ export class ExecutionFiltersDto {
   testType?: TestType;
 
   @ApiPropertyOptional({
-    description: 'Filtrar por tags',
+    description: 'Filter by tags',
     example: ['@smoke', '@create'],
   })
   @IsOptional()
@@ -37,7 +40,7 @@ export class ExecutionFiltersDto {
   tags?: string[];
 
   @ApiPropertyOptional({
-    description: 'Filtrar por estado de ejecución',
+    description: 'Filter by execution status',
     example: 'completed',
   })
   @IsOptional()
@@ -45,7 +48,7 @@ export class ExecutionFiltersDto {
   status?: string;
 
   @ApiPropertyOptional({
-    description: 'Fecha de inicio desde',
+    description: 'Start date from (inclusive)',
     example: '2024-01-01T00:00:00Z',
   })
   @IsOptional()
@@ -53,7 +56,7 @@ export class ExecutionFiltersDto {
   dateFrom?: string;
 
   @ApiPropertyOptional({
-    description: 'Fecha de inicio hasta',
+    description: 'Start date to (inclusive)',
     example: '2024-01-31T23:59:59Z',
   })
   @IsOptional()
@@ -61,14 +64,14 @@ export class ExecutionFiltersDto {
   dateTo?: string;
 
   @ApiPropertyOptional({
-    description: 'Número de página',
+    description: 'Page number',
     default: 1,
   })
   @IsOptional()
   page?: number = 1;
 
   @ApiPropertyOptional({
-    description: 'Límite de resultados por página',
+    description: 'Page size (items per page)',
     default: 20,
   })
   @IsOptional()

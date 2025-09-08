@@ -11,21 +11,30 @@ import {
   Max,
 } from 'class-validator';
 
+/**
+ * Specifies the type/category of tests to execute.
+ */
 export enum TestType {
   POSITIVE = 'positive',
   NEGATIVE = 'negative',
   ALL = 'all',
 }
 
+/**
+ * Supported environments for test execution.
+ */
 export enum TestEnvironment {
   LOCAL = 'local',
   STAGING = 'staging',
   PRODUCTION = 'production',
 }
 
+/**
+ * DTO: Parameters to execute tests for a project/entity.
+ */
 export class ExecuteTestsDto {
   @ApiPropertyOptional({
-    description: 'Nombre de la entidad para ejecutar pruebas. Si no se proporciona, se ejecutarán todos los test cases del proyecto',
+    description: 'Entity name to run tests for. If omitted, all project test cases will run',
     example: 'Product',
   })
   @IsOptional()
@@ -33,7 +42,7 @@ export class ExecuteTestsDto {
   entityName?: string;
 
   @ApiPropertyOptional({
-    description: 'Método HTTP específico para filtrar casos de prueba',
+    description: 'Specific HTTP method to filter test cases',
     example: 'POST',
   })
   @IsOptional()
@@ -41,7 +50,7 @@ export class ExecuteTestsDto {
   method?: string;
 
   @ApiPropertyOptional({
-    description: 'Tipo de pruebas a ejecutar',
+    description: 'Type of tests to execute',
     enum: TestType,
     default: TestType.ALL,
   })
@@ -50,7 +59,7 @@ export class ExecuteTestsDto {
   testType?: TestType = TestType.ALL;
 
   @ApiPropertyOptional({
-    description: 'Tags para filtrar casos de prueba específicos',
+    description: 'Tags to filter specific test cases',
     example: ['@smoke', '@create'],
   })
   @IsOptional()
@@ -59,7 +68,7 @@ export class ExecuteTestsDto {
   tags?: string[];
 
   @ApiPropertyOptional({
-    description: 'Nombre específico del escenario a ejecutar',
+    description: 'Specific scenario name to execute',
     example: 'Create Product with valid data',
   })
   @IsOptional()
@@ -67,7 +76,7 @@ export class ExecuteTestsDto {
   specificScenario?: string;
 
   @ApiPropertyOptional({
-    description: 'Ejecutar pruebas en paralelo',
+    description: 'Run tests in parallel',
     default: false,
   })
   @IsOptional()
@@ -75,7 +84,7 @@ export class ExecuteTestsDto {
   parallel?: boolean = false;
 
   @ApiPropertyOptional({
-    description: 'Timeout en milisegundos para cada prueba',
+    description: 'Timeout in milliseconds for each test',
     minimum: 1000,
     maximum: 300000,
     default: 30000,
@@ -87,7 +96,7 @@ export class ExecuteTestsDto {
   timeout?: number = 30000;
 
   @ApiPropertyOptional({
-    description: 'Número de reintentos en caso de fallo',
+    description: 'Number of retries on failure',
     minimum: 0,
     maximum: 5,
     default: 0,
@@ -99,7 +108,7 @@ export class ExecuteTestsDto {
   retries?: number = 0;
 
   @ApiPropertyOptional({
-    description: 'Entorno de pruebas',
+    description: 'Target test environment',
     enum: TestEnvironment,
     default: TestEnvironment.LOCAL,
   })
@@ -108,7 +117,7 @@ export class ExecuteTestsDto {
   environment?: TestEnvironment = TestEnvironment.LOCAL;
 
   @ApiPropertyOptional({
-    description: 'Mostrar logs detallados',
+    description: 'Show verbose logs',
     default: false,
   })
   @IsOptional()
@@ -116,7 +125,7 @@ export class ExecuteTestsDto {
   verbose?: boolean = false;
 
   @ApiPropertyOptional({
-    description: 'Guardar logs de requests/responses',
+    description: 'Persist request/response logs',
     default: true,
   })
   @IsOptional()
@@ -124,7 +133,7 @@ export class ExecuteTestsDto {
   saveLogs?: boolean = true;
 
   @ApiPropertyOptional({
-    description: 'Guardar payloads de requests/responses',
+    description: 'Persist request/response payloads',
     default: true,
   })
   @IsOptional()
@@ -132,7 +141,7 @@ export class ExecuteTestsDto {
   savePayloads?: boolean = true;
 
   @ApiPropertyOptional({
-    description: 'Número de workers para ejecución paralela',
+    description: 'Number of workers for parallel execution',
     minimum: 1,
     maximum: 10,
     default: 1,
@@ -144,7 +153,7 @@ export class ExecuteTestsDto {
   workers?: number = 1;
 
   @ApiPropertyOptional({
-    description: 'ID del test case específico a ejecutar',
+    description: 'Specific test case ID to execute',
     example: 'TC-ecommerce-Product-2',
   })
   @IsOptional()
@@ -152,7 +161,7 @@ export class ExecuteTestsDto {
   testCaseId?: string;
 
   @ApiPropertyOptional({
-    description: 'ID del test suite específico a ejecutar',
+    description: 'Specific test suite ID to execute',
     example: 'SUITE-ECOMMERCE-PRODUCT-001',
   })
   @IsOptional()

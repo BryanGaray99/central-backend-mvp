@@ -8,6 +8,15 @@ import { Project } from '../../projects/project.entity';
 import { ThreadManagerService } from './thread-manager.service';
 import { OpenAIConfigService } from './openai-config.service';
 
+/**
+ * Assistant Manager Service
+ * 
+ * Manages AI assistants for projects, including creation, retrieval, verification,
+ * and deletion of OpenAI assistants. Handles the lifecycle of AI assistants
+ * and their integration with the project system.
+ * 
+ * @service AssistantManagerService
+ */
 @Injectable()
 export class AssistantManagerService {
   private readonly logger = new Logger(AssistantManagerService.name);
@@ -24,90 +33,115 @@ export class AssistantManagerService {
   ) {}
 
   /**
-   * Configura la API key de OpenAI dinámicamente
+   * Configures the OpenAI API key dynamically.
+   * 
+   * @private
+   * @throws Error - If API key is not configured
    */
   private async configureOpenAI() {
     const apiKey = await this.openAIConfigService.getOpenAIKey();
     if (!apiKey) {
-      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+      throw new Error('OpenAI API key not configured. Configure the API key in Settings > OpenAI Configuration.');
     }
     
-    // Crear la instancia de OpenAI si no existe
+    // Create OpenAI instance if it doesn't exist
     if (!this.openai) {
       this.openai = new OpenAI({ apiKey });
     } else {
-      // Actualizar la instancia existente con la nueva API key
+      // Update existing instance with new API key
       this.openai.apiKey = apiKey;
     }
   }
 
   /**
-   * Obtiene un assistant existente para un proyecto
+   * Gets an existing assistant for a project.
+   * 
+   * @param projectId - The ID of the project
+   * @returns Promise<AIAssistant | null> - The AI assistant or null if not found
+   * 
+   * @example
+   * ```typescript
+   * const assistant = await assistantManagerService.getAssistant('project-123');
+   * ```
    */
   async getAssistant(projectId: string): Promise<AIAssistant | null> {
-    this.logger.log(`🔍 Buscando assistant para proyecto ${projectId}`);
+    this.logger.log(`🔍 Searching for assistant for project ${projectId}`);
 
-    // Configurar OpenAI antes de hacer la llamada
+    // Configure OpenAI before making the call
     await this.configureOpenAI();
 
-    // Buscar assistant existente
+    // Search for existing assistant
     const assistant = await this.aiAssistantRepository.findOne({
       where: { projectId },
       relations: ['project'],
     });
 
     if (!assistant) {
-      this.logger.log(`❌ No se encontró assistant para proyecto ${projectId}`);
+      this.logger.log(`❌ No assistant found for project ${projectId}`);
       return null;
     }
 
-    this.logger.log(`✅ Assistant encontrado en BD: ${assistant.assistantId}`);
+    this.logger.log(`✅ Assistant found in DB: ${assistant.assistantId}`);
     
-    // Verificar que el assistant sigue activo en OpenAI
+    // Verify that the assistant is still active in OpenAI
     try {
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
       await this.openai.beta.assistants.retrieve(assistant.assistantId);
-      this.logger.log(`✅ Assistant verificado en OpenAI`);
+      this.logger.log(`✅ Assistant verified in OpenAI`);
       return assistant;
     } catch (error) {
-      this.logger.warn(`⚠️ Assistant no encontrado en OpenAI, eliminando de BD...`);
-      // Si no existe en OpenAI, lo eliminamos de la BD
+      this.logger.warn(`⚠️ Assistant not found in OpenAI, removing from DB...`);
+      // If it doesn't exist in OpenAI, remove it from DB
       await this.aiAssistantRepository.remove(assistant);
       return null;
     }
   }
 
   /**
-   * Crea un nuevo assistant para un proyecto
+   * Creates a new assistant for a project.
+   * 
+   * @param projectId - The ID of the project
+   * @returns Promise<AIAssistant> - The created AI assistant
+   * @throws Error - If assistant already exists or creation fails
+   * 
+   * @example
+   * ```typescript
+   * const assistant = await assistantManagerService.createAssistant('project-123');
+   * ```
    */
   async createAssistant(projectId: string): Promise<AIAssistant> {
-    this.logger.log(`🚀 Creando nuevo assistant para proyecto ${projectId}`);
+    this.logger.log(`🚀 Creating new assistant for project ${projectId}`);
     
-    // Verificar que no existe ya un assistant
+    // Verify that an assistant doesn't already exist
     const existingAssistant = await this.getAssistant(projectId);
     if (existingAssistant) {
-      throw new Error(`Ya existe un assistant para el proyecto ${projectId}. Usa getAssistant() para obtenerlo.`);
+      throw new Error(`An assistant already exists for project ${projectId}. Use getAssistant() to retrieve it.`);
     }
 
     return await this.createAssistantInternal(projectId);
   }
 
   /**
-   * Crea un nuevo assistant para un proyecto (método interno)
+   * Creates a new assistant for a project (internal method).
+   * 
+   * @private
+   * @param projectId - The ID of the project
+   * @returns Promise<AIAssistant> - The created AI assistant
+   * @throws Error - If project not found or creation fails
    */
   private async createAssistantInternal(projectId: string): Promise<AIAssistant> {
-    // Configurar OpenAI antes de hacer la llamada
+    // Configure OpenAI before making the call
     await this.configureOpenAI();
 
-    // Obtener información del proyecto
+    // Get project information
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
       throw new Error(`Project with ID ${projectId} not found`);
     }
 
-    // Crear assistant en OpenAI (sin vector store)
+    // Create assistant in OpenAI (without vector store)
     if (!this.openai) {
       throw new Error('OpenAI client not configured');
     }
@@ -115,11 +149,11 @@ export class AssistantManagerService {
       name: `API-Test-Bot-${project.name}`,
       instructions: this.buildAssistantInstructions(project),
       model: 'gpt-4o-mini',
-      tools: [], // Sin tools, los archivos se enviarán en el prompt
+      tools: [], // No tools, files will be sent in the prompt
     });
-    this.logger.log(`✅ Assistant creado en OpenAI: ${openaiAssistant.id}`);
+    this.logger.log(`✅ Assistant created in OpenAI: ${openaiAssistant.id}`);
 
-    // Guardar assistant en BD
+    // Save assistant in DB
     const assistant = new AIAssistant();
     assistant.projectId = projectId;
     assistant.assistantId = openaiAssistant.id;
@@ -129,46 +163,58 @@ export class AssistantManagerService {
     assistant.status = 'active';
 
     const savedAssistant = await this.aiAssistantRepository.save(assistant);
-    this.logger.log(`💾 Assistant guardado en BD: ${savedAssistant.id}`);
+    this.logger.log(`💾 Assistant saved in DB: ${savedAssistant.id}`);
 
-    // Actualizar proyecto con assistant_id
+    // Update project with assistant_id
     await this.projectRepository.update(projectId, {
       assistantId: openaiAssistant.id,
       assistantCreatedAt: new Date(),
     });
 
-    this.logger.log(`📝 Proyecto actualizado con assistant_id`);
+    this.logger.log(`📝 Project updated with assistant_id`);
 
     return savedAssistant;
   }
 
   /**
-   * Construye las instrucciones del assistant basadas en el proyecto
+   * Builds assistant instructions based on the project.
+   * 
+   * @private
+   * @param project - The project entity
+   * @returns string - The formatted instructions for the assistant
    */
   private buildAssistantInstructions(project: Project): string {
-    return `Eres un asistente especializado en generar tests de APIs REST con Playwright y BDD para ${project.name}.
+    return `You are an assistant specialized in generating REST API tests with Playwright and BDD for ${project.name}.
 
-INSTRUCCIONES PRINCIPALES:
-1. **ANÁLISIS DE CONTEXTO**: Los archivos feature y steps actuales se incluyen directamente en el prompt
-2. **GENERACIÓN INTELIGENTE**: Analiza los archivos existentes para evitar duplicaciones
-3. **FORMATO CONSISTENTE**: Mantén el estilo y estructura de los archivos existentes
-4. **RESPUESTA ESTRUCTURADA**: Usa el formato específico solicitado en el prompt
+MAIN INSTRUCTIONS:
+1. **CONTEXT ANALYSIS**: Current feature and steps files are included directly in the prompt
+2. **INTELLIGENT GENERATION**: Analyze existing files to avoid duplications
+3. **CONSISTENT FORMAT**: Maintain the style and structure of existing files
+4. **STRUCTURED RESPONSE**: Use the specific format requested in the prompt
 
-REGLAS ESTRICTAS:
-1. SOLO APIs REST
-2. NO dupliques steps ni escenarios existentes
-3. Respeta secciones: Given antes de "// When steps", When antes de "// Then steps"
-4. Agrega ID incremental: @TC-${project.name}-{entityName}-Number
-5. Usa clientes API existentes (ProductClient, etc.)
-6. NO incluyas "Feature:" ni rutas en la respuesta
-7. Genera SOLO el código necesario para completar la operación
-8. Sigue EXACTAMENTE el formato de respuesta especificado en el prompt
+STRICT RULES:
+1. REST APIs ONLY
+2. DO NOT duplicate existing steps or scenarios
+3. Respect sections: Given before "// When steps", When before "// Then steps"
+4. Add incremental ID: @TC-${project.name}-{entityName}-Number
+5. Use existing API clients (ProductClient, etc.)
+6. DO NOT include "Feature:" or paths in the response
+7. Generate ONLY the code necessary to complete the operation
+8. Follow EXACTLY the response format specified in the prompt
 
-CONTEXTO: Los archivos actuales se proporcionan en el prompt para que puedas analizarlos y generar contenido complementario. El prompt te dará instrucciones específicas sobre el formato de respuesta requerido.`;
+CONTEXT: Current files are provided in the prompt so you can analyze them and generate complementary content. The prompt will give you specific instructions about the required response format.`;
   }
 
   /**
-   * Verifica que el assistant tenga acceso
+   * Verifies that the assistant has access.
+   * 
+   * @param projectId - The ID of the project
+   * @returns Promise<boolean> - True if assistant has access, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * const hasAccess = await assistantManagerService.verifyAssistantAccess('project-123');
+   * ```
    */
   async verifyAssistantAccess(projectId: string): Promise<boolean> {
     const assistant = await this.aiAssistantRepository.findOne({
@@ -180,20 +226,29 @@ CONTEXTO: Los archivos actuales se proporcionan en el prompt para que puedas ana
     }
 
     try {
-      // Verificar que el assistant existe en OpenAI
+      // Verify that the assistant exists in OpenAI
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
       await this.openai.beta.assistants.retrieve(assistant.assistantId);
       return true;
     } catch (error) {
-      this.logger.warn(`⚠️ Error verificando acceso del assistant: ${error.message}`);
+      this.logger.warn(`⚠️ Error verifying assistant access: ${error.message}`);
       return false;
     }
   }
 
   /**
-   * Elimina un assistant
+   * Deletes an assistant and all its associated resources.
+   * 
+   * @param projectId - The ID of the project
+   * @returns Promise<void>
+   * @throws Error - If deletion fails
+   * 
+   * @example
+   * ```typescript
+   * await assistantManagerService.deleteAssistant('project-123');
+   * ```
    */
   async deleteAssistant(projectId: string): Promise<void> {
     const assistant = await this.aiAssistantRepository.findOne({
@@ -202,60 +257,60 @@ CONTEXTO: Los archivos actuales se proporcionan en el prompt para que puedas ana
 
     if (assistant) {
       try {
-        this.logger.log(`🗑️ [DELETE] Iniciando eliminación de assistant: ${assistant.assistantId}`);
+        this.logger.log(`🗑️ [DELETE] Starting assistant deletion: ${assistant.assistantId}`);
         
-        // 1. ELIMINAR THREADS PRIMERO (para evitar foreign key constraint)
-        this.logger.log(`🗑️ [DELETE] Paso 1: Eliminando threads...`);
+        // 1. DELETE THREADS FIRST (to avoid foreign key constraint)
+        this.logger.log(`🗑️ [DELETE] Step 1: Deleting threads...`);
         try {
           await this.threadManagerService.deleteAllProjectThreads(projectId);
-          this.logger.log(`✅ [DELETE] Threads eliminados exitosamente para proyecto: ${projectId}`);
+          this.logger.log(`✅ [DELETE] Threads deleted successfully for project: ${projectId}`);
         } catch (err) {
-          this.logger.error(`❌ [DELETE] Error eliminando threads: ${err.message}`);
-          // Continuar con la eliminación aunque falle
+          this.logger.error(`❌ [DELETE] Error deleting threads: ${err.message}`);
+          // Continue with deletion even if it fails
         }
 
-        // 2. LIMPIAR REFERENCIA EN PROYECTO (antes de eliminar assistant)
-        this.logger.log(`🗑️ [DELETE] Paso 2: Limpiando referencia en proyecto...`);
+        // 2. CLEAR REFERENCE IN PROJECT (before deleting assistant)
+        this.logger.log(`🗑️ [DELETE] Step 2: Clearing reference in project...`);
         try {
           await this.projectRepository.update(projectId, {
             assistantId: undefined,
             assistantCreatedAt: undefined,
           });
-          this.logger.log(`✅ [DELETE] Referencia de assistant limpiada en proyecto: ${projectId}`);
+          this.logger.log(`✅ [DELETE] Assistant reference cleared in project: ${projectId}`);
         } catch (err) {
-          this.logger.error(`❌ [DELETE] Error limpiando referencia en proyecto: ${err.message}`);
+          this.logger.error(`❌ [DELETE] Error clearing reference in project: ${err.message}`);
         }
 
-        // 3. ELIMINAR DE OPENAI
-        this.logger.log(`🗑️ [DELETE] Paso 3: Eliminando de OpenAI...`);
+        // 3. DELETE FROM OPENAI
+        this.logger.log(`🗑️ [DELETE] Step 3: Deleting from OpenAI...`);
         try {
           if (!this.openai) {
             throw new Error('OpenAI client not configured');
           }
           await this.openai.beta.assistants.del(assistant.assistantId);
-          this.logger.log(`✅ [DELETE] Assistant eliminado de OpenAI: ${assistant.assistantId}`);
+          this.logger.log(`✅ [DELETE] Assistant deleted from OpenAI: ${assistant.assistantId}`);
         } catch (err) {
-          this.logger.error(`❌ [DELETE] Error eliminando assistant de OpenAI: ${err.message}`);
+          this.logger.error(`❌ [DELETE] Error deleting assistant from OpenAI: ${err.message}`);
         }
 
-        // 4. ELIMINAR ASSISTANT DE BD (último paso)
-        this.logger.log(`🗑️ [DELETE] Paso 4: Eliminando assistant de BD...`);
+        // 4. DELETE ASSISTANT FROM DB (last step)
+        this.logger.log(`🗑️ [DELETE] Step 4: Deleting assistant from DB...`);
         try {
           await this.aiAssistantRepository.remove(assistant);
-          this.logger.log(`✅ [DELETE] Assistant eliminado de BD exitosamente`);
+          this.logger.log(`✅ [DELETE] Assistant deleted from DB successfully`);
         } catch (err) {
-          this.logger.error(`❌ [DELETE] Error eliminando assistant de BD: ${err.message}`);
-          throw err; // Re-lanzar para que el usuario sepa que falló
+          this.logger.error(`❌ [DELETE] Error deleting assistant from DB: ${err.message}`);
+          throw err; // Re-throw so user knows it failed
         }
         
-        this.logger.log(`🎉 [DELETE] Eliminación de assistant completada exitosamente`);
+        this.logger.log(`🎉 [DELETE] Assistant deletion completed successfully`);
         
       } catch (error) {
-        this.logger.error(`💥 [DELETE] Error general en eliminación: ${error.message}`);
+        this.logger.error(`💥 [DELETE] General error in deletion: ${error.message}`);
         throw error;
       }
     } else {
-      this.logger.warn(`⚠️ [DELETE] No se encontró assistant para eliminar en proyecto: ${projectId}`);
+      this.logger.warn(`⚠️ [DELETE] No assistant found to delete in project: ${projectId}`);
     }
   }
 } 

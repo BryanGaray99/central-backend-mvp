@@ -1,3 +1,7 @@
+/**
+ * Interface for AI generation requests.
+ * Contains all necessary information to generate test cases using AI.
+ */
 export interface AIGenerationRequest {
   projectId: string;
   entityName: string;
@@ -7,6 +11,10 @@ export interface AIGenerationRequest {
   metadata?: Record<string, any>;
 }
 
+/**
+ * Interface for AI generation responses.
+ * Contains the generated code, insertion information, and metadata.
+ */
 export interface AIGenerationResponse {
   success: boolean;
   data?: {
@@ -26,6 +34,10 @@ export interface AIGenerationResponse {
   };
 }
 
+/**
+ * Interface for generated code structure.
+ * Contains different types of generated test artifacts.
+ */
 export interface GeneratedCode {
   feature?: string;
   steps?: string;
@@ -36,6 +48,10 @@ export interface GeneratedCode {
   client?: string;
 }
 
+/**
+ * Interface for code insertion operations.
+ * Defines where and how to insert generated code into existing files.
+ */
 export interface CodeInsertion {
   file: string;
   line: number;
@@ -44,6 +60,10 @@ export interface CodeInsertion {
   description?: string;
 }
 
+/**
+ * Interface for project context information.
+ * Contains patterns, examples, and preferences for AI generation.
+ */
 export interface ProjectContext {
   projectId: string;
   patterns: {
@@ -64,6 +84,10 @@ export interface ProjectContext {
   lastAnalyzed: Date;
 }
 
+/**
+ * Interface for file analysis results.
+ * Contains parsed file structure and content information.
+ */
 export interface FileAnalysis {
   filePath: string;
   content: string;
@@ -74,6 +98,10 @@ export interface FileAnalysis {
   };
 }
 
+/**
+ * Interface for AI tools.
+ * Defines the structure for AI-powered tools and their execution.
+ */
 export interface AITool {
   name: string;
   description: string;

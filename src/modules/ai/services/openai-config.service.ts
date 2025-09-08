@@ -4,6 +4,14 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
+/**
+ * OpenAI Configuration Service
+ * 
+ * Manages OpenAI API key configuration and retrieval from the .env file.
+ * Handles reading, writing, and validating OpenAI API keys for the application.
+ * 
+ * @service OpenAIConfigService
+ */
 @Injectable()
 export class OpenAIConfigService {
   private readonly logger = new Logger(OpenAIConfigService.name);
@@ -11,7 +19,17 @@ export class OpenAIConfigService {
   constructor(private readonly configService: ConfigService) {}
 
   /**
-   * Obtiene la API key de OpenAI desde el archivo .env
+   * Gets the OpenAI API key from the .env file.
+   * 
+   * @returns Promise<string | null> - The API key or null if not found
+   * 
+   * @example
+   * ```typescript
+   * const apiKey = await openAIConfigService.getOpenAIKey();
+   * if (apiKey) {
+   *   console.log('API key found');
+   * }
+   * ```
    */
   async getOpenAIKey(): Promise<string | null> {
     try {
@@ -27,48 +45,67 @@ export class OpenAIConfigService {
   }
 
   /**
-   * Guarda la API key de OpenAI en el archivo .env
+   * Saves the OpenAI API key to the .env file.
+   * 
+   * @param apiKey - The API key to save
+   * @returns Promise<void>
+   * @throws Error - If saving fails
+   * 
+   * @example
+   * ```typescript
+   * await openAIConfigService.saveOpenAIKey('sk-...');
+   * ```
    */
   async saveOpenAIKey(apiKey: string): Promise<void> {
     try {
       const envFilePath = await this.getEnvFilePath();
       
-      // Leer el archivo .env existente si existe
+      // Read existing .env file if it exists
       let envContent = '';
       try {
         envContent = await fs.readFile(envFilePath, 'utf-8');
       } catch {
-        // El archivo no existe, crear uno nuevo
+        // File doesn't exist, create a new one
         envContent = '';
       }
       
-      // Parsear el contenido existente
+      // Parse existing content
       const envConfig = dotenv.parse(envContent);
       
-      // Actualizar o agregar la API key
+      // Update or add the API key
       envConfig.OPENAI_API_KEY = apiKey;
       
-      // Convertir de vuelta a formato .env
+      // Convert back to .env format
       const newEnvContent = Object.entries(envConfig)
         .map(([key, value]) => `${key}=${value}`)
         .join('\n');
       
-      // Asegurar que el directorio existe
+      // Ensure the directory exists
       const envDir = path.dirname(envFilePath);
       await fs.mkdir(envDir, { recursive: true });
       
-      // Escribir el archivo
+      // Write the file
       await fs.writeFile(envFilePath, newEnvContent, 'utf-8');
       
-      this.logger.log(`OpenAI API key guardada en: ${envFilePath}`);
+      this.logger.log(`OpenAI API key saved to: ${envFilePath}`);
     } catch (error) {
       this.logger.error(`Error saving OpenAI API key: ${error.message}`);
-      throw new Error(`No se pudo guardar la API key: ${error.message}`);
+      throw new Error(`Could not save API key: ${error.message}`);
     }
   }
 
   /**
-   * Verifica si la API key está configurada
+   * Verifies if the API key is configured.
+   * 
+   * @returns Promise<boolean> - True if API key is configured, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * const isConfigured = await openAIConfigService.isConfigured();
+   * if (isConfigured) {
+   *   console.log('API key is configured');
+   * }
+   * ```
    */
   async isConfigured(): Promise<boolean> {
     const apiKey = await this.getOpenAIKey();
@@ -76,7 +113,10 @@ export class OpenAIConfigService {
   }
 
   /**
-   * Obtiene la ruta del archivo .env
+   * Gets the path to the .env file.
+   * 
+   * @private
+   * @returns Promise<string> - The path to the .env file
    */
   private async getEnvFilePath(): Promise<string> {
     const workspacesPath = this.configService.get('PLAYWRIGHT_WORKSPACES_PATH') || '../playwright-workspaces';

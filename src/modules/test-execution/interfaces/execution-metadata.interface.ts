@@ -1,3 +1,6 @@
+/**
+ * Execution-level metadata captured during a run.
+ */
 export interface ExecutionMetadata {
   environment?: string;
   verbose?: boolean;
@@ -11,6 +14,9 @@ export interface ExecutionMetadata {
   customConfig?: Record<string, any>;
 }
 
+/**
+ * Aggregated metrics for a test execution.
+ */
 export interface TestSummary {
   totalScenarios: number;
   passedScenarios: number;
@@ -23,6 +29,9 @@ export interface TestSummary {
   endTime: Date;
 }
 
+/**
+ * Complete execution report structure.
+ */
 export interface ExecutionReport {
   executionId: string;
   status: string;

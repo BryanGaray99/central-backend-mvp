@@ -7,6 +7,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
 
+/**
+ * Service responsible for updating the api.config.ts file in Playwright projects.
+ * 
+ * This service manages the generation and maintenance of the api.config.ts file
+ * that contains all registered endpoints for a project. It extracts endpoint
+ * information from the database, processes analysis results, and generates
+ * TypeScript configuration files using Handlebars templates.
+ * 
+ * @class ApiConfigUpdaterService
+ * @since 1.0.0
+ */
 @Injectable()
 export class ApiConfigUpdaterService {
   private readonly logger = new Logger(ApiConfigUpdaterService.name);
@@ -19,59 +30,81 @@ export class ApiConfigUpdaterService {
   ) {}
 
   /**
-   * Actualiza el archivo api.config.ts del proyecto con todos los endpoints registrados
+   * Updates the api.config.ts file for a project with all registered endpoints.
+   * 
+   * This method retrieves all endpoints for a project, processes their analysis results,
+   * and generates a new api.config.ts file using Handlebars templates. The file is
+   * written to the project's workspace directory.
+   * 
+   * @param projectId - The ID of the project to update the configuration for
+   * @returns Promise that resolves when the configuration file has been updated
+   * 
+   * @example
+   * ```typescript
+   * await apiConfigUpdater.updateApiConfig('project-123');
+   * ```
    */
   async updateApiConfig(projectId: string): Promise<void> {
     try {
-      this.logger.log(`Actualizando api.config.ts para el proyecto ${projectId}`);
+      this.logger.log(`Updating api.config.ts for project ${projectId}`);
 
-      // Obtener el proyecto
+      // Get the project
       const project = await this.projectRepository.findOne({
         where: { id: projectId },
       });
 
       if (!project) {
-        this.logger.warn(`Proyecto ${projectId} no encontrado`);
+        this.logger.warn(`Project ${projectId} not found`);
         return;
       }
 
-      // Obtener todos los endpoints del proyecto
+      // Get all endpoints for the project
       const endpoints = await this.endpointRepository.find({
         where: { projectId },
         order: { entityName: 'ASC' },
       });
 
-      // Preparar datos para el template (incluso si no hay endpoints)
+      // Prepare template data (even if there are no endpoints)
       const templateData = this.prepareTemplateData(project, endpoints);
 
-      // Generar el contenido del archivo
+      // Generate file content
       const apiConfigContent = await this.generateApiConfigContent(templateData);
 
-      // Escribir el archivo en la raíz del workspace del proyecto
+      // Write file to project workspace root
       const apiConfigPath = path.join(project.path, 'api.config.ts');
 
-      // Asegurar que el directorio existe
+      // Ensure directory exists
       const apiConfigDir = path.dirname(apiConfigPath);
       if (!fs.existsSync(apiConfigDir)) {
         fs.mkdirSync(apiConfigDir, { recursive: true });
       }
 
-      // Escribir el archivo
+      // Write the file
       fs.writeFileSync(apiConfigPath, apiConfigContent, 'utf8');
 
       if (endpoints.length === 0) {
-        this.logger.log(`api.config.ts actualizado (sin endpoints) en ${apiConfigPath}`);
+        this.logger.log(`api.config.ts updated (no endpoints) at ${apiConfigPath}`);
       } else {
-        this.logger.log(`api.config.ts actualizado con ${endpoints.length} endpoints en ${apiConfigPath}`);
+        this.logger.log(`api.config.ts updated with ${endpoints.length} endpoints at ${apiConfigPath}`);
       }
     } catch (error) {
-      this.logger.error(`Error actualizando api.config.ts: ${error.message}`, error.stack);
-      // No lanzar el error para evitar que falle todo el proceso
+      this.logger.error(`Error updating api.config.ts: ${error.message}`, error.stack);
+      // Don't throw the error to avoid failing the entire process
     }
   }
 
   /**
-   * Prepara los datos para el template de api.config.ts
+   * Prepares template data for the api.config.ts file generation.
+   * 
+   * This method processes endpoint data and analysis results to create a structured
+   * data object that can be used with Handlebars templates. It extracts create and
+   * update fields from analysis results and detects special features like address
+   * fields and order status fields.
+   * 
+   * @private
+   * @param project - The project configuration
+   * @param endpoints - Array of endpoints to process
+   * @returns Template data object with processed endpoint information
    */
   private prepareTemplateData(project: Project, endpoints: Endpoint[]): any {
     const endpointsData = endpoints.map(endpoint => {
@@ -79,10 +112,10 @@ export class ApiConfigUpdaterService {
       const entityLower = entityName.toLowerCase();
       const EntityName = entityName.charAt(0).toUpperCase() + entityName.slice(1);
 
-      // Extraer campos de creación y actualización del análisis
+      // Extract create and update fields from analysis
       const analysis = endpoint.analysisResults;
       
-      // Verificar si el análisis existe y tiene la estructura esperada
+      // Check if analysis exists and has expected structure
       if (!analysis || typeof analysis !== 'object') {
         return {
           entityName,
@@ -107,7 +140,7 @@ export class ApiConfigUpdaterService {
       };
     });
 
-    // Detectar características especiales solo si hay endpoints
+    // Detect special features only if there are endpoints
     let hasAddress = false;
     let hasOrderStatus = false;
 
@@ -140,7 +173,15 @@ export class ApiConfigUpdaterService {
   }
 
   /**
-   * Extrae los campos de creación del análisis del endpoint
+   * Extracts create fields from endpoint analysis results.
+   * 
+   * This method processes the POST method analysis to extract field definitions
+   * that are used for creating new entities.
+   * 
+   * @private
+   * @param analysis - The analysis results from endpoint exploration
+   * @param entityName - The name of the entity being processed
+   * @returns Array of field definitions for entity creation
    */
   private extractCreateFields(analysis: any, entityName: string): any[] {
     if (!analysis?.POST?.requestBodyDefinition) {
@@ -154,7 +195,15 @@ export class ApiConfigUpdaterService {
   }
 
   /**
-   * Extrae los campos de actualización del análisis del endpoint
+   * Extracts update fields from endpoint analysis results.
+   * 
+   * This method processes the PATCH or PUT method analysis to extract field definitions
+   * that are used for updating existing entities.
+   * 
+   * @private
+   * @param analysis - The analysis results from endpoint exploration
+   * @param entityName - The name of the entity being processed
+   * @returns Array of field definitions for entity updates
    */
   private extractUpdateFields(analysis: any, entityName: string): any[] {
     const patchAnalysis = analysis?.PATCH;
@@ -172,7 +221,14 @@ export class ApiConfigUpdaterService {
   }
 
   /**
-   * Mapea tipos JSON a TypeScript
+   * Maps JSON schema types to TypeScript types.
+   * 
+   * This utility method converts JSON schema type definitions to their
+   * corresponding TypeScript type representations.
+   * 
+   * @private
+   * @param jsonType - The JSON schema type to convert
+   * @returns The corresponding TypeScript type string
    */
   private mapTypeToTs(jsonType: string): string {
     switch (jsonType) {
@@ -187,34 +243,54 @@ export class ApiConfigUpdaterService {
   }
 
   /**
-   * Genera el contenido del archivo api.config.ts usando el template
+   * Generates the api.config.ts file content using Handlebars templates.
+   * 
+   * This method reads the Handlebars template file, compiles it with the provided
+   * data, and returns the generated TypeScript configuration content.
+   * 
+   * @private
+   * @param templateData - The data to use for template compilation
+   * @returns Promise resolving to the generated file content
+   * @throws Error when template file cannot be read or compiled
    */
   private async generateApiConfigContent(templateData: any): Promise<string> {
     try {
-      // Leer el template
+      // Read the template
       const templatePath = path.join(__dirname, '..', 'templates', 'api.config.ts.template');
       const templateContent = fs.readFileSync(templatePath, 'utf8');
 
-      // Compilar el template
+      // Compile the template
       const template = handlebars.compile(templateContent);
 
-      // Generar el contenido
+      // Generate the content
       return template(templateData);
     } catch (error) {
-      this.logger.error(`Error generando contenido de api.config.ts: ${error.message}`);
+      this.logger.error(`Error generating api.config.ts content: ${error.message}`);
       throw error;
     }
   }
 
   /**
-   * Actualiza el api.config.ts cuando se registra un nuevo endpoint
+   * Updates the api.config.ts file when a new endpoint is registered.
+   * 
+   * This is a convenience method that triggers the configuration update
+   * after endpoint registration.
+   * 
+   * @param projectId - The ID of the project to update
+   * @returns Promise that resolves when the configuration has been updated
    */
   async updateApiConfigOnEndpointRegistration(projectId: string): Promise<void> {
     await this.updateApiConfig(projectId);
   }
 
   /**
-   * Actualiza el api.config.ts cuando se elimina un endpoint
+   * Updates the api.config.ts file when an endpoint is deleted.
+   * 
+   * This is a convenience method that triggers the configuration update
+   * after endpoint deletion.
+   * 
+   * @param projectId - The ID of the project to update
+   * @returns Promise that resolves when the configuration has been updated
    */
   async updateApiConfigOnEndpointDeletion(projectId: string): Promise<void> {
     await this.updateApiConfig(projectId);

@@ -1,6 +1,14 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { Project } from '../../projects/project.entity';
 
+/**
+ * AI Assistant Entity
+ * 
+ * Represents an AI assistant created in OpenAI for a specific project.
+ * Each project can have one assistant that handles test case generation.
+ * 
+ * @entity AIAssistant
+ */
 @Entity('ai_assistants')
 export class AIAssistant {
   @PrimaryGeneratedColumn()
@@ -13,7 +21,7 @@ export class AIAssistant {
   assistantId: string;
 
   @Column({ name: 'file_ids', type: 'text', nullable: true })
-  fileIds: string; // JSON array - ya no se usa, mantener por compatibilidad
+  fileIds: string;
 
   @Column({ type: 'text', nullable: true })
   instructions: string;

@@ -2,6 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, IsBoolean, IsNumber } from 'class-validator';
 import { TestSuiteType, TestSuiteStatus } from '../entities/test-suite.entity';
 
+/**
+ * DTO: Payload to update an existing test suite.
+ */
 export class UpdateTestSuiteDto {
   @ApiProperty({
     description: 'Name of the test suite',

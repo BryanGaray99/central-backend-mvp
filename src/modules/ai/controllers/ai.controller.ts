@@ -6,6 +6,14 @@ import { AIAssistant } from '../entities/ai-assistant.entity';
 import { TestCaseSuggestionRequestDto, TestCaseSuggestionResponseDto } from '../dto/test-case-suggestion.dto';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
+/**
+ * AI Controller
+ * 
+ * Handles project-specific AI operations including assistant management,
+ * test case generation, and AI suggestions. All endpoints are scoped to a specific project.
+ * 
+ * @controller AIController
+ */
 @ApiTags('ai')
 @Controller('projects/:projectId/ai')
 export class AIController {
@@ -17,21 +25,59 @@ export class AIController {
     private readonly testCaseSuggestionService: TestCaseSuggestionService,
   ) {}
 
+  /**
+   * Retrieves the AI assistant for a specific project.
+   * 
+   * @param projectId - The ID of the project
+   * @returns Promise<AIAssistant> - The AI assistant entity
+   * @throws BadRequestException - If no assistant exists for the project
+   * 
+   * @example
+   * ```typescript
+   * const assistant = await aiController.getAssistant('project-123');
+   * ```
+   */
   @Get('assistant')
   async getAssistant(@Param('projectId') projectId: string): Promise<AIAssistant> {
     const assistant = await this.assistantManagerService.getAssistant(projectId);
     if (!assistant) {
-      throw new BadRequestException('No existe un assistant para este proyecto. Inicializa el contexto IA primero.');
+      throw new BadRequestException('No assistant exists for this project. Initialize the AI context first.');
     }
     return assistant;
   }
 
+  /**
+   * Deletes the AI assistant for a specific project.
+   * 
+   * @param projectId - The ID of the project
+   * @returns Promise<object> - Success message
+   * 
+   * @example
+   * ```typescript
+   * const result = await aiController.deleteAssistant('project-123');
+   * // Returns: { message: 'Assistant deleted successfully' }
+   * ```
+   */
   @Delete('assistant')
   async deleteAssistant(@Param('projectId') projectId: string): Promise<{ message: string }> {
     await this.assistantManagerService.deleteAssistant(projectId);
     return { message: 'Assistant deleted successfully' };
   }
 
+  /**
+   * Initializes an AI assistant for a specific project.
+   * 
+   * @param projectId - The ID of the project
+   * @param dto - Optional assistant configuration
+   * @param dto.assistantName - Optional custom name for the assistant
+   * @returns Promise<object> - Assistant ID and success message
+   * 
+   * @example
+   * ```typescript
+   * const result = await aiController.initAssistant('project-123', { assistantName: 'Custom Bot' });
+   * // Returns: { assistantId: 'asst_...', message: 'Assistant initialized successfully...' }
+   * ```
+   */
   @Post('assistant/init')
   async initAssistant(
     @Param('projectId') projectId: string,
@@ -39,19 +85,19 @@ export class AIController {
   ): Promise<{ assistantId: string; message: string }> {
     let assistant: AIAssistant | null = null;
     try {
-      // 1. Obtener assistant existente o crear uno nuevo
+      // 1. Get existing assistant or create a new one
       assistant = await this.assistantManagerService.getAssistant(projectId);
       if (!assistant) {
-        this.logger.log(`🚀 No existe assistant, creando uno nuevo para proyecto ${projectId}`);
+        this.logger.log(`🚀 No assistant exists, creating a new one for project ${projectId}`);
         assistant = await this.assistantManagerService.createAssistant(projectId);
       }
       
       return {
         assistantId: assistant.assistantId,
-        message: 'Assistant initialized successfully. Los archivos se enviarán directamente en el prompt.',
+        message: 'Assistant initialized successfully. Files will be sent directly in the prompt.',
       };
     } catch (err) {
-      // Rollback: eliminar assistant si algo falla
+      // Rollback: delete assistant if something fails
       if (assistant) {
         await this.assistantManagerService.deleteAssistant(projectId);
       }
@@ -59,6 +105,23 @@ export class AIController {
     }
   }
 
+  /**
+   * Generates test case suggestions using AI based on existing feature and steps files.
+   * 
+   * @param projectId - The ID of the project
+   * @param request - The test case suggestion request parameters
+   * @returns Promise<TestCaseSuggestionResponseDto> - Generated test case suggestions
+   * @throws BadRequestException - If assistant is missing or input is invalid
+   * 
+   * @example
+   * ```typescript
+   * const suggestions = await aiController.suggestTestCases('project-123', {
+   *   section: 'ecommerce',
+   *   entityName: 'Product',
+   *   requirements: 'Test cases for product validation'
+   * });
+   * ```
+   */
   @Post('test-cases/suggest')
   @ApiOperation({
     summary: 'Generate test case suggestions using AI',
@@ -93,6 +156,18 @@ export class AIController {
     }
   }
 
+  /**
+   * Retrieves all AI suggestions for a specific project.
+   * 
+   * @param projectId - The ID of the project
+   * @returns Promise<object> - List of AI suggestions with metadata
+   * 
+   * @example
+   * ```typescript
+   * const suggestions = await aiController.getProjectSuggestions('project-123');
+   * // Returns: { success: true, data: [...], total: 5 }
+   * ```
+   */
   @Get('suggestions')
   @ApiOperation({
     summary: 'Get all AI suggestions for a project',
@@ -119,7 +194,21 @@ export class AIController {
       data: stats
     };
   }
-
+  
+  /**
+   * Retrieves a specific AI suggestion by its ID.
+   * 
+   * @param projectId - The ID of the project
+   * @param suggestionId - The ID of the suggestion to retrieve
+   * @returns Promise<object> - The AI suggestion data
+   * @throws BadRequestException - If the suggestion is not found
+   * 
+   * @example
+   * ```typescript
+   * const suggestion = await aiController.getSuggestionById('project-123', 'suggestion-456');
+   * // Returns: { success: true, data: { ... } }
+   * ```
+   */
   @Get('suggestions/:suggestionId')
   @ApiOperation({
     summary: 'Get a specific AI suggestion by ID',

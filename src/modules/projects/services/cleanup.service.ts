@@ -4,16 +4,52 @@ import { WorkspaceService } from '../../workspace/workspace.service';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+/**
+ * Service for cleaning up failed projects and orphaned resources.
+ * 
+ * This service provides comprehensive cleanup functionality for projects that
+ * fail during generation or become orphaned. It handles file cleanup,
+ * dependency removal, and workspace restoration.
+ * 
+ * @class CleanupService
+ * @since 1.0.0
+ */
 @Injectable()
 export class CleanupService {
+  /** Logger instance for this service */
   private readonly logger = new Logger(CleanupService.name);
+  
+  /** Maximum number of retry attempts for file operations */
   private readonly maxRetries = 3;
-  private readonly retryDelay = 1000; // 1 second
+  
+  /** Delay between retry attempts in milliseconds */
+  private readonly retryDelay = 1000;
 
+  /**
+   * Creates an instance of CleanupService.
+   * 
+   * @param workspaceService - Service for workspace management
+   */
   constructor(private readonly workspaceService: WorkspaceService) {}
 
   /**
-   * Clean up a failed project
+   * Cleans up a failed project.
+   * 
+   * This method performs comprehensive cleanup of a project that failed during
+   * generation, including file cleanup, dependency removal, and state restoration.
+   * 
+   * @param project - The project to clean up
+   * @param error - The error that caused the failure
+   * @returns Promise that resolves when cleanup is complete
+   * 
+   * @example
+   * ```typescript
+   * try {
+   *   await generationService.generateProject(project);
+   * } catch (error) {
+   *   await cleanupService.cleanupFailedProject(project, error);
+   * }
+   * ```
    */
   async cleanupFailedProject(project: Project, error: Error): Promise<void> {
     this.logger.warn(`Starting cleanup for failed project: ${project.name}`);
@@ -44,7 +80,14 @@ export class CleanupService {
   }
 
   /**
-   * Clean partially generated files
+   * Cleans up partially generated files.
+   * 
+   * This method removes files that were created during project generation
+   * but are no longer needed after a failure.
+   * 
+   * @param project - The project to clean up
+   * @returns Promise that resolves when file cleanup is complete
+   * @private
    */
   private async cleanupGeneratedFiles(project: Project): Promise<void> {
     const filesToClean = [
@@ -81,7 +124,14 @@ export class CleanupService {
   }
 
   /**
-   * Clean installed dependencies
+   * Cleans up installed dependencies.
+   * 
+   * This method removes node_modules and package-lock.json files
+   * to clean up dependency installations.
+   * 
+   * @param project - The project to clean up
+   * @returns Promise that resolves when dependency cleanup is complete
+   * @private
    */
   private async cleanupDependencies(project: Project): Promise<void> {
     const nodeModulesPath = path.join(project.path, 'node_modules');
@@ -103,7 +153,14 @@ export class CleanupService {
   }
 
   /**
-   * Clean temporary files
+   * Cleans up temporary files and directories.
+   * 
+   * This method removes temporary directories created during testing
+   * and project generation.
+   * 
+   * @param project - The project to clean up
+   * @returns Promise that resolves when temporary file cleanup is complete
+   * @private
    */
   private async cleanupTempFiles(project: Project): Promise<void> {
     const tempDirs = [
@@ -130,7 +187,14 @@ export class CleanupService {
   }
 
   /**
-   * Restore project state
+   * Restores the project to a basic working state.
+   * 
+   * This method restores essential configuration files to their basic
+   * state so the project can be used or regenerated later.
+   * 
+   * @param project - The project to restore
+   * @returns Promise that resolves when project state is restored
+   * @private
    */
   private async restoreProjectState(project: Project): Promise<void> {
     // Restore original package.json
@@ -195,7 +259,14 @@ export default defineConfig({
   }
 
   /**
-   * Emergency cleanup - delete entire workspace
+   * Performs emergency cleanup by deleting the entire workspace.
+   * 
+   * This method is used as a last resort when normal cleanup fails.
+   * It completely removes the workspace directory.
+   * 
+   * @param project - The project to perform emergency cleanup on
+   * @returns Promise that resolves when emergency cleanup is complete
+   * @private
    */
   private async emergencyCleanup(project: Project): Promise<void> {
     this.logger.error(`Executing emergency cleanup for: ${project.name}`);
@@ -211,7 +282,19 @@ export default defineConfig({
   }
 
   /**
-   * Clean orphaned projects (projects that remained in PENDING status for too long)
+   * Cleans up orphaned projects.
+   * 
+   * This method identifies and cleans up projects that have been in PENDING
+   * status for too long, indicating they may have been abandoned.
+   * 
+   * @param projects - Array of projects to check for orphaned status
+   * @returns Promise that resolves when orphaned project cleanup is complete
+   * 
+   * @example
+   * ```typescript
+   * const projects = await projectRepo.find();
+   * await cleanupService.cleanupOrphanedProjects(projects);
+   * ```
    */
   async cleanupOrphanedProjects(projects: Project[]): Promise<void> {
     const orphanedProjects = projects.filter((project) => {
@@ -231,6 +314,13 @@ export default defineConfig({
     }
   }
 
+  /**
+   * Creates a delay for the specified number of milliseconds.
+   * 
+   * @param ms - The number of milliseconds to delay
+   * @returns Promise that resolves after the specified delay
+   * @private
+   */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }

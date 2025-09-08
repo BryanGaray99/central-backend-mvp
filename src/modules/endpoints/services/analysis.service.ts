@@ -4,15 +4,45 @@ import { Project } from '../../projects/project.entity';
 import { RegisterEndpointDto } from '../dto/register-endpoint.dto';
 import { firstValueFrom } from 'rxjs';
 
+/**
+ * Service responsible for analyzing API endpoints through exploratory HTTP requests.
+ * 
+ * This service performs comprehensive analysis of API endpoints by making actual HTTP requests
+ * to understand their behavior, infer response schemas, and extract entity data patterns.
+ * It handles different HTTP methods, manages resource creation for dependent operations,
+ * and provides detailed analysis results for endpoint registration.
+ * 
+ * @class AnalysisService
+ * @since 1.0.0
+ */
 @Injectable()
 export class AnalysisService {
   private readonly logger = new Logger(AnalysisService.name);
 
   constructor(private readonly httpService: HttpService) {}
 
+  /**
+   * Analyzes an API endpoint by making exploratory HTTP requests to understand its behavior.
+   * 
+   * This method performs comprehensive analysis of all configured HTTP methods for an endpoint.
+   * It handles resource creation dependencies (e.g., creating a resource via POST before
+   * testing PATCH/DELETE operations) and provides detailed analysis results including
+   * response schemas, status codes, and entity data extraction.
+   * 
+   * @param project - The project configuration containing base URL and path information
+   * @param dto - The endpoint registration data containing methods and configuration
+   * @returns Promise containing comprehensive analysis results for all endpoint methods
+   * @throws {BadRequestException} When API is unreachable or returns critical errors
+   * 
+   * @example
+   * ```typescript
+   * const analysis = await analysisService.analyzeEndpoint(project, endpointDto);
+   * console.log(analysis.summary.totalMethods); // Number of methods analyzed
+   * ```
+   */
   async analyzeEndpoint(project: Project, dto: RegisterEndpointDto) {
     this.logger.log(
-      `[ANALYZE] Iniciating analysis for endpoint: ${dto.entityName}`,
+      `[ANALYZE] Initiating analysis for endpoint: ${dto.entityName}`,
     );
 
     const analysisResults: Record<string, any> = {};
@@ -102,6 +132,22 @@ export class AnalysisService {
     };
   }
 
+  /**
+   * Analyzes a specific HTTP method for an endpoint by making an exploratory request.
+   * 
+   * This private method handles the actual HTTP request execution for a single method,
+   * including request configuration, response processing, and error handling. It builds
+   * the appropriate URL, configures request data for methods that require it, and
+   * extracts entity data and response schemas from the API response.
+   * 
+   * @private
+   * @param project - The project configuration containing base URL and path information
+   * @param dto - The endpoint registration data containing path and parameter information
+   * @param methodConfig - Configuration for the specific HTTP method being analyzed
+   * @param createdResourceId - Optional ID of a previously created resource for dependent operations
+   * @returns Promise containing analysis results for the specific method
+   * @throws {BadRequestException} When the HTTP method is unsupported or API request fails
+   */
   private async analyzeMethod(
     project: Project,
     dto: RegisterEndpointDto,
@@ -221,6 +267,17 @@ export class AnalysisService {
     }
   }
 
+  /**
+   * Generates a summary of the analysis results for all endpoint methods.
+   * 
+   * This method processes the analysis results from all HTTP methods and creates
+   * a comprehensive summary including success/failure counts, status codes, and
+   * error indicators.
+   * 
+   * @private
+   * @param analysisResults - Record containing analysis results for each HTTP method
+   * @returns Summary object with statistics about the analysis results
+   */
   private generateAnalysisSummary(analysisResults: Record<string, any>): any {
     const summary = {
       totalMethods: Object.keys(analysisResults).length,
@@ -243,6 +300,16 @@ export class AnalysisService {
     return summary;
   }
 
+  /**
+   * Builds a request body object from field definitions for HTTP methods that require it.
+   * 
+   * This method creates a request body by using example values from field definitions
+   * or generating default values based on field types when examples are not available.
+   * 
+   * @private
+   * @param requestBodyDefinition - Array of field definitions containing type and example information
+   * @returns Request body object with appropriate values for each field
+   */
   private buildRequestBody(requestBodyDefinition: any[]): any {
     const body: any = {};
     
@@ -276,6 +343,18 @@ export class AnalysisService {
     return body;
   }
 
+  /**
+   * Finds the most likely data path in a response object by analyzing object complexity.
+   * 
+   * This method recursively searches through response data to identify the path that
+   * leads to the most complex object (with the most properties), which is typically
+   * where the main entity data is located.
+   * 
+   * @private
+   * @param data - The response data object to analyze
+   * @param currentPath - Current path being analyzed (used for recursion)
+   * @returns The path string pointing to the most complex data object
+   */
   private findDataPath(data: any, currentPath = ''): string {
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {
       return '';
@@ -312,11 +391,36 @@ export class AnalysisService {
     return bestPath;
   }
 
+  /**
+   * Retrieves an object from a nested structure using a dot-notation path.
+   * 
+   * This utility method navigates through nested objects using a path string
+   * with dot notation (e.g., "data.items.0").
+   * 
+   * @private
+   * @param obj - The root object to navigate from
+   * @param path - Dot-notation path to the desired object
+   * @returns The object at the specified path, or null if path doesn't exist
+   */
   private getObjectByPath(obj: any, path: string): any {
     if (!path) return obj;
     return path.split('.').reduce((o, i) => (o ? o[i] : null), obj);
   }
 
+  /**
+   * Builds the complete URL for an API endpoint request.
+   * 
+   * This method constructs the full URL by combining base URL, base path, endpoint path,
+   * and handling path parameters and resource IDs for dependent operations.
+   * 
+   * @private
+   * @param baseUrl - The base URL of the API
+   * @param dto - The endpoint registration data containing path and parameters
+   * @param method - The HTTP method being used
+   * @param createdResourceId - Optional ID of a previously created resource
+   * @param basePath - Optional base path for the API
+   * @returns The complete URL for the API request
+   */
   private buildUrl(
     baseUrl: string,
     dto: RegisterEndpointDto,
@@ -365,11 +469,32 @@ export class AnalysisService {
     return url;
   }
 
+  /**
+   * Determines if an HTTP method typically requires a resource ID in the URL.
+   * 
+   * This method identifies which HTTP methods (PUT, PATCH, DELETE) typically
+   * require a resource identifier in the URL path for their operations.
+   * 
+   * @private
+   * @param method - The HTTP method to check
+   * @returns True if the method typically requires an ID, false otherwise
+   */
   private methodNeedsId(method: string): boolean {
     // Methods that typically require an ID in the URL
     return ['PUT', 'PATCH', 'DELETE'].includes(method);
   }
 
+  /**
+   * Extracts entity-specific data from API response by searching common data paths.
+   * 
+   * This method searches for entity data in various common response structures,
+   * including direct entity names, plural forms, and common data container fields.
+   * 
+   * @private
+   * @param responseData - The complete API response data
+   * @param entityName - The name of the entity being searched for
+   * @returns The extracted entity data or the entire response if no specific entity found
+   */
   private extractEntityData(responseData: any, entityName: string): any {
     // Search for the specific entity in the response
     const entityNameLower = entityName.toLowerCase();
@@ -402,6 +527,17 @@ export class AnalysisService {
     return responseData;
   }
 
+  /**
+   * Infers a JSON schema from data by analyzing its structure and types.
+   * 
+   * This method recursively analyzes data to create a JSON schema that describes
+   * the structure, types, and required fields of the data. It handles primitive
+   * types, arrays, objects, and nested structures.
+   * 
+   * @private
+   * @param data - The data to analyze and create a schema for
+   * @returns A JSON schema object describing the data structure
+   */
   private inferSchemaFromData(data: any): any {
     if (data === null) {
       return { type: 'null' };

@@ -4,7 +4,7 @@ import { TestType, TestEnvironment } from '../../test-execution/dto/execute-test
 
 export class ExecuteTestSuiteDto {
   @ApiPropertyOptional({
-    description: 'Método HTTP específico para filtrar casos de prueba',
+    description: 'Specific HTTP method to filter test cases',
     example: 'POST',
   })
   @IsOptional()
@@ -12,7 +12,7 @@ export class ExecuteTestSuiteDto {
   method?: string;
 
   @ApiPropertyOptional({
-    description: 'Tipo de pruebas a ejecutar',
+    description: 'Type of tests to execute',
     enum: TestType,
     default: TestType.ALL,
   })
@@ -21,7 +21,7 @@ export class ExecuteTestSuiteDto {
   testType?: TestType = TestType.ALL;
 
   @ApiPropertyOptional({
-    description: 'Ejecutar pruebas en paralelo',
+    description: 'Run tests in parallel',
     default: true,
   })
   @IsOptional()
@@ -29,7 +29,7 @@ export class ExecuteTestSuiteDto {
   parallel?: boolean = true;
 
   @ApiPropertyOptional({
-    description: 'Timeout en milisegundos para cada prueba',
+    description: 'Timeout in milliseconds for each test',
     minimum: 1000,
     maximum: 300000,
     default: 30000,
@@ -39,7 +39,7 @@ export class ExecuteTestSuiteDto {
   timeout?: number = 30000;
 
   @ApiPropertyOptional({
-    description: 'Número de reintentos en caso de fallo',
+    description: 'Number of retries on failure',
     minimum: 0,
     maximum: 5,
     default: 1,
@@ -49,7 +49,7 @@ export class ExecuteTestSuiteDto {
   retries?: number = 1;
 
   @ApiPropertyOptional({
-    description: 'Entorno de pruebas',
+    description: 'Target test environment',
     enum: TestEnvironment,
     default: TestEnvironment.LOCAL,
   })
@@ -58,7 +58,7 @@ export class ExecuteTestSuiteDto {
   environment?: TestEnvironment = TestEnvironment.LOCAL;
 
   @ApiPropertyOptional({
-    description: 'Mostrar logs detallados',
+    description: 'Show verbose logs',
     default: true,
   })
   @IsOptional()
@@ -66,7 +66,7 @@ export class ExecuteTestSuiteDto {
   verbose?: boolean = true;
 
   @ApiPropertyOptional({
-    description: 'Guardar logs de requests/responses',
+    description: 'Persist request/response logs',
     default: true,
   })
   @IsOptional()
@@ -74,7 +74,7 @@ export class ExecuteTestSuiteDto {
   saveLogs?: boolean = true;
 
   @ApiPropertyOptional({
-    description: 'Guardar payloads de requests/responses',
+    description: 'Persist request/response payloads',
     default: true,
   })
   @IsOptional()
@@ -82,7 +82,7 @@ export class ExecuteTestSuiteDto {
   savePayloads?: boolean = true;
 
   @ApiPropertyOptional({
-    description: 'Número de workers para ejecución paralela',
+    description: 'Number of workers for parallel execution',
     minimum: 1,
     maximum: 10,
     default: 3,

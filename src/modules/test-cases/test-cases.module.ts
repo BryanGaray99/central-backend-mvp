@@ -17,11 +17,29 @@ import { ProjectsModule } from '../projects/projects.module';
 import { AIModule } from '../ai/ai.module';
 import { Bug } from '../bugs/entities/bug.entity';
 
+/**
+ * Test Cases Module
+ *
+ * This module provides comprehensive test case management functionality for the API testing system.
+ * It handles the creation, management, and execution of test cases and test steps, including
+ * AI-powered test generation, feature file management, and integration with Playwright projects.
+ *
+ * The module includes:
+ * - Test case and test step entities for data persistence
+ * - Controllers for handling HTTP requests related to test cases
+ * - Services for test case generation, registration, and management
+ * - Integration with AI services for automated test generation
+ * - Feature file management for Playwright test execution
+ * - Common hooks registration for database tracking
+ *
+ * @module TestCasesModule
+ * @since 1.0.0
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([TestCase, TestStep, Project, AIGeneration, Bug]),
-    ProjectsModule, // Importar ProjectsModule para acceder a FileSystemService y TemplateService
-    forwardRef(() => AIModule), // Importar AI Module para acceder a AIAgentService
+    ProjectsModule, // Import ProjectsModule to access FileSystemService and TemplateService
+    forwardRef(() => AIModule), // Import AI Module to access AIAgentService
   ],
   controllers: [TestCasesController, ProjectTestCasesController],
   providers: [

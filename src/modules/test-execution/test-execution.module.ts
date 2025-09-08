@@ -15,6 +15,12 @@ import { TestCase } from '../test-cases/entities/test-case.entity';
 import { TestSuitesModule } from '../test-suites/test-suites.module';
 import { BugsModule } from '../bugs/bugs.module';
 
+/**
+ * Module: TestExecutionModule
+ *
+ * Provides all components required for executing tests, collecting results,
+ * logging, streaming events (SSE), and integrating with test suites and bugs.
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([TestExecution, TestResult, Project, TestCase]),

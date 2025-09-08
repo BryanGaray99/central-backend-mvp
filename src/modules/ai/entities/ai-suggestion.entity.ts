@@ -2,6 +2,14 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDa
 import { Project } from '../../projects/project.entity';
 import { TestCaseSuggestionDto } from '../dto/test-case-suggestion.dto';
 
+/**
+ * AI Suggestion Entity
+ * 
+ * Represents AI-generated test case suggestions for a specific project and entity.
+ * Stores the suggestions, metadata, and processing information.
+ * 
+ * @entity AISuggestion
+ */
 @Entity('ai_suggestions')
 export class AISuggestion {
   @PrimaryGeneratedColumn('uuid')

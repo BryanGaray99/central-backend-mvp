@@ -11,7 +11,7 @@ import { FeatureFileManagerService } from './feature-file-manager.service';
 import { TestCaseResponseDto } from '../dto/test-case-response.dto';
 import { TestCaseStatisticsDto } from '../dto/test-case-statistics.dto';
 
-// Interfaces temporales para los métodos TODO
+// Temporary interfaces for TODO methods
 interface TestCaseListResponseDto {
   testCases: TestCaseResponseDto[];
   pagination: {
@@ -40,6 +40,17 @@ interface TestCaseExportDto {
 
 
 
+/**
+ * Test Cases Service
+ *
+ * This service provides comprehensive test case management functionality including
+ * CRUD operations, filtering, pagination, statistics, and integration with feature files.
+ * It handles test case creation, updates, deletion, and provides various query methods
+ * for retrieving test cases with different criteria.
+ *
+ * @class TestCasesService
+ * @since 1.0.0
+ */
 @Injectable()
 export class TestCasesService {
   private readonly logger = new Logger(TestCasesService.name);
@@ -52,26 +63,49 @@ export class TestCasesService {
     private readonly featureFileManagerService: FeatureFileManagerService,
   ) {}
 
-  // ✅ MÉTODOS CRUD BÁSICOS EN USO
+  /**
+   * Creates a new test case for the specified project.
+   *
+   * This method validates input data, generates a unique test case ID,
+   * saves the test case to the database, and optionally adds it to the feature file.
+   *
+   * @param projectId - The ID of the project to create the test case in
+   * @param dto - The test case creation data
+   * @param skipFeatureInsertion - Whether to skip adding the test case to the feature file
+   * @returns Promise resolving to the created test case response
+   * @throws Error when validation fails or database operations fail
+   *
+   * @example
+   * ```typescript
+   * const testCase = await service.createTestCase('project-123', {
+   *   name: 'Create Product Test',
+   *   description: 'Test product creation',
+   *   entityName: 'Product',
+   *   section: 'ecommerce',
+   *   method: 'POST',
+   *   scenario: 'Given I have valid data\nWhen I create a product\nThen it should be created'
+   * });
+   * ```
+   */
   async createTestCase(projectId: string, dto: CreateTestCaseDto, skipFeatureInsertion: boolean = false): Promise<TestCaseResponseDto> {
     this.logger.log(`Creating test case for project ${projectId}`);
 
     try {
-      // 1. Validar datos de entrada
+      // 1. Validate input data
       await this.validateTestCase(dto);
 
-      // 2. Determinar el ID del test case
+      // 2. Determine the test case ID
       let testCaseId: string;
       if (skipFeatureInsertion && dto.testCaseId) {
-        // Para test cases generados por IA, usar el ID que ya viene en el DTO
+        // For AI-generated test cases, use the ID that already comes in the DTO
         testCaseId = dto.testCaseId;
         this.logger.log(`Using AI-generated test case ID: ${testCaseId}`);
       } else {
-        // Para test cases normales, generar ID único (basado en BD existente)
+        // For normal test cases, generate unique ID (based on existing database)
         testCaseId = await this.generateTestCaseId(projectId, dto.section, dto.entityName);
       }
 
-      // 3. Crear test case en BD (asegurar que projectId del path prevalezca)
+      // 3. Create test case in database (ensure that projectId from path takes precedence)
       const testCase = this.testCaseRepository.create({
         ...dto,
         testCaseId,
@@ -80,7 +114,7 @@ export class TestCasesService {
 
       const savedTestCase = await this.testCaseRepository.save(testCase);
 
-      // 4. Append scenario to feature file (solo si no se saltó la inserción)
+      // 4. Append scenario to feature file (only if insertion was not skipped)
       if (!skipFeatureInsertion) {
         try {
           await this.featureFileManagerService.addTestCaseToFeature(
@@ -104,22 +138,41 @@ export class TestCasesService {
     }
   }
 
+  /**
+   * Updates an existing test case.
+   *
+   * This method validates input data, updates the test case in the database,
+   * and updates the corresponding feature file.
+   *
+   * @param testCaseId - The ID of the test case to update
+   * @param dto - The update data for the test case
+   * @returns Promise resolving to the updated test case response
+   * @throws Error when test case is not found or validation fails
+   *
+   * @example
+   * ```typescript
+   * const updated = await service.updateTestCase('TC-ECOMMERCE-01', {
+   *   name: 'Updated Test Case Name',
+   *   description: 'Updated description'
+   * });
+   * ```
+   */
   async updateTestCase(testCaseId: string, dto: UpdateTestCaseDto): Promise<TestCaseResponseDto> {
     this.logger.log(`Updating test case: ${testCaseId}`);
 
     try {
       const testCase = await this.findTestCaseEntityById(testCaseId);
       
-      // 1. Validar datos de entrada
+      // 1. Validate input data
       await this.validateTestCase({ ...testCase, ...dto });
 
-      // 2. Actualizar en BD
+      // 2. Update in database
       const updatedTestCase = await this.testCaseRepository.save({
         ...testCase,
         ...dto,
       });
 
-      // 3. Actualizar archivos de feature
+      // 3. Update feature files
       try {
         await this.featureFileManagerService.updateTestCaseInFeature(
           testCase.projectId,
@@ -130,7 +183,7 @@ export class TestCasesService {
         this.logger.log(`Test case updated in feature file: ${testCaseId}`);
       } catch (featureError) {
         this.logger.warn(`Warning: Could not update test case in feature file: ${featureError.message}`);
-        // No lanzar error aquí, solo loggear como warning
+        // Don't throw error here, just log as warning
       }
 
       this.logger.log(`Test case updated successfully: ${testCaseId}`);
@@ -141,6 +194,32 @@ export class TestCasesService {
     }
   }
 
+  /**
+   * Updates test case steps with organized step selection.
+   *
+   * This method updates a test case with new steps, tags, and scenario structure.
+   * It reconstructs the scenario based on selected steps and updates both the
+   * database and feature files.
+   *
+   * @param projectId - The ID of the project containing the test case
+   * @param testCaseId - The ID of the test case to update
+   * @param dto - The step update data including tags, steps, and scenario
+   * @returns Promise resolving to the updated test case response
+   * @throws Error when test case is not found or step processing fails
+   *
+   * @example
+   * ```typescript
+   * const updated = await service.updateTestCaseSteps('project-123', 'TC-ECOMMERCE-01', {
+   *   tags: ['@smoke', '@api'],
+   *   steps: [
+   *     { type: 'Given', stepId: 'ST-SETUP-01' },
+   *     { type: 'When', stepId: 'ST-CREATE-01' },
+   *     { type: 'Then', stepId: 'ST-VERIFY-01' }
+   *   ],
+   *   scenario: 'Given I have valid data\nWhen I create a product\nThen it should be created'
+   * });
+   * ```
+   */
   async updateTestCaseSteps(
     projectId: string, 
     testCaseId: string, 
@@ -159,7 +238,7 @@ export class TestCasesService {
     try {
       const testCase = await this.findTestCaseEntityById(testCaseId);
       
-      // 1. Reconstruir el escenario basado en los steps seleccionados
+      // 1. Reconstruct the scenario based on selected steps
       const scenarioSteps = dto.steps.map(step => {
         const stepType = step.type === 'And' ? this.getPreviousStepType(dto.steps, dto.steps.indexOf(step)) : step.type;
         return `${stepType} ${this.getStepDefinition(step.stepId, step.parameters)}`;
@@ -167,14 +246,14 @@ export class TestCasesService {
 
       const newScenario = scenarioSteps.join('\n    ');
 
-      // 2. Actualizar test case con nuevos datos
+      // 2. Update test case with new data
       const updatedTestCase = await this.testCaseRepository.save({
         ...testCase,
         tags: dto.tags,
         scenario: newScenario,
       });
 
-      // 3. Actualizar archivos de feature
+      // 3. Update feature files
       try {
         await this.featureFileManagerService.updateTestCaseInFeature(
           testCase.projectId,
@@ -195,6 +274,26 @@ export class TestCasesService {
     }
   }
 
+  /**
+   * Updates test case scenario with complete text.
+   *
+   * This method updates a test case with new tags and complete scenario text.
+   * It processes tags and updates both the database and feature files.
+   *
+   * @param projectId - The ID of the project containing the test case
+   * @param testCaseId - The ID of the test case to update
+   * @param dto - The scenario update data including tags and scenario text
+   * @returns Promise resolving to the updated test case response
+   * @throws Error when test case is not found or validation fails
+   *
+   * @example
+   * ```typescript
+   * const updated = await service.updateTestCaseScenario('project-123', 'TC-ECOMMERCE-01', {
+   *   tags: ['@smoke', '@api'],
+   *   scenario: 'Given I have valid product data\nWhen I send a POST request\nThen the product should be created successfully'
+   * });
+   * ```
+   */
   async updateTestCaseScenario(
     projectId: string, 
     testCaseId: string, 
@@ -208,24 +307,24 @@ export class TestCasesService {
     try {
       const testCase = await this.findTestCaseEntityById(testCaseId);
       
-      // Procesar tags - manejar tanto array de strings como array con string que contiene espacios
+      // Process tags - handle both array of strings and array with string containing spaces
       let processedTags = dto.tags;
       if (Array.isArray(dto.tags) && dto.tags.length === 1 && typeof dto.tags[0] === 'string' && dto.tags[0].includes(' ')) {
-        // Si los tags vienen como ["@read @smoke"], separarlos
+        // If tags come as ["@read @smoke"], split them
         processedTags = dto.tags[0].split(' ').filter(tag => tag.trim() !== '');
       }
       
-      // 1. Validar datos de entrada (mismo patrón que updateTestCase)
+      // 1. Validate input data (same pattern as updateTestCase)
       await this.validateTestCase({ ...testCase, tags: processedTags, scenario: dto.scenario });
 
-      // 2. Actualizar en BD usando el mismo patrón que updateTestCase
+      // 2. Update in database using the same pattern as updateTestCase
       const updatedTestCase = await this.testCaseRepository.save({
         ...testCase,
         tags: processedTags,
         scenario: dto.scenario,
       });
 
-      // 3. Actualizar archivos de feature
+      // 3. Update feature files
       try {
         await this.featureFileManagerService.updateTestCaseInFeature(
           testCase.projectId,
@@ -246,6 +345,17 @@ export class TestCasesService {
     }
   }
 
+  /**
+   * Gets the previous step type for 'And' steps.
+   *
+   * This private method determines the correct step type for 'And' steps
+   * by looking at the previous non-'And' step in the sequence.
+   *
+   * @private
+   * @param steps - Array of step objects
+   * @param currentIndex - Current step index
+   * @returns The step type to use for the 'And' step
+   */
   private getPreviousStepType(steps: any[], currentIndex: number): string {
     for (let i = currentIndex - 1; i >= 0; i--) {
       if (steps[i].type !== 'And') {
@@ -255,8 +365,20 @@ export class TestCasesService {
     return 'Given'; // Default fallback
   }
 
+  /**
+   * Gets step definition with parameter substitution.
+   *
+   * This private method retrieves a step definition from the database
+   * and substitutes any provided parameters into the definition.
+   *
+   * @private
+   * @param stepId - The ID of the step to retrieve
+   * @param parameters - Optional parameters to substitute in the definition
+   * @returns Promise resolving to the step definition with substituted parameters
+   * @throws Error when step is not found
+   */
   private async getStepDefinition(stepId: string, parameters?: Record<string, any>): Promise<string> {
-    // Buscar el step en la base de datos
+    // Search for the step in the database
     const step = await this.testStepRepository.findOne({ where: { stepId } });
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
@@ -264,7 +386,7 @@ export class TestCasesService {
 
     let definition = step.definition;
     
-    // Reemplazar parámetros si existen
+    // Replace parameters if they exist
     if (parameters) {
       Object.entries(parameters).forEach(([key, value]) => {
         definition = definition.replace(new RegExp(`{${key}}`, 'g'), String(value));
@@ -274,16 +396,31 @@ export class TestCasesService {
     return definition;
   }
 
+  /**
+   * Deletes a test case by ID.
+   *
+   * This method removes a test case from the database and updates
+   * the corresponding feature file to remove the scenario.
+   *
+   * @param testCaseId - The ID of the test case to delete
+   * @returns Promise that resolves when the test case is deleted
+   * @throws Error when test case is not found or deletion fails
+   *
+   * @example
+   * ```typescript
+   * await service.deleteTestCase('TC-ECOMMERCE-01');
+   * ```
+   */
   async deleteTestCase(testCaseId: string): Promise<void> {
     this.logger.log(`Deleting test case: ${testCaseId}`);
 
     try {
       const testCase = await this.findTestCaseEntityById(testCaseId);
 
-      // 1. Eliminar de BD
+      // 1. Remove from database
       await this.testCaseRepository.remove(testCase);
 
-      // 2. Actualizar archivos de feature
+      // 2. Update feature files
       try {
         await this.featureFileManagerService.removeTestCaseFromFeature(
           testCase.projectId,
@@ -294,7 +431,7 @@ export class TestCasesService {
         this.logger.log(`Test case removed from feature file: ${testCaseId}`);
       } catch (featureError) {
         this.logger.warn(`Warning: Could not remove test case from feature file: ${featureError.message}`);
-        // No lanzar error aquí, solo loggear como warning
+        // Don't throw error here, just log as warning
       }
 
       this.logger.log(`Test case deleted successfully: ${testCaseId}`);
@@ -304,21 +441,59 @@ export class TestCasesService {
     }
   }
 
+  /**
+   * Finds a test case by its ID and returns it as a response DTO.
+   *
+   * This method retrieves a test case from the database by its ID
+   * and converts it to a response DTO format.
+   *
+   * @param testCaseId - The ID of the test case to find
+   * @returns Promise resolving to the test case response DTO
+   * @throws Error when test case is not found
+   *
+   * @example
+   * ```typescript
+   * const testCase = await service.findByTestCaseId('TC-ECOMMERCE-01');
+   * ```
+   */
   async findByTestCaseId(testCaseId: string): Promise<TestCaseResponseDto> {
     const testCase = await this.findTestCaseEntityById(testCaseId);
     return this.toTestCaseResponseDto(testCase);
   }
 
+  /**
+   * Lists test cases for a project with filtering and pagination.
+   *
+   * This method retrieves test cases for a specific project with support for
+   * filtering by various criteria and pagination. It applies filters for
+   * entity name, section, method, test type, status, search terms, and tags.
+   *
+   * @param projectId - The ID of the project to list test cases for
+   * @param filters - Filtering and pagination criteria
+   * @returns Promise resolving to paginated list of test cases with metadata
+   * @throws Error when database operations fail
+   *
+   * @example
+   * ```typescript
+   * const result = await service.listTestCases('project-123', {
+   *   page: 1,
+   *   limit: 20,
+   *   entityName: 'Product',
+   *   method: 'POST',
+   *   search: 'create'
+   * });
+   * ```
+   */
   async listTestCases(projectId: string, filters: TestCaseFiltersDto): Promise<TestCaseListResponseDto> {
     this.logger.log(`Listing test cases for project ${projectId}`);
 
     try {
-      // Construir query base
+
       const queryBuilder = this.testCaseRepository
         .createQueryBuilder('testCase')
         .where('testCase.projectId = :projectId', { projectId });
 
-      // Aplicar filtros
+
       if (filters.entityName) {
         queryBuilder.andWhere('testCase.entityName = :entityName', { entityName: filters.entityName });
       }
@@ -347,7 +522,7 @@ export class TestCasesService {
       }
 
       if (filters.tags && filters.tags.length > 0) {
-        // Buscar test cases que contengan al menos uno de los tags
+ 
         const tagConditions = filters.tags.map((_, index) => `testCase.tags LIKE :tag${index}`);
         queryBuilder.andWhere(`(${tagConditions.join(' OR ')})`);
         filters.tags.forEach((tag, index) => {
@@ -355,22 +530,19 @@ export class TestCasesService {
         });
       }
 
-      // Aplicar ordenamiento
+
       const sortBy = filters.sortBy || 'createdAt';
       const sortOrder = filters.sortOrder || 'DESC';
       queryBuilder.orderBy(`testCase.${sortBy}`, sortOrder as 'ASC' | 'DESC');
 
-      // Aplicar paginación
       const page = filters.page || 1;
       const limit = filters.limit || 20;
       const offset = (page - 1) * limit;
 
       queryBuilder.skip(offset).take(limit);
 
-      // Ejecutar query
       const [testCases, total] = await queryBuilder.getManyAndCount();
 
-      // Calcular información de paginación
       const totalPages = Math.ceil(total / limit);
 
       this.logger.log(`Found ${testCases.length} test cases (total: ${total})`);
@@ -391,6 +563,20 @@ export class TestCasesService {
     }
   }
 
+  /**
+   * Lists all test cases across all projects.
+   *
+   * This method retrieves all test cases from the database regardless of project,
+   * ordered by creation date in descending order.
+   *
+   * @returns Promise resolving to array of all test case entities
+   * @throws Error when database operations fail
+   *
+   * @example
+   * ```typescript
+   * const allTestCases = await service.listAllTestCases();
+   * ```
+   */
   async listAllTestCases(): Promise<TestCase[]> {
     this.logger.log('Listing all test cases across all projects');
 
@@ -407,6 +593,23 @@ export class TestCasesService {
     }
   }
 
+  /**
+   * Deletes all test cases for a specific project, section, and entity combination.
+   *
+   * This method removes all test cases that match the specified project ID,
+   * section, and entity name from the database.
+   *
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The entity name
+   * @returns Promise that resolves when all matching test cases are deleted
+   * @throws Error when database operations fail
+   *
+   * @example
+   * ```typescript
+   * await service.deleteTestCasesByProjectSectionEntity('project-123', 'ecommerce', 'Product');
+   * ```
+   */
   async deleteTestCasesByProjectSectionEntity(projectId: string, section: string, entityName: string): Promise<void> {
     this.logger.log(`Deleting all test cases for projectId=${projectId}, section=${section}, entityName=${entityName}`);
     try {
@@ -418,27 +621,26 @@ export class TestCasesService {
     }
   }
 
-
-
-  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Exportar test case con formato optimizado
-  async exportTestCase(projectId: string, testCaseId: string): Promise<TestCaseExportDto> {
-    // TODO: Implementar con IA para exportación inteligente
-    // - Análisis de formato de exportación
-    // - Generación de metadatos optimizados
-    // - Validación de compatibilidad
-    throw new Error('TODO: Implementar con IA - exportTestCase');
-  }
-
-  // TODO: FUTURA IMPLEMENTACIÓN CON IA - Obtener estadísticas avanzadas
+  /**
+   * Gets test case statistics for a project.
+   *
+   * This method is currently a placeholder for future AI implementation.
+   * It will provide comprehensive statistics about test cases in a project.
+   *
+   * @param projectId - The ID of the project to get statistics for
+   * @returns Promise resolving to test case statistics
+   * @throws Error indicating this is a TODO implementation
+   *
+   * @example
+   * ```typescript
+   * const stats = await service.getStatistics('project-123');
+   * ```
+   */
   async getStatistics(projectId: string): Promise<TestCaseStatisticsDto> {
-    // TODO: Implementar con IA para estadísticas inteligentes
-    // - Análisis de patrones de uso
-    // - Métricas de cobertura avanzadas
-    // - Predicciones de rendimiento
-    throw new Error('TODO: Implementar con IA - getStatistics');
+    throw new Error('TODO: Implement with AI - getStatistics');
   }
 
-  // ✅ MÉTODOS DE SOPORTE EN USO
+
   private async findTestCaseEntityById(testCaseId: string): Promise<TestCase> {
     const testCase = await this.testCaseRepository.findOne({
       where: { testCaseId },
@@ -481,7 +683,7 @@ export class TestCasesService {
   }
 
   private async validateTestCase(dto: CreateTestCaseDto | (TestCase & UpdateTestCaseDto)): Promise<void> {
-    // Validaciones básicas
+    // Basic validations
     if (!dto.name || dto.name.trim().length === 0) {
       throw new Error('Test case name is required');
     }

@@ -10,6 +10,16 @@ import { ProjectsModule } from '../projects/projects.module';
 import { EndpointsModule } from '../endpoints/endpoints.module';
 import { TestCasesModule } from '../test-cases/test-cases.module';
 
+/**
+ * Sync Module
+ * 
+ * Manages project synchronization functionality between file system artifacts
+ * and database entities. Provides comprehensive synchronization of endpoints,
+ * test cases, and test steps to ensure consistency between generated files
+ * and database records.
+ * 
+ * @module SyncModule
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Project, Endpoint, TestCase, TestStep]),

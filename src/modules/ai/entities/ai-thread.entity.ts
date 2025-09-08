@@ -1,6 +1,14 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
 import { Project } from '../../projects/project.entity';
 
+/**
+ * AI Thread Entity
+ * 
+ * Represents a conversation thread with an AI assistant for a specific project.
+ * Manages the conversation history and message limits for OpenAI Assistant API.
+ * 
+ * @entity AIThread
+ */
 @Entity('ai_threads')
 export class AIThread {
   @PrimaryGeneratedColumn()

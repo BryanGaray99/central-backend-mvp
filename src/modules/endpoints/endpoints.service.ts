@@ -20,10 +20,36 @@ import { TestCasesService } from '../test-cases/services/test-cases.service';
 import { TestStepRegistrationService } from '../test-cases/services/test-step-registration.service';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Service for managing API endpoints and their testing artifacts.
+ * 
+ * This service handles the complete lifecycle of endpoint management, including
+ * registration, analysis, artifact generation, and cleanup. It coordinates
+ * with various specialized services to provide comprehensive endpoint
+ * management functionality.
+ * 
+ * @class EndpointsService
+ * @since 1.0.0
+ */
 @Injectable()
 export class EndpointsService {
+  /** Logger instance for this service */
   private readonly logger = new Logger(EndpointsService.name);
 
+  /**
+   * Creates an instance of EndpointsService.
+   * 
+   * @param projectRepository - TypeORM repository for Project entity
+   * @param endpointRepository - TypeORM repository for Endpoint entity
+   * @param analysisService - Service for endpoint analysis
+   * @param artifactsGenerationService - Service for artifact generation
+   * @param hooksUpdaterService - Service for hooks file updates
+   * @param apiConfigUpdaterService - Service for API config updates
+   * @param cleanupService - Service for cleanup operations
+   * @param testCaseGenerationService - Service for test case generation
+   * @param testCasesService - Service for test cases management
+   * @param testStepRegistrationService - Service for test step registration
+   */
   constructor(
     @InjectRepository(Project)
     private readonly projectRepository: Repository<Project>,
@@ -39,6 +65,27 @@ export class EndpointsService {
     private readonly testStepRegistrationService: TestStepRegistrationService,
   ) {}
 
+  /**
+   * Registers and analyzes an endpoint for test generation.
+   * 
+   * This method validates the endpoint data, creates the endpoint record,
+   * and starts the analysis and generation process in the background.
+   * 
+   * @param dto - Endpoint registration data
+   * @returns Promise that resolves to registration result
+   * @throws {BadRequestException} When project ID is missing or endpoint already exists
+   * @throws {NotFoundException} When project is not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await endpointsService.registerAndAnalyze({
+   *   projectId: 'project-id',
+   *   entityName: 'Product',
+   *   path: '/products',
+   *   methods: [{ method: 'GET' }, { method: 'POST' }]
+   * });
+   * ```
+   */
   async registerAndAnalyze(dto: RegisterEndpointDto) {
     // Validate projectId is present
     if (!dto.projectId) {
@@ -94,6 +141,19 @@ export class EndpointsService {
     };
   }
 
+  /**
+   * Lists all endpoints for a specific project.
+   * 
+   * @param projectId - The ID of the project to list endpoints for
+   * @returns Promise that resolves to an array of endpoints
+   * @throws {NotFoundException} When project is not found
+   * 
+   * @example
+   * ```typescript
+   * const endpoints = await endpointsService.listEndpoints('project-id');
+   * console.log(`Found ${endpoints.length} endpoints`);
+   * ```
+   */
   async listEndpoints(projectId: string): Promise<Endpoint[]> {
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
@@ -107,12 +167,37 @@ export class EndpointsService {
     });
   }
 
+  /**
+   * Lists all endpoints across all projects.
+   * 
+   * @returns Promise that resolves to an array of all endpoints
+   * 
+   * @example
+   * ```typescript
+   * const allEndpoints = await endpointsService.listAllEndpoints();
+   * console.log(`Found ${allEndpoints.length} endpoints across all projects`);
+   * ```
+   */
   async listAllEndpoints(): Promise<Endpoint[]> {
     return this.endpointRepository.find({
       order: { createdAt: 'DESC' },
     });
   }
 
+  /**
+   * Retrieves a specific endpoint by ID and project ID.
+   * 
+   * @param id - The unique ID of the endpoint
+   * @param projectId - The ID of the project containing the endpoint
+   * @returns Promise that resolves to the endpoint
+   * @throws {NotFoundException} When project or endpoint is not found
+   * 
+   * @example
+   * ```typescript
+   * const endpoint = await endpointsService.getEndpoint('endpoint-id', 'project-id');
+   * console.log(`Endpoint: ${endpoint.name}`);
+   * ```
+   */
   async getEndpoint(id: string, projectId: string): Promise<Endpoint> {
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
@@ -132,8 +217,17 @@ export class EndpointsService {
   }
 
   /**
-   * Procesa y filtra analysisResults para devolver solo información relevante
-   * en formato Swagger-like para cada método del endpoint
+   * Processes and filters analysis results to return only relevant information
+   * in Swagger-like format for each endpoint method.
+   * 
+   * @param analysisResults - Raw analysis results from endpoint analysis
+   * @returns Processed analysis results with relevant fields
+   * 
+   * @example
+   * ```typescript
+   * const processed = endpointsService.processAnalysisResults(rawAnalysis);
+   * console.log(processed.GET.statusCode); // 200
+   * ```
    */
   public processAnalysisResults(analysisResults: any): any {
     if (!analysisResults) return null;
@@ -157,8 +251,12 @@ export class EndpointsService {
   }
 
   /**
-   * Extrae los campos de la respuesta y su estado de requerido
-   * para mostrar de forma concisa en el frontend
+   * Extracts response fields and their required status
+   * to display concisely in the frontend.
+   * 
+   * @param responseSchema - The response schema to extract fields from
+   * @returns Array of extracted response fields
+   * @private
    */
   private extractResponseFields(responseSchema: any): any[] {
     if (!responseSchema || typeof responseSchema !== 'object') {
@@ -167,15 +265,15 @@ export class EndpointsService {
 
     const fields: any[] = [];
 
-    // Si es un objeto con propiedades
+    // If it's an object with properties
     if (responseSchema.properties && typeof responseSchema.properties === 'object') {
       const requiredFields = responseSchema.required || [];
       
-      // Buscar específicamente el campo 'data' que contiene los datos reales
+      // Look specifically for the 'data' field that contains the actual data
       if (responseSchema.properties.data) {
         const dataSchema = responseSchema.properties.data;
         
-        // Si data es un array, extraer los campos de los items
+        // If data is an array, extract fields from items
         if (dataSchema.type === 'array' && dataSchema.items && dataSchema.items.properties) {
           const itemRequiredFields = dataSchema.items.required || [];
           
@@ -190,7 +288,7 @@ export class EndpointsService {
             });
           }
         }
-        // Si data es un objeto, extraer sus campos directamente
+        // If data is an object, extract its fields directly
         else if (dataSchema.type === 'object' && dataSchema.properties) {
           const dataRequiredFields = dataSchema.required || [];
           
@@ -205,7 +303,7 @@ export class EndpointsService {
             });
           }
         }
-        // Si data es un tipo primitivo
+        // If data is a primitive type
         else {
           fields.push({
             name: 'data',
@@ -216,7 +314,7 @@ export class EndpointsService {
           });
         }
       } else {
-        // Si no hay campo 'data', extraer todos los campos del nivel superior
+        // If there's no 'data' field, extract all top-level fields
         for (const [fieldName, fieldSchema] of Object.entries(responseSchema.properties)) {
           const field = fieldSchema as any;
           fields.push({
@@ -229,7 +327,7 @@ export class EndpointsService {
         }
       }
     }
-    // Si es un array, mostrar información del tipo de items
+    // If it's an array, show information about the item type
     else if (responseSchema.type === 'array' && responseSchema.items) {
       if (responseSchema.items.properties) {
         const requiredFields = responseSchema.items.required || [];
@@ -254,7 +352,7 @@ export class EndpointsService {
         });
       }
     }
-    // Si es un tipo primitivo
+    // If it's a primitive type
     else {
       fields.push({
         name: 'response',
@@ -269,8 +367,19 @@ export class EndpointsService {
   }
 
   /**
-   * Procesa los métodos del endpoint para incluir requestBodyDefinition
-   * en formato Swagger-like
+   * Processes endpoint methods to include requestBodyDefinition
+   * in Swagger-like format.
+   * 
+   * @param methods - Array of endpoint methods to process
+   * @returns Processed methods with standardized format
+   * 
+   * @example
+   * ```typescript
+   * const processed = endpointsService.processMethods([
+   *   { method: 'GET' },
+   *   { method: 'POST', requestBodyDefinition: [...] }
+   * ]);
+   * ```
    */
   public processMethods(methods: any[]): any[] {
     if (!Array.isArray(methods)) return [];
@@ -293,6 +402,24 @@ export class EndpointsService {
     });
   }
 
+  /**
+   * Updates an existing endpoint.
+   * 
+   * @param id - The unique ID of the endpoint to update
+   * @param projectId - The ID of the project containing the endpoint
+   * @param dto - Endpoint update data
+   * @returns Promise that resolves to the updated endpoint
+   * @throws {NotFoundException} When project or endpoint is not found
+   * 
+   * @example
+   * ```typescript
+   * const updated = await endpointsService.updateEndpoint(
+   *   'endpoint-id',
+   *   'project-id',
+   *   { entityName: 'UpdatedEntity', description: 'New description' }
+   * );
+   * ```
+   */
   async updateEndpoint(
     id: string,
     projectId: string,
@@ -326,6 +453,23 @@ export class EndpointsService {
     return this.endpointRepository.save(endpoint);
   }
 
+  /**
+   * Deletes an endpoint and all its associated artifacts.
+   * 
+   * This method performs comprehensive cleanup including artifact files,
+   * test cases, test steps, and configuration updates.
+   * 
+   * @param id - The unique ID of the endpoint to delete
+   * @param projectId - The ID of the project containing the endpoint
+   * @returns Promise that resolves when deletion is complete
+   * @throws {NotFoundException} When project or endpoint is not found
+   * 
+   * @example
+   * ```typescript
+   * await endpointsService.deleteEndpoint('endpoint-id', 'project-id');
+   * console.log('Endpoint and all artifacts deleted');
+   * ```
+   */
   async deleteEndpoint(id: string, projectId: string): Promise<void> {
     // Validate project exists
     const project = await this.projectRepository.findOneBy({ id: projectId });
@@ -351,10 +495,10 @@ export class EndpointsService {
       await this.cleanupService.cleanupEndpointArtifacts(project.path, artifacts, section, entityName);
     }
 
-    // Eliminar test cases asociados a este endpoint (por projectId, section y entityName)
+    // Delete test cases associated with this endpoint (by projectId, section and entityName)
     await this.testCasesService.deleteTestCasesByProjectSectionEntity(projectId, section, entityName);
 
-    // Eliminar test steps asociados a este endpoint (por projectId, section y entityName)
+    // Delete test steps associated with this endpoint (by projectId, section and entityName)
     await this.testStepRegistrationService.deleteTestStepsByProjectSectionEntity(projectId, section, entityName);
 
     // Delete endpoint record
@@ -375,6 +519,17 @@ export class EndpointsService {
     await this.apiConfigUpdaterService.updateApiConfigOnEndpointDeletion(project.id);
   }
 
+  /**
+   * Processes an endpoint asynchronously through analysis and generation.
+   * 
+   * This method handles the complete endpoint processing pipeline including
+   * analysis, artifact generation, and configuration updates.
+   * 
+   * @param endpoint - The endpoint to process
+   * @param dto - Original endpoint registration data
+   * @param project - The project containing the endpoint
+   * @private
+   */
   private async processEndpointAsync(
     endpoint: Endpoint,
     dto: RegisterEndpointDto,
@@ -446,6 +601,14 @@ export class EndpointsService {
     }
   }
 
+  /**
+   * Extracts DTO structure from request body definition.
+   * 
+   * @param requestBody - The request body definition to extract from
+   * @param dtoType - Type of DTO to create ('create' or 'update')
+   * @returns Extracted DTO structure
+   * @private
+   */
   private extractDtoFromRequestBody(requestBody: any, dtoType: 'create' | 'update'): any {
     const dto: any = {};
 
@@ -546,6 +709,13 @@ export class EndpointsService {
     return dto;
   }
 
+  /**
+   * Maps JSON schema types to TypeScript types.
+   * 
+   * @param jsonType - The JSON schema type to map
+   * @returns Corresponding TypeScript type
+   * @private
+   */
   private mapJsonTypeToTypeScript(jsonType: string): string {
     const typeMap: { [key: string]: string } = {
       'string': 'string',
@@ -559,11 +729,25 @@ export class EndpointsService {
     return typeMap[jsonType] || 'any';
   }
 
+  /**
+   * Generates a unique endpoint name from the DTO data.
+   * 
+   * @param dto - The endpoint registration DTO
+   * @returns Generated endpoint name
+   * @private
+   */
   private generateEndpointName(dto: RegisterEndpointDto): string {
     const baseId = `${dto.entityName.toLowerCase()}-${dto.methods.map((m) => m.method.toLowerCase()).join('-')}`;
     return baseId.replace(/[^a-z0-9-]/g, '-');
   }
 
+  /**
+   * Converts a string to kebab-case format.
+   * 
+   * @param str - The string to convert
+   * @returns Kebab-case formatted string
+   * @private
+   */
   private kebabCase(str: string): string {
     return str
       .replace(/([a-z])([A-Z])/g, '$1-$2')

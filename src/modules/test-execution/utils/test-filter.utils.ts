@@ -1,5 +1,8 @@
 import { ExecuteTestsDto } from '../dto/execute-tests.dto';
 
+/**
+ * Criteria used to filter available scenarios.
+ */
 export interface TestFilter {
   entityName: string;
   method?: string;
@@ -8,36 +11,39 @@ export interface TestFilter {
   specificScenario?: string;
 }
 
+/**
+ * Helper utilities to build cucumber filters and validate scenarios.
+ */
 export class TestFilterUtils {
   /**
-   * Construye el filtro de Cucumber basado en los parámetros de ejecución
+   * Builds Cucumber filter string based on the execution parameters.
    */
   static buildCucumberFilter(dto: ExecuteTestsDto): string {
     const filters: string[] = [];
 
-    // Filtro por entidad
+    // Filter by entity
     if (dto.entityName) {
       filters.push(`--require src/features/ecommerce/${dto.entityName.toLowerCase()}.feature`);
     }
 
-    // Filtro por tags
+    // Filter by tags
     if (dto.tags && dto.tags.length > 0) {
       const tagFilters = dto.tags.map(tag => `--tags "${tag}"`).join(' ');
       filters.push(tagFilters);
     }
 
-    // Filtro por escenario específico
+    // Filter by specific scenario
     if (dto.specificScenario) {
       filters.push(`--name "${dto.specificScenario}"`);
     }
 
-    // Filtro por tipo de prueba
+    // Filter by test type
     if (dto.testType && dto.testType !== 'all') {
       const testTypeTag = dto.testType === 'positive' ? '@positive' : '@negative';
       filters.push(`--tags "${testTypeTag}"`);
     }
 
-    // Filtro por método HTTP
+    // Filter by HTTP method
     if (dto.method) {
       const methodTag = `@${dto.method.toLowerCase()}`;
       filters.push(`--tags "${methodTag}"`);
@@ -47,18 +53,18 @@ export class TestFilterUtils {
   }
 
   /**
-   * Valida si un escenario cumple con los filtros especificados
+   * Validates if a scenario meets the specified filters.
    */
   static validateScenarioAgainstFilters(
     scenario: any,
     filters: TestFilter,
   ): boolean {
-    // Validar entidad
+    // Validate entity
     if (filters.entityName && !scenario.feature?.name?.toLowerCase().includes(filters.entityName.toLowerCase())) {
       return false;
     }
 
-    // Validar método HTTP
+    // Validate HTTP method
     if (filters.method) {
       const methodTag = `@${filters.method.toLowerCase()}`;
       const hasMethodTag = scenario.tags?.some((tag: any) => tag.name === methodTag);
@@ -67,7 +73,7 @@ export class TestFilterUtils {
       }
     }
 
-    // Validar tipo de prueba
+    // Validate test type
     if (filters.testType && filters.testType !== 'all') {
       const testTypeTag = filters.testType === 'positive' ? '@positive' : '@negative';
       const hasTestTypeTag = scenario.tags?.some((tag: any) => tag.name === testTypeTag);
@@ -76,7 +82,7 @@ export class TestFilterUtils {
       }
     }
 
-    // Validar tags específicos
+    // Validate specific tags
     if (filters.tags && filters.tags.length > 0) {
       const scenarioTags = scenario.tags?.map((tag: any) => tag.name) || [];
       const hasAllTags = filters.tags.every(tag => scenarioTags.includes(tag));
@@ -85,7 +91,7 @@ export class TestFilterUtils {
       }
     }
 
-    // Validar escenario específico
+    // Validate specific scenario
     if (filters.specificScenario && scenario.name !== filters.specificScenario) {
       return false;
     }
@@ -94,7 +100,7 @@ export class TestFilterUtils {
   }
 
   /**
-   * Obtiene la lista de escenarios disponibles para una entidad
+   * Gets the list of scenarios available for an entity.
    */
   static async getAvailableScenarios(projectPath: string, entityName: string): Promise<any[]> {
     try {
@@ -112,13 +118,13 @@ export class TestFilterUtils {
       
       return scenarios;
     } catch (error) {
-      console.error(`Error obteniendo escenarios para ${entityName}:`, error);
+      console.error(`Error getting scenarios for ${entityName}:`, error);
       return [];
     }
   }
 
   /**
-   * Parsea un archivo .feature para extraer escenarios
+   * Parses a .feature file to extract scenarios.
    */
   private static parseFeatureFile(content: string): any[] {
     const scenarios: any[] = [];
@@ -156,7 +162,7 @@ export class TestFilterUtils {
   }
 
   /**
-   * Obtiene estadísticas de escenarios disponibles
+   * Computes statistics for available scenarios.
    */
   static async getScenarioStatistics(projectPath: string, entityName: string): Promise<any> {
     const scenarios = await this.getAvailableScenarios(projectPath, entityName);
@@ -170,7 +176,7 @@ export class TestFilterUtils {
     };
 
     for (const scenario of scenarios) {
-      // Contar por tipo
+      // Count by type
       if (scenario.tags.some((tag: string) => tag.includes('@positive'))) {
         statistics.positiveScenarios++;
       }
@@ -178,7 +184,7 @@ export class TestFilterUtils {
         statistics.negativeScenarios++;
       }
 
-      // Contar por método
+      // Count by method
       for (const tag of scenario.tags) {
         if (tag.includes('@get') || tag.includes('@post') || tag.includes('@put') || tag.includes('@patch') || tag.includes('@delete')) {
           const method = tag.replace('@', '');
@@ -186,7 +192,7 @@ export class TestFilterUtils {
         }
       }
 
-      // Contar por tags
+      // Count by tags
       for (const tag of scenario.tags) {
         statistics.scenariosByTag[tag] = (statistics.scenariosByTag[tag] || 0) + 1;
       }

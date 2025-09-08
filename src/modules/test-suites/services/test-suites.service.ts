@@ -13,6 +13,13 @@ import { TestType, TestEnvironment } from '../../test-execution/dto/execute-test
 import { ExecuteTestSuiteDto } from '../dto/execute-test-suite.dto';
 
 @Injectable()
+/**
+ * Service: TestSuitesService
+ *
+ * Manages creation, retrieval, update, deletion and execution of test suites
+ * (test sets and test plans), including statistics updates and integration
+ * with the TestExecutionService.
+ */
 export class TestSuitesService {
   private readonly logger = new Logger(TestSuitesService.name);
 
@@ -27,6 +34,26 @@ export class TestSuitesService {
     private readonly testExecutionService: TestExecutionService,
   ) {}
 
+  /**
+   * Creates a test suite (test set or test plan) for a given project.
+   * 
+   * @param projectId - The ID of the project to create the test suite for
+   * @param dto - The test suite creation data
+   * @returns Promise<TestSuiteResponseDto> - The created test suite response
+   * @throws NotFoundException - If the project is not found
+   * @throws BadRequestException - If validation fails
+   * 
+   * @example
+   * ```typescript
+   * const testSuite = await testSuitesService.createTestSuite('project-123', {
+   *   name: 'Product API Tests',
+   *   type: TestSuiteType.TEST_SET,
+   *   section: 'ecommerce',
+   *   entity: 'Product',
+   *   testCaseIds: ['TC-001', 'TC-002']
+   * });
+   * ```
+   */
   async createTestSuite(projectId: string, dto: CreateTestSuiteDto): Promise<TestSuiteResponseDto> {
     this.logger.log(`Creating test suite for project: ${projectId}`);
 
@@ -82,7 +109,7 @@ export class TestSuitesService {
         testCases: ts.testCases?.map(tc => tc.testCaseId) || []
       }));
       
-      // Calcular total de test cases para el plan
+      // Calculate total test cases for the plan
       totalTestCasesForPlan = foundTestSuites.reduce((total, ts) => total + (ts.totalTestCases || 0), 0);
       
       this.logger.log(`Test plan will contain ${testSets.length} test sets with ${totalTestCasesForPlan} total test cases`);
@@ -117,6 +144,23 @@ export class TestSuitesService {
     return this.mapToResponseDto(savedTestSuite);
   }
 
+  /**
+   * Retrieves test suites for a project with filtering, sorting, and pagination.
+   * 
+   * @param projectId - The ID of the project to get test suites for
+   * @param filters - Filtering, sorting, and pagination options
+   * @returns Promise<object> - Paginated list of test suites with metadata
+   * 
+   * @example
+   * ```typescript
+   * const result = await testSuitesService.getTestSuites('project-123', {
+   *   type: TestSuiteType.TEST_SET,
+   *   section: 'ecommerce',
+   *   page: 1,
+   *   limit: 10
+   * });
+   * ```
+   */
   async getTestSuites(projectId: string, filters: TestSuiteFiltersDto): Promise<{
     testSuites: TestSuiteResponseDto[];
     total: number;
@@ -184,6 +228,19 @@ export class TestSuitesService {
     };
   }
 
+  /**
+   * Retrieves a specific test suite by ID.
+   * 
+   * @param projectId - The ID of the project
+   * @param suiteId - The ID of the test suite to retrieve
+   * @returns Promise<TestSuiteResponseDto> - The test suite response
+   * @throws NotFoundException - If the test suite is not found
+   * 
+   * @example
+   * ```typescript
+   * const testSuite = await testSuitesService.getTestSuite('project-123', 'SUITE-ECOMMERCE-PRODUCT-001');
+   * ```
+   */
   async getTestSuite(projectId: string, suiteId: string): Promise<TestSuiteResponseDto> {
     this.logger.log(`Getting test suite: ${suiteId} for project: ${projectId}`);
 
@@ -198,6 +255,23 @@ export class TestSuitesService {
     return this.mapToResponseDto(testSuite);
   }
 
+  /**
+   * Updates an existing test suite.
+   * 
+   * @param projectId - The ID of the project
+   * @param suiteId - The ID of the test suite to update
+   * @param dto - The update data for the test suite
+   * @returns Promise<TestSuiteResponseDto> - The updated test suite response
+   * @throws NotFoundException - If the test suite is not found
+   * 
+   * @example
+   * ```typescript
+   * const updatedSuite = await testSuitesService.updateTestSuite('project-123', 'SUITE-001', {
+   *   name: 'Updated Test Suite',
+   *   testCaseIds: ['TC-001', 'TC-002', 'TC-003']
+   * });
+   * ```
+   */
   async updateTestSuite(projectId: string, suiteId: string, dto: UpdateTestSuiteDto): Promise<TestSuiteResponseDto> {
     this.logger.log(`Updating test suite: ${suiteId} for project: ${projectId}`);
 
@@ -245,7 +319,7 @@ export class TestSuitesService {
         testCases: ts.testCases?.map(tc => tc.testCaseId) || []
       }));
       
-      // Actualizar totalTestCases para test plans
+      // Update totalTestCases for test plans
       testSuite.totalTestCases = foundTestSuites.reduce((total, ts) => total + (ts.totalTestCases || 0), 0);
       this.logger.log(`Updated test plan ${suiteId} with ${testSuite.totalTestCases} total test cases from ${foundTestSuites.length} test sets`);
     }
@@ -254,6 +328,20 @@ export class TestSuitesService {
     return this.mapToResponseDto(updatedTestSuite);
   }
 
+  /**
+   * Deletes a test suite.
+   * 
+   * @param projectId - The ID of the project
+   * @param suiteId - The ID of the test suite to delete
+   * @returns Promise<object> - Success status and message
+   * @throws NotFoundException - If the test suite is not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await testSuitesService.deleteTestSuite('project-123', 'SUITE-001');
+   * // Returns: { success: true, message: 'Test suite SUITE-001 deleted successfully' }
+   * ```
+   */
   async deleteTestSuite(projectId: string, suiteId: string): Promise<{ success: boolean; message: string }> {
     this.logger.log(`Deleting test suite: ${suiteId} for project: ${projectId}`);
 
@@ -273,6 +361,25 @@ export class TestSuitesService {
     };
   }
 
+  /**
+   * Executes a test suite (test set or test plan).
+   * 
+   * @param projectId - The ID of the project
+   * @param suiteId - The ID of the test suite to execute
+   * @param dto - Optional execution configuration parameters
+   * @returns Promise<object> - Execution result with status and metadata
+   * @throws NotFoundException - If the test suite is not found
+   * @throws BadRequestException - If the test suite has no test cases or test sets to execute
+   * 
+   * @example
+   * ```typescript
+   * const result = await testSuitesService.executeTestSuite('project-123', 'SUITE-001', {
+   *   parallel: true,
+   *   timeout: 30000,
+   *   environment: TestEnvironment.STAGING
+   * });
+   * ```
+   */
   async executeTestSuite(projectId: string, suiteId: string, dto?: ExecuteTestSuiteDto): Promise<{
     success: boolean;
     data: {
@@ -300,7 +407,7 @@ export class TestSuitesService {
       this.logger.log(`  - Test sets array: ${JSON.stringify(testSuite.testSets)}`);
       this.logger.log(`  - Test sets length: ${testSuite.testSets?.length || 0}`);
       
-      // Para Test Plans: verificar que tengan test sets
+      // For Test Plans: verify that they have test sets
       const actualTestSetsCount = testSuite.testSets?.length || 0;
       
       if (actualTestSetsCount === 0) {
@@ -315,7 +422,7 @@ export class TestSuitesService {
       this.logger.log(`  - Test cases array: ${JSON.stringify(testSuite.testCases)}`);
       this.logger.log(`  - Test cases length: ${testSuite.testCases?.length || 0}`);
       
-      // Para Test Sets: verificar que tengan test cases
+      // For Test Sets: verify that they have test cases
       const actualTestCasesCount = testSuite.testCases?.length || 0;
       
       if (actualTestCasesCount === 0) {
@@ -327,7 +434,7 @@ export class TestSuitesService {
         throw new BadRequestException(`Test set ${suiteId} has no test cases to execute. Please add test cases to this test set before executing.`);
       }
       
-      // Corregir el totalTestCases si está inconsistente (solo para test sets)
+      // Fix totalTestCases if inconsistent (only for test sets)
       if (testSuite.totalTestCases !== actualTestCasesCount) {
         this.logger.warn(`Fixing inconsistent totalTestCases: ${testSuite.totalTestCases} -> ${actualTestCasesCount}`);
         testSuite.totalTestCases = actualTestCasesCount;
@@ -344,23 +451,23 @@ export class TestSuitesService {
     // Generate execution ID
     const executionId = `EXEC-${suiteId}-${Date.now()}`;
 
-    // Guardar el executionId en el campo executionLogs
+    // Save executionId in executionLogs field
     testSuite.executionLogs = executionId;
     await this.testSuiteRepository.save(testSuite);
 
-    // Ejecutar las pruebas usando el TestExecutionService
+    // Execute tests using TestExecutionService
     try {
       if (testSuite.type === TestSuiteType.TEST_PLAN) {
-        // Para Test Plans: ejecutar todos los test sets contenidos
+        // For Test Plans: execute all contained test sets
         return await this.executeTestPlan(projectId, testSuite, dto);
       } else {
-        // Para Test Sets: ejecutar directamente los test cases
+        // For Test Sets: execute test cases directly
         return await this.executeTestSet(projectId, testSuite, dto);
       }
     } catch (error) {
       this.logger.error(`Error executing test suite ${suiteId}: ${error.message}`);
       
-      // Revertir el estado si hay error
+      // Revert status in case of error
       testSuite.status = TestSuiteStatus.FAILED;
       await this.testSuiteRepository.save(testSuite);
       
@@ -368,6 +475,19 @@ export class TestSuitesService {
     }
   }
 
+  /**
+   * Retrieves execution history for a test suite.
+   * 
+   * @param projectId - The ID of the project
+   * @param suiteId - The ID of the test suite
+   * @returns Promise<any[]> - Array of execution history records
+   * @throws NotFoundException - If the test suite is not found
+   * 
+   * @example
+   * ```typescript
+   * const history = await testSuitesService.getExecutionHistory('project-123', 'SUITE-001');
+   * ```
+   */
   async getExecutionHistory(projectId: string, suiteId: string): Promise<any[]> {
     this.logger.log(`Getting execution history for test suite: ${suiteId}`);
 
@@ -379,11 +499,10 @@ export class TestSuitesService {
       throw new NotFoundException(`Test suite with ID ${suiteId} not found`);
     }
 
-    // Si hay un executionId guardado en executionLogs, obtener los resultados
+    // If an executionId is stored in executionLogs, obtain results
     if (testSuite!.executionLogs) {
       try {
-        // Aquí se integraría con el TestExecutionService para obtener resultados
-        // Por ahora retornamos información básica
+        // TODO: Integrate with TestExecutionService to get real results. For now, basic info is returned
         return [{
           executionId: testSuite!.executionLogs,
           status: testSuite!.status,
@@ -404,6 +523,18 @@ export class TestSuitesService {
     return [];
   }
 
+  /**
+   * Retrieves all test sets for a specific section.
+   * 
+   * @param projectId - The ID of the project
+   * @param section - The section name to filter by
+   * @returns Promise<TestSuiteResponseDto[]> - Array of test sets for the section
+   * 
+   * @example
+   * ```typescript
+   * const testSets = await testSuitesService.getTestSetsBySection('project-123', 'ecommerce');
+   * ```
+   */
   async getTestSetsBySection(projectId: string, section: string): Promise<TestSuiteResponseDto[]> {
     this.logger.log(`Getting test sets for section: ${section} in project: ${projectId}`);
 
@@ -420,7 +551,13 @@ export class TestSuitesService {
   }
 
   /**
-   * Ejecuta un Test Set (colección de test cases)
+   * Executes a Test Set (collection of test cases).
+   * 
+   * @param projectId - The ID of the project
+   * @param testSuite - The test suite entity to execute
+   * @param dto - Optional execution configuration parameters
+   * @returns Promise<object> - Execution result with status and metadata
+   * @private
    */
   private async executeTestSet(
     projectId: string, 
@@ -435,12 +572,12 @@ export class TestSuitesService {
       startedAt: string;
     };
   }> {
-    // Extraer los nombres de los escenarios específicos del test set
+    // Extract specific scenario names from test set
     const specificScenarios = testSuite.testCases?.map(tc => tc.name) || [];
     
     this.logger.log(`Test set ${testSuite.suiteId} contains ${specificScenarios.length} specific scenarios: ${specificScenarios.join(', ')}`);
     
-    // Preparar los datos para la ejecución
+    // Prepare execution DTO
     const executeTestsDto = {
       entityName: testSuite.entity,
       method: dto?.method,
@@ -458,15 +595,15 @@ export class TestSuitesService {
       testSuiteId: testSuite.suiteId,
     };
 
-    // Llamar al TestExecutionService
+    // Call TestExecutionService
     const executionResult = await this.testExecutionService.executeTests(projectId, executeTestsDto);
 
     this.logger.log(`Test set ${testSuite.suiteId} execution initiated with execution ID: ${executionResult.executionId}`);
 
-    // Esperar un poco para que se complete la ejecución y se actualicen las estadísticas
+    // Wait briefly so that execution can progress and stats update
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Verificar que el test set se haya actualizado correctamente
+    // Verify the test set got updated
     const updatedTestSet = await this.testSuiteRepository.findOne({
       where: { projectId, suiteId: testSuite.suiteId }
     });
@@ -489,7 +626,13 @@ export class TestSuitesService {
   }
 
   /**
-   * Ejecuta un Test Plan (colección de test sets)
+   * Executes a Test Plan (collection of test sets).
+   * 
+   * @param projectId - The ID of the project
+   * @param testPlan - The test plan entity to execute
+   * @param dto - Optional execution configuration parameters
+   * @returns Promise<object> - Execution result with status and metadata
+   * @private
    */
   private async executeTestPlan(
     projectId: string, 
@@ -507,7 +650,7 @@ export class TestSuitesService {
     this.logger.log(`Executing test plan ${testPlan.suiteId} with ${testPlan.testSets?.length || 0} test sets`);
     this.logger.log(`Test plan testSets: ${JSON.stringify(testPlan.testSets)}`);
     
-    // Obtener todos los test sets del plan
+    // Get all test sets of the plan
     const testSetIds = testPlan.testSets?.map(ts => ts.setId) || [];
     this.logger.log(`Test set IDs to execute: ${testSetIds.join(', ')}`);
     
@@ -515,7 +658,7 @@ export class TestSuitesService {
       throw new BadRequestException(`Test plan ${testPlan.suiteId} has no test sets to execute`);
     }
 
-    // Obtener los test sets completos de la base de datos
+    // Retrieve full test sets from the database
     this.logger.log(`Searching for test sets with IDs: ${testSetIds.join(', ')}`);
     const testSets = await this.testSuiteRepository.find({
       where: { suiteId: In(testSetIds), projectId, type: TestSuiteType.TEST_SET }
@@ -529,7 +672,7 @@ export class TestSuitesService {
 
     this.logger.log(`Found ${testSets.length} test sets to execute: ${testSets.map(ts => ts.suiteId).join(', ')}`);
 
-    // Crear una test execution para el test plan completo ANTES de ejecutar los test sets
+    // Create a test execution for the entire test plan BEFORE executing test sets
     const planExecutionDto = {
       entityName: testPlan.entity,
       method: dto?.method,
@@ -543,14 +686,14 @@ export class TestSuitesService {
       timeout: dto?.timeout || 30000,
       retries: dto?.retries || 1,
       workers: dto?.workers || 3,
-      testSuiteId: testPlan.suiteId, // Usar el ID del test plan
+      testSuiteId: testPlan.suiteId, // Use the test plan ID
     };
 
-    // Crear la test execution para el test plan
+    // Create the test execution for the test plan
     const planExecutionResult = await this.testExecutionService.executeTests(projectId, planExecutionDto);
     this.logger.log(`Created test execution for test plan ${testPlan.suiteId} with ID: ${planExecutionResult.executionId}`);
 
-    // NO ejecutar test sets individuales - solo recolectar información para estadísticas
+    // DO NOT execute individual test sets - only collect info for statistics
     const executionResults: Array<{
       testSetId: string;
       testSetName: string;
@@ -560,7 +703,7 @@ export class TestSuitesService {
     let totalTestCases = 0;
 
     for (const testSet of testSets) {
-      // Solo recolectar información, NO ejecutar
+      // Only collect information, DO NOT execute
       const testCaseIds = testSet.testCases?.map(tc => tc.testCaseId) || [];
       const testSetTotalTestCases = testCaseIds.length;
       
@@ -575,18 +718,18 @@ export class TestSuitesService {
       this.logger.log(`Test set ${testSet.suiteId} has ${testSetTotalTestCases} test cases: ${testCaseIds.join(', ')}`);
     }
 
-    // Actualizar las estadísticas del test plan
+    // Update test plan statistics
     testPlan.totalTestCases = totalTestCases;
-    testPlan.passedTestCases = 0; // Se actualizará cuando se complete la ejecución real
-    testPlan.failedTestCases = 0; // Se actualizará cuando se complete la ejecución real
-    testPlan.skippedTestCases = 0; // Se actualizará cuando se complete la ejecución real
-    testPlan.executionTime = 0; // Se actualizará cuando se complete la ejecución real
+    testPlan.passedTestCases = 0; // Will be updated when the real execution completes
+    testPlan.failedTestCases = 0; // Will be updated when the real execution completes
+    testPlan.skippedTestCases = 0; // Will be updated when the real execution completes
+    testPlan.executionTime = 0; // Will be updated when the real execution completes
     testPlan.completedAt = new Date();
     
-    // El estado se mantendrá como RUNNING hasta que se complete la ejecución real
+    // Keep status as RUNNING until the real execution completes
     testPlan.status = TestSuiteStatus.RUNNING;
 
-    // Guardar los resultados de ejecución en el test plan
+    // Save execution results in the test plan
     testPlan.executionLogs = JSON.stringify({
       planExecutionId: `PLAN-EXEC-${testPlan.suiteId}-${Date.now()}`,
       testSetResults: executionResults,
@@ -614,7 +757,23 @@ export class TestSuitesService {
   }
 
   /**
-   * Actualiza las estadísticas de una test suite basado en los resultados de ejecución
+   * Updates test suite statistics based on execution results.
+   * 
+   * @param projectId - The ID of the project
+   * @param suiteId - The ID of the test suite
+   * @param executionResults - The execution results to update statistics with
+   * @returns Promise<void>
+   * @throws NotFoundException - If the test suite is not found
+   * 
+   * @example
+   * ```typescript
+   * await testSuitesService.updateTestSuiteExecutionStats('project-123', 'SUITE-001', {
+   *   totalScenarios: 10,
+   *   passedScenarios: 8,
+   *   failedScenarios: 1,
+   *   executionTime: 45000
+   * });
+   * ```
    */
   async updateTestSuiteExecutionStats(
     projectId: string, 
@@ -636,16 +795,16 @@ export class TestSuitesService {
       throw new NotFoundException(`Test suite with ID ${suiteId} not found`);
     }
 
-    // Actualizar estadísticas
+    // Update statistics
     testSuite.totalTestCases = executionResults.totalScenarios;
     testSuite.passedTestCases = executionResults.passedScenarios;
     testSuite.failedTestCases = executionResults.failedScenarios;
-    // Calcular skipped: total - passed - failed (según tu lógica)
+    // Calculate skipped: total - passed - failed
     testSuite.skippedTestCases = executionResults.totalScenarios - executionResults.passedScenarios - executionResults.failedScenarios;
     testSuite.executionTime = executionResults.executionTime;
     testSuite.completedAt = new Date();
     
-    // Determinar el estado final
+    // Determine final status
     if (executionResults.failedScenarios > 0) {
       testSuite.status = TestSuiteStatus.FAILED;
     } else if (executionResults.passedScenarios > 0) {
@@ -656,7 +815,7 @@ export class TestSuitesService {
 
     await this.testSuiteRepository.save(testSuite);
     
-    // Log detallado de las estadísticas actualizadas
+    // Detailed log of updated statistics
     this.logger.log(`Test suite ${suiteId} execution stats updated successfully:`);
     this.logger.log(`  - Total scenarios: ${testSuite.totalTestCases}`);
     this.logger.log(`  - Passed scenarios: ${testSuite.passedTestCases}`);
@@ -666,11 +825,21 @@ export class TestSuitesService {
     this.logger.log(`  - Execution time: ${testSuite.executionTime}ms`);
   }
 
+  /**
+   * Generates a unique suite ID based on project name, type, section, and entity.
+   * 
+   * @param projectName - The name of the project
+   * @param type - The type of test suite (TEST_SET or TEST_PLAN)
+   * @param section - The section name
+   * @param entity - Optional entity name (for test sets)
+   * @returns Promise<string> - The generated suite ID
+   * @private
+   */
   private async generateSuiteId(projectName: string, type: TestSuiteType, section: string, entity?: string): Promise<string> {
     const prefix = type === TestSuiteType.TEST_SET ? 'SUITE' : 'PLAN';
     
     if (type === TestSuiteType.TEST_SET) {
-      // Para Test Sets: SUITE-section-entity-number
+      // For Test Sets: SUITE-section-entity-number
       const lastTestSuite = await this.testSuiteRepository
         .createQueryBuilder('ts')
         .where('ts.section = :section', { section })
@@ -689,7 +858,7 @@ export class TestSuitesService {
 
       return `${prefix}-${section.toUpperCase()}-${entity?.toUpperCase()}-${nextId.toString().padStart(3, '0')}`;
     } else {
-      // Para Test Plans: PLAN-section-number
+      // For Test Plans: PLAN-section-number
       const lastTestPlan = await this.testSuiteRepository
         .createQueryBuilder('ts')
         .where('ts.section = :section', { section })
@@ -709,6 +878,13 @@ export class TestSuitesService {
     }
   }
 
+  /**
+   * Maps a TestSuite entity to a TestSuiteResponseDto.
+   * 
+   * @param testSuite - The test suite entity to map
+   * @returns TestSuiteResponseDto - The mapped response DTO
+   * @private
+   */
   private mapToResponseDto(testSuite: TestSuite): TestSuiteResponseDto {
     return {
       id: testSuite.id,

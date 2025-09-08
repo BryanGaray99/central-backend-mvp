@@ -2,25 +2,71 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Project } from '../project.entity';
 import { GenerationService } from '../generation.service';
 
+/**
+ * Interface for queue items.
+ * 
+ * @interface QueueItem
+ * @since 1.0.0
+ */
 interface QueueItem {
+  /** The project to be processed */
   project: Project;
+  /** Priority level (higher number = higher priority) */
   priority: number;
+  /** Number of retry attempts */
   retries: number;
+  /** Timestamp when the item was added to the queue */
   addedAt: Date;
 }
 
+/**
+ * Service for managing project generation queue.
+ * 
+ * This service provides a priority-based queue system for project generation.
+ * It handles queuing, processing, retry logic, and timeout management for
+ * project generation operations.
+ * 
+ * @class QueueService
+ * @since 1.0.0
+ */
 @Injectable()
 export class QueueService {
+  /** Logger instance for this service */
   private readonly logger = new Logger(QueueService.name);
+  
+  /** Internal queue storage */
   private readonly queue: QueueItem[] = [];
+  
+  /** Maximum number of retry attempts */
   private readonly maxRetries = 3;
-  private readonly timeoutMs = 5 * 60 * 1000; // 5 minutes
+  
+  /** Timeout for generation operations in milliseconds */
+  private readonly timeoutMs = 5 * 60 * 1000;
+  
+  /** Flag indicating if the queue is currently being processed */
   private isProcessing = false;
 
+  /**
+   * Creates an instance of QueueService.
+   * 
+   * @param generationService - Service for project generation
+   */
   constructor(private readonly generationService: GenerationService) {}
 
   /**
-   * Add a project to the generation queue
+   * Adds a project to the generation queue.
+   * 
+   * Projects are inserted based on priority (higher priority first).
+   * If the queue is not currently being processed, processing will start automatically.
+   * 
+   * @param project - The project to add to the queue
+   * @param priority - Priority level (higher number = higher priority)
+   * 
+   * @example
+   * ```typescript
+   * const project = await projectRepo.findOne({ where: { id: 'project-id' } });
+   * queueService.enqueue(project, 2); // High priority
+   * ```
    */
   enqueue(project: Project, priority: number = 1): void {
     const queueItem: QueueItem = {
@@ -51,7 +97,13 @@ export class QueueService {
   }
 
   /**
-   * Process the queue
+   * Processes the queue sequentially.
+   * 
+   * This method processes all items in the queue one by one, handling
+   * errors gracefully and maintaining the processing state.
+   * 
+   * @returns Promise that resolves when queue processing is complete
+   * @private
    */
   private async processQueue(): Promise<void> {
     if (this.isProcessing || this.queue.length === 0) {
@@ -79,7 +131,15 @@ export class QueueService {
   }
 
   /**
-   * Process a single queue item
+   * Processes a single queue item.
+   * 
+   * This method handles the generation of a single project with timeout
+   * and retry logic. If generation fails, it will retry up to the maximum
+   * number of attempts with decreasing priority.
+   * 
+   * @param item - The queue item to process
+   * @returns Promise that resolves when processing is complete
+   * @private
    */
   private async processItem(item: QueueItem): Promise<void> {
     this.logger.log(
@@ -127,15 +187,31 @@ export class QueueService {
   }
 
   /**
-   * Get queue status
+   * Gets the current status of the queue.
+   * 
+   * @returns Object containing queue status information
+   * 
+   * @example
+   * ```typescript
+   * const status = queueService.getQueueStatus();
+   * console.log(`Queue has ${status.queueLength} items`);
+   * console.log(`Processing: ${status.isProcessing}`);
+   * ```
    */
   getQueueStatus(): {
+    /** Whether the queue is currently being processed */
     isProcessing: boolean;
+    /** Number of items in the queue */
     queueLength: number;
+    /** Array of queue items with their details */
     items: Array<{
+      /** Name of the project */
       projectName: string;
+      /** Priority level */
       priority: number;
+      /** Number of retry attempts */
       retries: number;
+      /** When the item was added to the queue */
       addedAt: Date;
     }>;
   } {
@@ -152,7 +228,13 @@ export class QueueService {
   }
 
   /**
-   * Clear the queue
+   * Clears all items from the queue.
+   * 
+   * @example
+   * ```typescript
+   * queueService.clearQueue();
+   * console.log('Queue has been cleared');
+   * ```
    */
   clearQueue(): void {
     this.queue.length = 0;

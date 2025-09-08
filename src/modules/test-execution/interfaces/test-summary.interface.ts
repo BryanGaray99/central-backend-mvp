@@ -1,3 +1,6 @@
+/**
+ * Summary metrics for executed scenarios.
+ */
 export interface TestSummary {
   totalScenarios: number;
   passedScenarios: number;
@@ -10,6 +13,9 @@ export interface TestSummary {
   endTime: Date;
 }
 
+/**
+ * High-level summary for a single execution.
+ */
 export interface ExecutionSummary {
   executionId: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
@@ -17,6 +23,9 @@ export interface ExecutionSummary {
   errorMessage?: string;
 }
 
+/**
+ * Brief history record for recent executions.
+ */
 export interface ExecutionHistory {
   executionId: string;
   timestamp: Date;

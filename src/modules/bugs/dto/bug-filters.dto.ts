@@ -2,6 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 import { BugType, BugSeverity, BugPriority, BugStatus } from '../entities/bug.entity';
 
+/**
+ * Bug Filters DTO
+ * 
+ * Defines filtering options for bug queries including search terms,
+ * status filters, pagination, and sorting options.
+ * 
+ * @class BugFiltersDto
+ */
 export class BugFiltersDto {
   @ApiProperty({
     description: 'Project ID for filtering bugs',

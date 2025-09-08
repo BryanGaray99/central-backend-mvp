@@ -13,6 +13,15 @@ import { ThreadManagerService } from './thread-manager.service';
 import { OpenAIConfigService } from './openai-config.service';
 import { TestCaseSuggestionRequestDto, TestCaseSuggestionDto } from '../dto/test-case-suggestion.dto';
 
+/**
+ * Test Case Suggestion Service
+ * 
+ * Handles AI-powered test case suggestions using OpenAI's Assistant API.
+ * Generates intelligent suggestions for test cases based on existing code
+ * and user requirements, helping identify gaps in test coverage.
+ * 
+ * @service TestCaseSuggestionService
+ */
 @Injectable()
 export class TestCaseSuggestionService {
   private readonly logger = new Logger(TestCaseSuggestionService.name);
@@ -32,25 +41,42 @@ export class TestCaseSuggestionService {
   ) {}
 
   /**
-   * Configura la API key de OpenAI dinámicamente
+   * Configures the OpenAI API key dynamically.
+   * 
+   * @private
+   * @throws Error - If API key is not configured
    */
   private async configureOpenAI() {
     const apiKey = await this.openAIConfigService.getOpenAIKey();
     if (!apiKey) {
-      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+      throw new Error('OpenAI API key not configured. Configure the API key in Settings > OpenAI Configuration.');
     }
     
-    // Crear la instancia de OpenAI si no existe
+    // Create OpenAI instance if it doesn't exist
     if (!this.openai) {
       this.openai = new OpenAI({ apiKey });
     } else {
-      // Actualizar la instancia existente con la nueva API key
+      // Update existing instance with new API key
       this.openai.apiKey = apiKey;
     }
   }
 
   /**
-   * Genera sugerencias de test cases usando IA
+   * Generates test case suggestions using AI.
+   * 
+   * @param projectId - The project ID
+   * @param request - The suggestion request parameters
+   * @returns Promise<TestCaseSuggestionDto[]> - Array of generated suggestions
+   * @throws Error - If generation fails
+   * 
+   * @example
+   * ```typescript
+   * const suggestions = await testCaseSuggestionService.generateSuggestions('project-123', {
+   *   entityName: 'Product',
+   *   section: 'ecommerce',
+   *   requirements: 'Generate test cases for product validation'
+   * });
+   * ```
    */
   async generateSuggestions(
     projectId: string, 
@@ -59,53 +85,53 @@ export class TestCaseSuggestionService {
     const startTime = Date.now();
     const suggestionId = `AI-SUGGEST-${Date.now()}`;
     
-    this.logger.log(`🚀 [${suggestionId}] INICIANDO GENERACIÓN DE SUGERENCIAS DE TEST CASES`);
+    this.logger.log(`🚀 [${suggestionId}] STARTING TEST CASE SUGGESTIONS GENERATION`);
     this.logger.log(`📋 [${suggestionId}] Request: ${JSON.stringify(request, null, 2)}`);
     
     try {
-      // Configurar OpenAI antes de hacer la llamada
+      // Configure OpenAI before making the call
       await this.configureOpenAI();
       
-      // Obtener el proyecto para usar su path
+      // Get the project to use its path
       const project = await this.projectRepository.findOneBy({ id: projectId });
       if (!project) {
         throw new Error(`Project with ID ${projectId} not found`);
       }
       
-      this.logger.log(`📁 [${suggestionId}] Proyecto encontrado: ${project.name} (${project.path})`);
+      this.logger.log(`📁 [${suggestionId}] Project found: ${project.name} (${project.path})`);
       
-      // Crear directorio de debug en la raíz de playwright-workspaces
-      const debugDir = path.join(path.dirname(project.path), 'debug');
-      if (!fs.existsSync(debugDir)) {
-        fs.mkdirSync(debugDir, { recursive: true });
-      }
+      // Create debug directory in playwright-workspaces root
+      // const debugDir = path.join(path.dirname(project.path), 'debug');
+      // if (!fs.existsSync(debugDir)) {
+      //   fs.mkdirSync(debugDir, { recursive: true });
+      // }
 
-      // Paso 1: Obtener Assistant existente
-      this.logger.log(`🤖 [${suggestionId}] PASO 1: Obteniendo Assistant existente...`);
+      // Step 1: Get existing Assistant
+      this.logger.log(`🤖 [${suggestionId}] STEP 1: Getting existing Assistant...`);
       const assistant = await this.assistantManagerService.getAssistant(projectId);
       if (!assistant) {
-        this.logger.error(`❌ [${suggestionId}] ERROR: No existe un assistant creado para el proyecto ${projectId}. Debes inicializar el contexto IA primero.`);
-        throw new Error(`No existe un assistant creado para el proyecto. Inicializa el contexto IA con el endpoint /ai/projects/:projectId/assistant/init antes de generar sugerencias.`);
+        this.logger.error(`❌ [${suggestionId}] ERROR: No assistant created for project ${projectId}. You must initialize the AI context first.`);
+        throw new Error(`No assistant created for the project. Initialize the AI context with endpoint /ai/projects/:projectId/assistant/init before generating suggestions.`);
       }
-      this.logger.log(`✅ [${suggestionId}] Assistant listo: ${assistant.assistantId}`);
+      this.logger.log(`✅ [${suggestionId}] Assistant ready: ${assistant.assistantId}`);
 
-      // Paso 2: Crear Thread NUEVO para evitar historial
-      this.logger.log(`🧵 [${suggestionId}] PASO 2: Creando Thread NUEVO...`);
+      // Step 2: Create NEW Thread to avoid history
+      this.logger.log(`🧵 [${suggestionId}] STEP 2: Creating NEW Thread...`);
       let thread = await this.threadManagerService.createThread(projectId, assistant.assistantId);
-      this.logger.log(`✅ [${suggestionId}] Thread NUEVO creado: ${thread.threadId}`);
+      this.logger.log(`✅ [${suggestionId}] NEW Thread created: ${thread.threadId}`);
 
-      // Paso 3: Construir prompt para sugerencias
-      this.logger.log(`📝 [${suggestionId}] PASO 3: Construyendo prompt para sugerencias...`);
+      // Step 3: Build prompt for suggestions
+      this.logger.log(`📝 [${suggestionId}] STEP 3: Building prompt for suggestions...`);
       const { prompt, featureContent, stepsContent } = await this.buildSuggestionPrompt(projectId, request);
-      this.logger.log(`📤 [${suggestionId}] Prompt construido (${prompt.length} caracteres)`);
+      this.logger.log(`📤 [${suggestionId}] Prompt built (${prompt.length} characters)`);
       
-      // Guardar prompt enviado
-      const promptPath = path.join(debugDir, 'ai-suggestion-prompt.txt');
-      fs.writeFileSync(promptPath, prompt);
-      this.logger.log(`📄 [${suggestionId}] Prompt guardado en: ${promptPath}`);
+      // Save sent prompt
+      // const promptPath = path.join(debugDir, 'ai-suggestion-prompt.txt');
+      // fs.writeFileSync(promptPath, prompt);
+      // this.logger.log(`📄 [${suggestionId}] Prompt saved to: ${promptPath}`);
 
-      // Paso 4: Enviar mensaje al assistant
-      this.logger.log(`💬 [${suggestionId}] PASO 4: Enviando mensaje al assistant...`);
+      // Step 4: Send message to assistant
+      this.logger.log(`💬 [${suggestionId}] STEP 4: Sending message to assistant...`);
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
@@ -113,10 +139,10 @@ export class TestCaseSuggestionService {
         role: 'user',
         content: prompt
       });
-      this.logger.log(`✅ [${suggestionId}] Mensaje enviado: ${message.id}`);
+      this.logger.log(`✅ [${suggestionId}] Message sent: ${message.id}`);
 
-      // Paso 5: Ejecutar run
-      this.logger.log(`▶️ [${suggestionId}] PASO 5: Ejecutando run...`);
+      // Step 5: Execute run
+      this.logger.log(`▶️ [${suggestionId}] STEP 5: Executing run...`);
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
@@ -125,50 +151,50 @@ export class TestCaseSuggestionService {
         tool_choice: 'auto',
         truncation_strategy: { type: 'auto' },
       });
-      this.logger.log(`✅ [${suggestionId}] Run iniciado: ${run.id} (status: ${run.status})`);
+      this.logger.log(`✅ [${suggestionId}] Run started: ${run.id} (status: ${run.status})`);
 
-      // Paso 6: Esperar completación del run
-      this.logger.log(`⏳ [${suggestionId}] PASO 6: Esperando completación del run...`);
+      // Step 6: Wait for run completion
+      this.logger.log(`⏳ [${suggestionId}] STEP 6: Waiting for run completion...`);
       const result = await this.waitForRunCompletion(thread.threadId, run.id, suggestionId);
-      this.logger.log(`✅ [${suggestionId}] Run completado: ${result.status}`);
+      this.logger.log(`✅ [${suggestionId}] Run completed: ${result.status}`);
 
-      // Paso 7: Obtener respuesta
-      this.logger.log(`📥 [${suggestionId}] PASO 7: Obteniendo respuesta...`);
+      // Step 7: Get response
+      this.logger.log(`📥 [${suggestionId}] STEP 7: Getting response...`);
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
       const messages = await this.openai.beta.threads.messages.list(thread.threadId);
-      const lastMessage = messages.data[0]; // El más reciente
+      const lastMessage = messages.data[0]; // The most recent
       
       if (!lastMessage || !lastMessage.content || lastMessage.content.length === 0) {
-        throw new Error('No se recibió respuesta del assistant');
+        throw new Error('No response received from assistant');
       }
 
       const generatedText = lastMessage.content[0].type === 'text' 
         ? lastMessage.content[0].text.value 
-        : 'No se pudo extraer texto de la respuesta';
+        : 'Could not extract text from response';
 
-      this.logger.log(`📥 [${suggestionId}] Respuesta recibida (${generatedText.length} caracteres)`);
+      this.logger.log(`📥 [${suggestionId}] Response received (${generatedText.length} characters)`);
       
-      // Guardar respuesta bruta
-      const responsePath = path.join(debugDir, 'ai-suggestion-response.txt');
-      fs.writeFileSync(responsePath, generatedText);
-      this.logger.log(`📄 [${suggestionId}] Respuesta guardada en: ${responsePath}`);
+      // Save raw response
+      // const responsePath = path.join(debugDir, 'ai-suggestion-response.txt');
+      // fs.writeFileSync(responsePath, generatedText);
+      // this.logger.log(`📄 [${suggestionId}] Response saved to: ${responsePath}`);
 
-      // Paso 8: Incrementar contador de mensajes
+      // Step 8: Increment message counter
       await this.threadManagerService.incrementMessageCount(thread.threadId);
-      this.logger.log(`📊 [${suggestionId}] Contador de mensajes incrementado`);
+      this.logger.log(`📊 [${suggestionId}] Message counter incremented`);
 
-      // Paso 9: Parsear la respuesta para extraer sugerencias
-      this.logger.log(`🔍 [${suggestionId}] PASO 9: Parseando sugerencias...`);
+      // Step 9: Parse response to extract suggestions
+      this.logger.log(`🔍 [${suggestionId}] STEP 9: Parsing suggestions...`);
       const suggestions = this.parseSuggestions(generatedText);
-      this.logger.log(`✅ [${suggestionId}] Sugerencias parseadas: ${suggestions.length} encontradas`);
+      this.logger.log(`✅ [${suggestionId}] Suggestions parsed: ${suggestions.length} found`);
 
       const processingTime = Date.now() - startTime;
-      this.logger.log(`🎉 [${suggestionId}] GENERACIÓN DE SUGERENCIAS COMPLETADA en ${processingTime}ms`);
+      this.logger.log(`🎉 [${suggestionId}] SUGGESTIONS GENERATION COMPLETED in ${processingTime}ms`);
 
-      // Paso 10: Guardar sugerencias en la base de datos
-      this.logger.log(`💾 [${suggestionId}] PASO 10: Guardando sugerencias en BD...`);
+      // Step 10: Save suggestions to database
+      this.logger.log(`💾 [${suggestionId}] STEP 10: Saving suggestions to database...`);
       const aiSuggestion = new AISuggestion();
       aiSuggestion.suggestionId = suggestionId;
       aiSuggestion.projectId = projectId;
@@ -190,9 +216,9 @@ export class TestCaseSuggestionService {
       };
 
       const savedSuggestion = await this.aiSuggestionRepository.save(aiSuggestion);
-      this.logger.log(`✅ [${suggestionId}] Sugerencias guardadas en BD con ID: ${savedSuggestion.id}`);
+      this.logger.log(`✅ [${suggestionId}] Suggestions saved to database with ID: ${savedSuggestion.id}`);
 
-      // Guardar resumen final
+      // Save final summary
       const summary = {
         suggestionId,
         request,
@@ -206,17 +232,17 @@ export class TestCaseSuggestionService {
         dbId: savedSuggestion.id,
       };
       
-      const summaryPath = path.join(debugDir, 'ai-suggestion-summary.json');
-      fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
-      this.logger.log(`📄 [${suggestionId}] Resumen guardado en: ${summaryPath}`);
+      // const summaryPath = path.join(debugDir, 'ai-suggestion-summary.json');
+      // fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+      // this.logger.log(`📄 [${suggestionId}] Summary saved to: ${summaryPath}`);
 
       return suggestions;
 
     } catch (error) {
-      this.logger.error(`❌ [${suggestionId}] ERROR en generación de sugerencias: ${error.message}`);
+      this.logger.error(`❌ [${suggestionId}] ERROR in suggestions generation: ${error.message}`);
       this.logger.error(`❌ [${suggestionId}] Stack trace: ${error.stack}`);
       
-      // Guardar error en la base de datos
+      // Save error to database
       try {
         const aiSuggestion = new AISuggestion();
         aiSuggestion.suggestionId = suggestionId;
@@ -236,12 +262,12 @@ export class TestCaseSuggestionService {
         };
 
         await this.aiSuggestionRepository.save(aiSuggestion);
-        this.logger.log(`💾 [${suggestionId}] Error guardado en BD`);
+        this.logger.log(`💾 [${suggestionId}] Error saved to database`);
       } catch (dbError) {
-        this.logger.error(`❌ [${suggestionId}] Error guardando en BD: ${dbError.message}`);
+        this.logger.error(`❌ [${suggestionId}] Error saving to database: ${dbError.message}`);
       }
       
-      // Guardar error en archivo
+      // Save error to file
       const errorLog = {
         suggestionId,
         request,
@@ -250,28 +276,34 @@ export class TestCaseSuggestionService {
         timestamp: new Date().toISOString(),
       };
       
-      // Obtener el proyecto para usar su path
-      const project = await this.projectRepository.findOneBy({ id: projectId });
-      if (project) {
-        const debugDir = path.join(path.dirname(project.path), 'debug');
-        if (!fs.existsSync(debugDir)) {
-          fs.mkdirSync(debugDir, { recursive: true });
-        }
-        
-        const errorPath = path.join(debugDir, 'ai-suggestion-error.json');
-        fs.writeFileSync(errorPath, JSON.stringify(errorLog, null, 2));
-        this.logger.log(`📄 [${suggestionId}] Error guardado en: ${errorPath}`);
-      }
+      // Get the project to use its path
+      // const project = await this.projectRepository.findOneBy({ id: projectId });
+      // if (project) {
+      //   const debugDir = path.join(path.dirname(project.path), 'debug');
+      //   if (!fs.existsSync(debugDir)) {
+      //     fs.mkdirSync(debugDir, { recursive: true });
+      //   }
+      //   
+      //   const errorPath = path.join(debugDir, 'ai-suggestion-error.json');
+      //   fs.writeFileSync(errorPath, JSON.stringify(errorLog, null, 2));
+      //   this.logger.log(`📄 [${suggestionId}] Error saved to: ${errorPath}`);
+      // }
       
       throw error;
     }
   }
 
   /**
-   * Construye un prompt optimizado para generar sugerencias de test cases
+   * Builds an optimized prompt for generating test case suggestions.
+   * 
+   * @private
+   * @param projectId - The project ID
+   * @param request - The suggestion request parameters
+   * @returns Promise<{ prompt: string; featureContent: string; stepsContent: string }> - The optimized prompt and file contents
+   * @throws Error - If project or endpoint not found
    */
   private async buildSuggestionPrompt(projectId: string, request: TestCaseSuggestionRequestDto): Promise<{ prompt: string; featureContent: string; stepsContent: string }> {
-    // Obtener archivos actuales de la entidad
+    // Get current files for the entity
     const project = await this.projectRepository.findOneBy({ id: projectId });
     if (!project) {
       throw new Error(`Project with ID ${projectId} not found`);
@@ -282,120 +314,124 @@ export class TestCaseSuggestionService {
     let featurePath = '';
     let stepsPath = '';
 
-    // Buscar el endpoint para obtener los archivos generados
+    // Find the endpoint to get generated files
     const endpoint = await this.endpointRepository.findOne({ 
       where: { projectId: projectId, section: request.section, entityName: request.entityName } 
     });
 
     if (endpoint && endpoint.generatedArtifacts) {
-      // Parsear generatedArtifacts si es string JSON
+      // Parse generatedArtifacts if it's a JSON string
       let artifacts: any;
       try {
         artifacts = typeof endpoint.generatedArtifacts === 'string'
           ? JSON.parse(endpoint.generatedArtifacts)
           : endpoint.generatedArtifacts;
         
-        this.logger.log(`📁 [SUGGESTION] GeneratedArtifacts parseado: ${JSON.stringify(artifacts, null, 2)}`);
+        this.logger.log(`📁 [SUGGESTION] GeneratedArtifacts parsed: ${JSON.stringify(artifacts, null, 2)}`);
       } catch (e) {
-        this.logger.warn(`⚠️ Error parseando generatedArtifacts: ${e.message}`);
+        this.logger.warn(`⚠️ Error parsing generatedArtifacts: ${e.message}`);
         artifacts = {};
       }
 
-      // Leer archivo feature si existe
+      // Read feature file if it exists
       if (artifacts.feature) {
         featurePath = path.join(project.path, artifacts.feature);
-        this.logger.log(`📁 [SUGGESTION] Intentando leer feature file: ${featurePath}`);
+        this.logger.log(`📁 [SUGGESTION] Trying to read feature file: ${featurePath}`);
         
         if (fs.existsSync(featurePath)) {
           featureContent = fs.readFileSync(featurePath, 'utf-8');
-          this.logger.log(`✅ [SUGGESTION] Feature file leído exitosamente (${featureContent.length} caracteres)`);
+          this.logger.log(`✅ [SUGGESTION] Feature file read successfully (${featureContent.length} characters)`);
         } else {
-          this.logger.warn(`⚠️ [SUGGESTION] Feature file no encontrado: ${featurePath}`);
+          this.logger.warn(`⚠️ [SUGGESTION] Feature file not found: ${featurePath}`);
         }
       }
 
-      // Leer archivo steps si existe
+      // Read steps file if it exists
       if (artifacts.steps) {
         stepsPath = path.join(project.path, artifacts.steps);
-        this.logger.log(`📁 [SUGGESTION] Intentando leer steps file: ${stepsPath}`);
+        this.logger.log(`📁 [SUGGESTION] Trying to read steps file: ${stepsPath}`);
         
         if (fs.existsSync(stepsPath)) {
           stepsContent = fs.readFileSync(stepsPath, 'utf-8');
-          this.logger.log(`✅ [SUGGESTION] Steps file leído exitosamente (${stepsContent.length} caracteres)`);
+          this.logger.log(`✅ [SUGGESTION] Steps file read successfully (${stepsContent.length} characters)`);
         } else {
-          this.logger.warn(`⚠️ [SUGGESTION] Steps file no encontrado: ${stepsPath}`);
+          this.logger.warn(`⚠️ [SUGGESTION] Steps file not found: ${stepsPath}`);
         }
       }
     }
 
     return {
-      prompt: `Genera 5 sugerencias de casos de prueba para "${request.entityName}" (${request.section}).
+      prompt: `Generate 5 test case suggestions for "${request.entityName}" (${request.section}).
 
-REQUISITOS DEL USUARIO: ${request.requirements}
+USER REQUIREMENTS: ${request.requirements}
 
-📁 ARCHIVOS ACTUALES INCLUIDOS EN EL PROMPT:
+📁 CURRENT FILES INCLUDED IN PROMPT:
 
-=== FEATURE FILE (${featurePath || 'No existe'}) ===
-${featureContent || 'No existe archivo feature para esta entidad'}
+=== FEATURE FILE (${featurePath || 'Does not exist'}) ===
+${featureContent || 'No feature file exists for this entity'}
 
-=== STEPS FILE (${stepsPath || 'No existe'}) ===
-${stepsContent || 'No existe archivo steps para esta entidad'}
+=== STEPS FILE (${stepsPath || 'Does not exist'}) ===
+${stepsContent || 'No steps file exists for this entity'}
 
-📋 INSTRUCCIONES DETALLADAS:
+📋 DETAILED INSTRUCTIONS:
 
-1. **ANÁLISIS DE ARCHIVOS EXISTENTES:**
-   - Revisa el FEATURE FILE para ver qué escenarios ya existen
-   - Revisa el STEPS FILE para ver qué steps ya están implementados
-   - NO sugieras casos de prueba que ya existan
-   - Identifica áreas de cobertura que podrían faltar
+1. **ANALYSIS OF EXISTING FILES:**
+   - Review the FEATURE FILE to see what scenarios already exist
+   - Review the STEPS FILE to see what steps are already implemented
+   - DO NOT suggest test cases that already exist
+   - Identify coverage areas that might be missing
 
-2. **GENERACIÓN DE SUGERENCIAS:**
-   - Genera EXACTAMENTE 5 sugerencias
-   - Cada sugerencia debe ser única y aportar valor
-   - Enfócate en casos edge, validaciones, y escenarios de error
-   - Considera casos positivos y negativos
-   - Mantén las sugerencias concisas pero informativas
+2. **SUGGESTION GENERATION:**
+   - Generate EXACTLY 5 suggestions
+   - Each suggestion must be unique and add value
+   - Focus on edge cases, validations, and error scenarios
+   - Consider positive and negative cases
+   - Keep suggestions concise but informative
 
-3. **REGLAS ESTRICTAS:**
-   - SOLO APIs REST
-   - NO dupliques escenarios existentes
-   - Las sugerencias deben ser específicas y accionables
-   - Considera diferentes tipos de testing: unit, integration, e2e
-   - Enfócate en cobertura de código y casos edge
+3. **STRICT RULES:**
+   - REST APIs ONLY
+   - DO NOT duplicate existing scenarios
+   - Suggestions must be specific and actionable
+   - Consider different types of testing: unit, integration, e2e
+   - Focus on code coverage and edge cases
 
-4. **FORMATO DE RESPUESTA OBLIGATORIO:**
-   DEBES usar exactamente este formato para que el sistema pueda procesar tu respuesta:
+4. **MANDATORY RESPONSE FORMAT:**
+   YOU MUST use exactly this format for the system to process your response:
 
    ***Suggestion 1:***
-   **Short Prompt:** [Prompt corto y descriptivo]
-   **Short Description:** [Descripción breve del caso de prueba]
-   **Detailed Description:** [Descripción detallada explicando el propósito y cobertura]
+   **Short Prompt:** [Short and descriptive prompt]
+   **Short Description:** [Brief test case description]
+   **Detailed Description:** [Detailed description explaining purpose and coverage]
 
    ***Suggestion 2:***
-   **Short Prompt:** [Prompt corto y descriptivo]
-   **Short Description:** [Descripción breve del caso de prueba]
-   **Detailed Description:** [Descripción detallada explicando el propósito y cobertura]
+   **Short Prompt:** [Short and descriptive prompt]
+   **Short Description:** [Brief test case description]
+   **Detailed Description:** [Detailed description explaining purpose and coverage]
 
-   [Continuar para las 5 sugerencias...]
+   [Continue for all 5 suggestions...]
 
-5. **ESTRUCTURA ESPECÍFICA:**
-   - SHORT PROMPT: Máximo 10 palabras, claro y directo
-   - SHORT DESCRIPTION: Máximo 20 palabras, explica qué valida
-   - DETAILED DESCRIPTION: Máximo 100 palabras, explica el propósito, cobertura y valor
+5. **SPECIFIC STRUCTURE:**
+   - SHORT PROMPT: Maximum 10 words, clear and direct
+   - SHORT DESCRIPTION: Maximum 20 words, explains what it validates
+   - DETAILED DESCRIPTION: Maximum 100 words, explains purpose, coverage and value
 
-Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros comentarios ni explicaciones fuera del formato requerido.`,
+Generate ONLY the 5 suggestions using the specified format. DO NOT include other comments or explanations outside the required format.`,
       featureContent,
       stepsContent
     };
   }
 
   /**
-   * Parsear la respuesta del assistant para extraer las sugerencias
+   * Parses the assistant response to extract suggestions.
+   * 
+   * @private
+   * @param generatedText - The generated text from the assistant
+   * @returns TestCaseSuggestionDto[] - Array of parsed suggestions
    */
   private parseSuggestions(generatedText: string): TestCaseSuggestionDto[] {
     const suggestions: TestCaseSuggestionDto[] = [];
     
-    // Buscar patrones de sugerencias en el texto
+    // Search for suggestion patterns in the text
     const suggestionPattern = /\*\*\*Suggestion (\d+):\*\*\*\s*\*\*Short Prompt:\*\*\s*([^\n]+)\s*\*\*Short Description:\*\*\s*([^\n]+)\s*\*\*Detailed Description:\*\*\s*([^\n]+)/g;
     
     let match;
@@ -408,11 +444,11 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
       suggestions.push(suggestion);
     }
 
-    // Si no se encontraron sugerencias con el patrón, intentar parsear de otra manera
+    // If no suggestions found with the pattern, try alternative parsing
     if (suggestions.length === 0) {
-      this.logger.warn('No se pudieron parsear sugerencias con el patrón estándar, intentando parseo alternativo...');
+      this.logger.warn('Could not parse suggestions with standard pattern, trying alternative parsing...');
       
-      // Parseo alternativo más flexible
+      // More flexible alternative parsing
       const lines = generatedText.split('\n');
       let currentSuggestion: Partial<TestCaseSuggestionDto> = {};
       
@@ -430,17 +466,17 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
         }
       }
       
-      // Agregar la última sugerencia si está completa
+      // Add the last suggestion if it's complete
       if (Object.keys(currentSuggestion).length === 3) {
         suggestions.push(currentSuggestion as TestCaseSuggestionDto);
       }
     }
 
-    // Si aún no hay sugerencias, crear sugerencias por defecto basadas en el texto
+    // If still no suggestions, create default suggestions based on context
     if (suggestions.length === 0) {
-      this.logger.warn('No se pudieron parsear sugerencias, creando sugerencias por defecto...');
+      this.logger.warn('Could not parse suggestions, creating default suggestions...');
       
-      // Crear sugerencias básicas basadas en el contexto
+      // Create basic suggestions based on context
       const defaultSuggestions = [
         {
           shortPrompt: 'Validate required fields',
@@ -472,12 +508,20 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
       suggestions.push(...defaultSuggestions);
     }
 
-    this.logger.log(`✅ Sugerencias parseadas exitosamente: ${suggestions.length}`);
+    this.logger.log(`✅ Suggestions parsed successfully: ${suggestions.length}`);
     return suggestions;
   }
 
   /**
-   * Obtiene todas las sugerencias de un proyecto
+   * Gets all suggestions for a project.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<AISuggestion[]> - Array of AI suggestions
+   * 
+   * @example
+   * ```typescript
+   * const suggestions = await testCaseSuggestionService.getProjectSuggestions('project-123');
+   * ```
    */
   async getProjectSuggestions(projectId: string): Promise<AISuggestion[]> {
     return await this.aiSuggestionRepository.find({
@@ -487,7 +531,19 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
   }
 
   /**
-   * Obtiene sugerencias por entidad y sección
+   * Gets suggestions by entity and section.
+   * 
+   * @param projectId - The project ID
+   * @param entityName - The entity name
+   * @param section - The section name
+   * @returns Promise<AISuggestion[]> - Array of AI suggestions
+   * 
+   * @example
+   * ```typescript
+   * const suggestions = await testCaseSuggestionService.getSuggestionsByEntityAndSection(
+   *   'project-123', 'Product', 'ecommerce'
+   * );
+   * ```
    */
   async getSuggestionsByEntityAndSection(
     projectId: string, 
@@ -501,7 +557,15 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
   }
 
   /**
-   * Obtiene una sugerencia específica por ID
+   * Gets a specific suggestion by ID.
+   * 
+   * @param suggestionId - The suggestion ID
+   * @returns Promise<AISuggestion | null> - The AI suggestion or null if not found
+   * 
+   * @example
+   * ```typescript
+   * const suggestion = await testCaseSuggestionService.getSuggestionById('AI-SUGGEST-123');
+   * ```
    */
   async getSuggestionById(suggestionId: string): Promise<AISuggestion | null> {
     return await this.aiSuggestionRepository.findOne({
@@ -510,7 +574,15 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
   }
 
   /**
-   * Elimina una sugerencia
+   * Deletes a suggestion.
+   * 
+   * @param suggestionId - The suggestion ID
+   * @returns Promise<void>
+   * 
+   * @example
+   * ```typescript
+   * await testCaseSuggestionService.deleteSuggestion('AI-SUGGEST-123');
+   * ```
    */
   async deleteSuggestion(suggestionId: string): Promise<void> {
     const suggestion = await this.aiSuggestionRepository.findOne({
@@ -519,12 +591,21 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
     
     if (suggestion) {
       await this.aiSuggestionRepository.remove(suggestion);
-      this.logger.log(`🗑️ Sugerencia eliminada: ${suggestionId}`);
+      this.logger.log(`🗑️ Suggestion deleted: ${suggestionId}`);
     }
   }
 
   /**
-   * Obtiene estadísticas de sugerencias de un proyecto
+   * Gets suggestion statistics for a project.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<object> - Statistics object with totals and averages
+   * 
+   * @example
+   * ```typescript
+   * const stats = await testCaseSuggestionService.getSuggestionStats('project-123');
+   * console.log(`Total suggestions: ${stats.total}`);
+   * ```
    */
   async getSuggestionStats(projectId: string): Promise<{
     total: number;
@@ -555,15 +636,22 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
   }
 
   /**
-   * Espera a que un run se complete
+   * Waits for a run to complete.
+   * 
+   * @private
+   * @param threadId - The thread ID
+   * @param runId - The run ID
+   * @param suggestionId - The suggestion ID for logging
+   * @returns Promise<any> - The completed run object
+   * @throws Error - If run fails, is cancelled, expires, or times out
    */
   private async waitForRunCompletion(threadId: string, runId: string, suggestionId: string): Promise<any> {
     let attempts = 0;
-    const maxAttempts = 60; // 5 minutos máximo (60 * 5 segundos)
+    const maxAttempts = 60; // 5 minutes maximum (60 * 5 seconds)
     
     while (attempts < maxAttempts) {
       attempts++;
-      this.logger.log(`⏳ [${suggestionId}] Verificando run (intento ${attempts}/${maxAttempts})...`);
+      this.logger.log(`⏳ [${suggestionId}] Checking run (attempt ${attempts}/${maxAttempts})...`);
       
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
@@ -573,26 +661,26 @@ Genera SOLO las 5 sugerencias usando el formato especificado. NO incluyas otros 
       this.logger.log(`📊 [${suggestionId}] Run status: ${run.status}`);
       
       if (run.status === 'completed') {
-        this.logger.log(`✅ [${suggestionId}] Run completado exitosamente`);
+        this.logger.log(`✅ [${suggestionId}] Run completed successfully`);
         return run;
       }
       
       if (run.status === 'failed') {
-        this.logger.error(`❌ [${suggestionId}] Run falló: ${run.last_error?.message || 'Error desconocido'}`);
-        throw new Error(`Run failed: ${run.last_error?.message || 'Error desconocido'}`);
+        this.logger.error(`❌ [${suggestionId}] Run failed: ${run.last_error?.message || 'Unknown error'}`);
+        throw new Error(`Run failed: ${run.last_error?.message || 'Unknown error'}`);
       }
       
       if (run.status === 'cancelled') {
-        this.logger.error(`❌ [${suggestionId}] Run cancelado`);
+        this.logger.error(`❌ [${suggestionId}] Run cancelled`);
         throw new Error('Run was cancelled');
       }
       
       if (run.status === 'expired') {
-        this.logger.error(`❌ [${suggestionId}] Run expirado`);
+        this.logger.error(`❌ [${suggestionId}] Run expired`);
         throw new Error('Run expired');
       }
       
-      // Esperar 5 segundos antes del siguiente intento
+      // Wait 5 seconds before next attempt
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
     

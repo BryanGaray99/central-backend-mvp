@@ -11,6 +11,16 @@ import { TestCase } from '../../test-cases/entities/test-case.entity';
 import { TestSuite } from '../../test-suites/entities/test-suite.entity';
 import { Endpoint } from '../../endpoints/endpoint.entity';
 
+/**
+ * Bugs Service
+ * 
+ * Comprehensive service for bug management and tracking functionality.
+ * Handles bug creation, retrieval, updates, deletion, and automatic bug
+ * generation from failed test executions. Provides statistics, filtering,
+ * and integration with test execution results.
+ * 
+ * @service BugsService
+ */
 @Injectable()
 export class BugsService {
   private readonly logger = new Logger(BugsService.name);
@@ -28,6 +38,24 @@ export class BugsService {
     private readonly endpointRepository: Repository<Endpoint>,
   ) {}
 
+  /**
+   * Creates a new bug for a specific project.
+   * 
+   * @param projectId - The project ID
+   * @param dto - The bug creation data
+   * @returns Promise<BugResponseDto> - The created bug
+   * @throws NotFoundException - If project, test case, or test suite not found
+   * 
+   * @example
+   * ```typescript
+   * const bug = await bugsService.createBug('project-123', {
+   *   title: 'API returns 500 error',
+   *   description: 'Product creation fails with internal server error',
+   *   type: BugType.TEST_FAILURE,
+   *   severity: BugSeverity.HIGH
+   * });
+   * ```
+   */
   async createBug(projectId: string, dto: CreateBugDto): Promise<BugResponseDto> {
     this.logger.log(`Creating bug for project: ${projectId}`);
 
@@ -167,6 +195,25 @@ export class BugsService {
     }
   }
 
+  /**
+   * Gets all bugs for a specific project with optional filters.
+   * 
+   * @param projectId - The project ID
+   * @param filters - Optional filters for bug retrieval
+   * @returns Promise<object> - Paginated list of bugs with metadata
+   * @throws BadRequestException - If bugs table doesn't exist
+   * 
+   * @example
+   * ```typescript
+   * const result = await bugsService.getBugs('project-123', {
+   *   severity: 'high',
+   *   status: 'open',
+   *   page: 1,
+   *   limit: 10
+   * });
+   * console.log(`Found ${result.total} bugs`);
+   * ```
+   */
   async getBugs(projectId: string, filters: BugFiltersDto): Promise<{
     bugs: BugResponseDto[];
     total: number;
@@ -258,6 +305,20 @@ export class BugsService {
     }
   }
 
+  /**
+   * Gets a specific bug by its ID.
+   * 
+   * @param projectId - The project ID
+   * @param bugId - The bug ID
+   * @returns Promise<BugResponseDto> - The bug details
+   * @throws NotFoundException - If bug not found
+   * 
+   * @example
+   * ```typescript
+   * const bug = await bugsService.getBug('project-123', 'BUG-ECOMMERCE-001');
+   * console.log(`Bug title: ${bug.title}`);
+   * ```
+   */
   async getBug(projectId: string, bugId: string): Promise<BugResponseDto> {
     this.logger.log(`Getting bug: ${bugId} for project: ${projectId}`);
 
@@ -272,6 +333,23 @@ export class BugsService {
     return this.mapToResponseDto(bug);
   }
 
+  /**
+   * Updates an existing bug.
+   * 
+   * @param projectId - The project ID
+   * @param bugId - The bug ID
+   * @param dto - The bug update data
+   * @returns Promise<BugResponseDto> - The updated bug
+   * @throws NotFoundException - If bug not found
+   * 
+   * @example
+   * ```typescript
+   * const updatedBug = await bugsService.updateBug('project-123', 'BUG-ECOMMERCE-001', {
+   *   status: BugStatus.IN_PROGRESS,
+   *   priority: BugPriority.HIGH
+   * });
+   * ```
+   */
   async updateBug(projectId: string, bugId: string, dto: UpdateBugDto): Promise<BugResponseDto> {
     this.logger.log(`Updating bug: ${bugId} for project: ${projectId}`);
 
@@ -311,6 +389,20 @@ export class BugsService {
     return this.mapToResponseDto(updatedBug);
   }
 
+  /**
+   * Deletes a bug.
+   * 
+   * @param projectId - The project ID
+   * @param bugId - The bug ID
+   * @returns Promise<{ success: boolean; message: string }> - Deletion result
+   * @throws NotFoundException - If bug not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await bugsService.deleteBug('project-123', 'BUG-ECOMMERCE-001');
+   * console.log(result.message); // "Bug BUG-ECOMMERCE-001 deleted successfully"
+   * ```
+   */
   async deleteBug(projectId: string, bugId: string): Promise<{ success: boolean; message: string }> {
     this.logger.log(`Deleting bug: ${bugId} for project: ${projectId}`);
 
@@ -330,6 +422,18 @@ export class BugsService {
     };
   }
 
+  /**
+   * Gets failed test executions for a specific project for bug creation.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<Array<object>> - Array of failed execution details
+   * 
+   * @example
+   * ```typescript
+   * const failedExecutions = await bugsService.getFailedExecutions('project-123');
+   * console.log(`Found ${failedExecutions.length} failed executions`);
+   * ```
+   */
   async getFailedExecutions(projectId: string): Promise<Array<{
     executionId: string;
     testCaseId: string;
@@ -365,6 +469,26 @@ export class BugsService {
     }));
   }
 
+  /**
+   * Creates a bug from a failed test execution.
+   * 
+   * @param projectId - The project ID
+   * @param executionId - The execution ID
+   * @param testCaseId - The test case ID
+   * @param dto - Partial bug creation data
+   * @returns Promise<BugResponseDto> - The created bug
+   * @throws NotFoundException - If test case not found
+   * 
+   * @example
+   * ```typescript
+   * const bug = await bugsService.createBugFromFailedExecution(
+   *   'project-123',
+   *   'exec-456',
+   *   'TC-ECOMMERCE-01',
+   *   { severity: BugSeverity.HIGH }
+   * );
+   * ```
+   */
   async createBugFromFailedExecution(
     projectId: string,
     executionId: string,
@@ -406,8 +530,24 @@ export class BugsService {
   }
 
   /**
-   * Automatically creates bugs from test execution results
-   * This method is called automatically after each test execution
+   * Automatically creates bugs from test execution results.
+   * This method is called automatically after each test execution.
+   * 
+   * @param projectId - The project ID
+   * @param executionId - The execution ID
+   * @param executionData - The execution metadata
+   * @param testResults - Array of test results
+   * @returns Promise<BugResponseDto[]> - Array of created bugs
+   * 
+   * @example
+   * ```typescript
+   * const bugs = await bugsService.createBugsFromExecutionResults(
+   *   'project-123',
+   *   'exec-456',
+   *   { projectName: 'E-commerce API' },
+   *   [{ status: 'failed', errorMessage: 'Expected 200, got 500' }]
+   * );
+   * ```
    */
   async createBugsFromExecutionResults(
     projectId: string,
@@ -485,7 +625,11 @@ export class BugsService {
   }
 
   /**
-   * Extract detailed error information from test result
+   * Extracts detailed error information from test result.
+   * 
+   * @private
+   * @param result - The test result object
+   * @returns Object containing error type, stack, code, and message
    */
   private extractErrorDetails(result: any): { errorType: string; errorStack: string; errorCode: string; errorMessage: string } {
     const errorMessage = result.errorMessage || '';
@@ -536,7 +680,12 @@ export class BugsService {
   }
 
   /**
-   * Determine error severity based on error type and context
+   * Determines error severity based on error type and context.
+   * 
+   * @private
+   * @param errorType - The type of error
+   * @param result - The test result object
+   * @returns BugSeverity - The determined severity level
    */
   private determineErrorSeverity(errorType: string, result: any): BugSeverity {
     const errorMessage = result.errorMessage || '';
@@ -581,7 +730,12 @@ export class BugsService {
   }
 
   /**
-   * Generate comprehensive bug description
+   * Generates comprehensive bug description.
+   * 
+   * @private
+   * @param result - The test result object
+   * @param executionData - The execution metadata
+   * @returns string - The generated description
    */
   private generateBugDescription(result: any, executionData: any): string {
     const description = [
@@ -641,7 +795,14 @@ export class BugsService {
   }
 
   /**
-   * Generate concise bug description
+   * Generates concise bug description.
+   * 
+   * @private
+   * @param result - The test result object
+   * @param executionData - The execution metadata
+   * @param testCaseId - The test case ID
+   * @param actualExecutionTime - The actual execution time in milliseconds
+   * @returns string - The generated concise description
    */
   private generateConciseBugDescription(result: any, executionData: any, testCaseId: string, actualExecutionTime: number): string {
     // Extract key information
@@ -686,7 +847,11 @@ export class BugsService {
   }
 
   /**
-   * Extract endpoint information from test steps
+   * Extracts endpoint information from test steps.
+   * 
+   * @private
+   * @param steps - Array of test steps
+   * @returns string - The extracted endpoint information
    */
   private extractEndpointFromSteps(steps: any[]): string {
     if (!steps) return '';
@@ -728,7 +893,11 @@ export class BugsService {
   }
 
   /**
-   * Extract request data from test steps
+   * Extracts request data from test steps.
+   * 
+   * @private
+   * @param steps - Array of test steps
+   * @returns any - The extracted request data
    */
   private extractRequestDataFromSteps(steps: any[]): any {
     if (!steps) return null;
@@ -766,7 +935,11 @@ export class BugsService {
   }
 
   /**
-   * Extract response data from test steps
+   * Extracts response data from test steps.
+   * 
+   * @private
+   * @param steps - Array of test steps
+   * @returns any - The extracted response data
    */
   private extractResponseDataFromSteps(steps: any[]): any {
     if (!steps) return null;
@@ -818,7 +991,12 @@ export class BugsService {
   }
 
   /**
-   * Generate execution logs from test result
+   * Generates execution logs from test result.
+   * 
+   * @private
+   * @param result - The test result object
+   * @param executionData - The execution metadata
+   * @returns string - The generated execution logs
    */
   private generateExecutionLogs(result: any, executionData: any): string {
     const logs = [
@@ -860,7 +1038,11 @@ export class BugsService {
   }
 
   /**
-   * Generate console logs from test result
+   * Generates console logs from test result.
+   * 
+   * @private
+   * @param result - The test result object
+   * @returns string - The generated console logs
    */
   private generateConsoleLogs(result: any): string {
     if (!result.errorMessage) return '';
@@ -868,6 +1050,19 @@ export class BugsService {
     return `Error: ${result.errorMessage}`;
   }
 
+  /**
+   * Gets bug statistics for a specific project.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<object> - Statistics object with counts by status, severity, type, and priority
+   * @throws BadRequestException - If bugs table doesn't exist
+   * 
+   * @example
+   * ```typescript
+   * const stats = await bugsService.getBugStatistics('project-123');
+   * console.log(`Project has ${stats.total} bugs, ${stats.open} open`);
+   * ```
+   */
   async getBugStatistics(projectId: string): Promise<{
     total: number;
     open: number;
@@ -940,6 +1135,15 @@ export class BugsService {
     }
   }
 
+  /**
+   * Generates a unique bug ID based on project, section, and entity.
+   * 
+   * @private
+   * @param projectName - The project name
+   * @param section - The section name
+   * @param entity - The entity name
+   * @returns Promise<string> - The generated bug ID
+   */
   private async generateBugId(projectName: string, section: string, entity: string): Promise<string> {
     // Normalize section and entity to avoid duplicates
     const normalizedSection = section?.toUpperCase() || 'GENERAL';
@@ -967,6 +1171,13 @@ export class BugsService {
     return `BUG-${identifier}-${nextId.toString().padStart(3, '0')}`;
   }
 
+  /**
+   * Maps a Bug entity to BugResponseDto.
+   * 
+   * @private
+   * @param bug - The bug entity
+   * @returns Promise<BugResponseDto> - The mapped response DTO
+   */
   private async mapToResponseDto(bug: Bug): Promise<BugResponseDto> {
     // Get the real test case name from database if we have a readable testCaseId
     let realTestCaseName = bug.testCaseName;
@@ -1026,7 +1237,24 @@ export class BugsService {
     };
   }
 
-  // General methods (without projectId)
+  /**
+   * Gets all bugs across all projects with optional filters.
+   * 
+   * @param filters - Optional filters for bug retrieval
+   * @returns Promise<object> - Paginated list of bugs with metadata
+   * @throws BadRequestException - If bugs table doesn't exist
+   * 
+   * @example
+   * ```typescript
+   * const result = await bugsService.getAllBugs({
+   *   severity: 'high',
+   *   status: 'open',
+   *   page: 1,
+   *   limit: 20
+   * });
+   * console.log(`Found ${result.total} bugs across all projects`);
+   * ```
+   */
   async getAllBugs(filters: BugFiltersDto): Promise<{
     bugs: BugResponseDto[];
     total: number;
@@ -1117,6 +1345,18 @@ export class BugsService {
     }
   }
 
+  /**
+   * Gets comprehensive bug statistics across all projects.
+   * 
+   * @returns Promise<object> - Statistics object with counts by status, severity, type, and priority
+   * @throws BadRequestException - If bugs table doesn't exist
+   * 
+   * @example
+   * ```typescript
+   * const stats = await bugsService.getAllBugStatistics();
+   * console.log(`Total bugs: ${stats.total}, Open: ${stats.open}`);
+   * ```
+   */
   async getAllBugStatistics(): Promise<{
     total: number;
     open: number;
@@ -1186,6 +1426,18 @@ export class BugsService {
     }
   }
 
+  /**
+   * Gets all failed test executions across all projects for bug creation.
+   * 
+   * @returns Promise<Array<object>> - Array of failed execution details
+   * @throws BadRequestException - If required tables don't exist
+   * 
+   * @example
+   * ```typescript
+   * const failedExecutions = await bugsService.getAllFailedExecutions();
+   * console.log(`Found ${failedExecutions.length} failed executions across all projects`);
+   * ```
+   */
   async getAllFailedExecutions(): Promise<Array<{
     executionId: string;
     testCaseId: string;
@@ -1229,7 +1481,11 @@ export class BugsService {
   }
 
   /**
-   * Extract HTTP method from test result
+   * Extracts HTTP method from test result.
+   * 
+   * @private
+   * @param result - The test result object
+   * @returns string - The extracted HTTP method
    */
   private extractHttpMethod(result: any): string {
     const scenarioName = result.scenarioName?.toLowerCase() || '';
@@ -1268,7 +1524,11 @@ export class BugsService {
   }
 
   /**
-   * Extract test case ID from test result
+   * Extracts test case ID from test result.
+   * 
+   * @private
+   * @param result - The test result object
+   * @returns string | undefined - The extracted test case ID
    */
   private extractTestCaseId(result: any): string | undefined {
     // Look for test case ID in scenario tags
@@ -1307,7 +1567,11 @@ export class BugsService {
   }
 
   /**
-   * Extract section from test result
+   * Extracts section from test result.
+   * 
+   * @private
+   * @param result - The test result object
+   * @returns string - The extracted section
    */
   private extractSectionFromResult(result: any): string {
     // Look for section in metadata tags
@@ -1354,7 +1618,11 @@ export class BugsService {
   }
 
   /**
-   * Extract entity from test result
+   * Extracts entity from test result.
+   * 
+   * @private
+   * @param result - The test result object
+   * @returns string - The extracted entity
    */
   private extractEntityFromResult(result: any): string {
     // Look for entity in metadata tags
@@ -1410,7 +1678,11 @@ export class BugsService {
   }
 
   /**
-   * Calculate actual execution time excluding hooks
+   * Calculates actual execution time excluding hooks.
+   * 
+   * @private
+   * @param result - The test result object
+   * @returns number - The actual execution time in milliseconds
    */
   private calculateActualExecutionTime(result: any): number {
     // Sum the duration of all steps. Cucumber.js reports duration in nanoseconds.
@@ -1419,6 +1691,14 @@ export class BugsService {
     return totalDurationNs / 1_000_000; // Convert nanoseconds to milliseconds
   }
 
+  /**
+   * Gets test case data from database by test case ID.
+   * 
+   * @private
+   * @param testCaseId - The test case ID
+   * @param projectId - The project ID
+   * @returns Promise<object | null> - The test case data or null if not found
+   */
   private async getTestCaseDataFromDatabase(testCaseId: string, projectId: string): Promise<{ id: string; name: string; section: string; entity: string; endpointPath: string | null } | null> {
     const testCase = await this.testCaseRepository.findOne({
       where: { testCaseId, projectId }
@@ -1446,6 +1726,13 @@ export class BugsService {
     };
   }
 
+  /**
+   * Cleans error message by removing stack traces and unnecessary information.
+   * 
+   * @private
+   * @param errorMessage - The raw error message
+   * @returns string - The cleaned error message
+   */
   private cleanErrorMessage(errorMessage: string): string {
     if (!errorMessage) return '';
     

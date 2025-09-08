@@ -12,6 +12,16 @@ import { ValidationService } from './services/validation.service';
 import { QueueService } from './services/queue.service';
 import { CleanupService } from './services/cleanup.service';
 
+/**
+ * Projects module that provides comprehensive project management functionality.
+ * 
+ * This module handles the creation, management, and lifecycle of testing projects.
+ * It includes services for project generation, validation, file system operations,
+ * template processing, and cleanup operations.
+ * 
+ * @module ProjectsModule
+ * @since 1.0.0
+ */
 @Module({
   imports: [TypeOrmModule.forFeature([Project]), WorkspaceModule],
   providers: [

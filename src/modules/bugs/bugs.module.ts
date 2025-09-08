@@ -10,6 +10,15 @@ import { BugsGeneralController } from './controllers/bugs-general.controller';
 import { BugsService } from './services/bugs.service';
 import { TestExecutionModule } from '../test-execution/test-execution.module';
 
+/**
+ * Bugs Module
+ * 
+ * Manages bug tracking and reporting functionality for test execution failures.
+ * Provides comprehensive bug management including creation from failed test executions,
+ * bug lifecycle management, statistics, and integration with test execution results.
+ * 
+ * @module BugsModule
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Bug, Project, TestCase, TestSuite, Endpoint]),

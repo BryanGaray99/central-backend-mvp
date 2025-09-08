@@ -4,6 +4,12 @@ import { TestResultsListenerService } from '../services/test-results-listener.se
 let listenerService: TestResultsListenerService;
 let currentExecutionId: string;
 
+/**
+ * Initializes Cucumber hooks for capturing execution events.
+ *
+ * @param executionId - Current execution identifier used for correlation
+ * @param listener - Listener service to capture scenario/step events
+ */
 export function initializeCucumberHooks(
   executionId: string,
   listener: TestResultsListenerService
@@ -50,7 +56,7 @@ After(async function(scenario) {
       status,
       duration,
       errorMessage,
-      steps: [] // Los steps se capturan individualmente
+      steps: [] // Steps are captured individually
     }
   );
 });
@@ -60,7 +66,7 @@ BeforeStep(async function(step) {
     return;
   }
 
-  // Usar un identificador único para el step
+  // Use a unique identifier for the step
   const stepName = `Step-${Date.now()}`;
   
   listenerService.captureStepStart(
@@ -73,7 +79,7 @@ AfterStep(async function(step) {
     return;
   }
 
-  // Usar un identificador único para el step
+  // Use a unique identifier for the step
   const stepName = `Step-${Date.now()}`;
   const status = step.result?.status === 'PASSED' ? 'passed' : 'failed';
   const duration = step.result?.duration || 0;
@@ -85,7 +91,7 @@ AfterStep(async function(step) {
       status,
       duration,
       errorMessage,
-      data: {} // Los datos se pueden capturar de otras formas
+      data: {} // Data can be captured through other mechanisms
     }
   );
 }); 

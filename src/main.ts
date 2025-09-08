@@ -1,4 +1,18 @@
-// NOTA: Si aparecen errores de tipos relacionados con Swagger o NestJS en Windows, puede deberse a múltiples node_modules en rutas diferentes. Reiniciar el IDE o limpiar node_modules puede ayudar.
+/**
+ * Main Application Bootstrap
+ * 
+ * Central entry point for the Central Backend MVP application.
+ * Configures NestJS application with security middleware, validation,
+ * CORS, Swagger documentation, and automatic port detection.
+ * 
+ * @file main.ts
+ * @version 1.0.0
+ * @author Central Backend MVP Team
+ */
+
+// NOTE: If TypeScript errors related to Swagger or NestJS appear on Windows,
+// it may be due to multiple node_modules in different paths. Restarting the IDE
+// or cleaning node_modules may help.
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, Logger, HttpStatus } from '@nestjs/common';
@@ -12,6 +26,18 @@ import helmet from 'helmet';
 
 dotenv.config();
 
+/**
+ * Checks if a port is available for use.
+ * 
+ * @param port - The port number to check
+ * @returns Promise<boolean> - True if port is available, false otherwise
+ * 
+ * @example
+ * ```typescript
+ * const available = await isPortAvailable(3000);
+ * console.log(`Port 3000 is ${available ? 'available' : 'not available'}`);
+ * ```
+ */
 async function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -27,6 +53,22 @@ async function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
+/**
+ * Finds an available port from a predefined list.
+ * 
+ * @returns Promise<number> - The first available port
+ * @throws Error - If no ports are available
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   const port = await findAvailablePort();
+ *   console.log(`Using port: ${port}`);
+ * } catch (error) {
+ *   console.error('No available ports found');
+ * }
+ * ```
+ */
 async function findAvailablePort(): Promise<number> {
   const ports = [3000, 3001, 3002];
 
@@ -37,17 +79,31 @@ async function findAvailablePort(): Promise<number> {
   }
 
   throw new Error(
-    'No se encontró un puerto disponible. Puertos 3000, 3001 y 3002 están ocupados.',
+    'No available port found. Ports 3000, 3001 and 3002 are occupied.',
   );
 }
 
+/**
+ * Bootstrap function that initializes and configures the NestJS application.
+ * Sets up middleware, validation, CORS, Swagger documentation, and starts the server.
+ * 
+ * @returns Promise<void>
+ * 
+ * @example
+ * ```typescript
+ * bootstrap().catch((error) => {
+ *   console.error('Failed to start application:', error);
+ *   process.exit(1);
+ * });
+ * ```
+ */
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
-  // Configurar base path global
+  // Configure global base path
   app.setGlobalPrefix('v1/api');
 
   // Security middleware
@@ -81,31 +137,31 @@ async function bootstrap() {
     }),
   );
 
-  // Filtros e interceptores globales
+  // Global filters and interceptors
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  // Configuración de Swagger mejorada
+  // Enhanced Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('Central Backend MVP - Test Generation Engine')
     .setDescription(
-      `API central para generación y orquestación de proyectos de testing automatizado.`,
+      `Central API for generation and orchestration of automated testing projects.`,
     )
     .setVersion('1.0.0')
-    .addTag('projects', 'Gestión de proyectos de testing')
-    .addTag('endpoints', 'Registro y gestión de endpoints de APIs')
-    .addTag('test-execution', 'Ejecución y gestión de resultados de pruebas')
-    .addTag('health', 'Estado del servicio')
+    .addTag('projects', 'Testing project management')
+    .addTag('endpoints', 'API endpoint registration and management')
+    .addTag('test-execution', 'Test execution and results management')
+    .addTag('health', 'Service status')
     .addBearerAuth()
     .addApiKey({ type: 'apiKey', name: 'X-API-KEY', in: 'header' }, 'X-API-KEY')
-    .addServer('http://localhost:3000', 'Servidor de Desarrollo')
-    .addServer('http://localhost:3001', 'Servidor Alternativo 1')
-    .addServer('http://localhost:3002', 'Servidor Alternativo 2')
+    .addServer('http://localhost:3000', 'Development Server')
+    .addServer('http://localhost:3001', 'Alternative Server 1')
+    .addServer('http://localhost:3002', 'Alternative Server 2')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
   
-  // Configurar Swagger con opciones mejoradas
+  // Configure Swagger with enhanced options
   SwaggerModule.setup('docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
@@ -129,19 +185,20 @@ async function bootstrap() {
     const port = await findAvailablePort();
     await app.listen(port);
     
-    logger.log(`🚀 Central Backend MVP corriendo en: http://localhost:${port}`);
-    logger.log(`📚 Documentación Swagger en: http://localhost:${port}/docs`);
+    logger.log(`🚀 Central Backend MVP running at: http://localhost:${port}`);
+    logger.log(`📚 Swagger documentation at: http://localhost:${port}/docs`);
     logger.log(`🔒 API Version: v1`);
-    logger.log(`🏥 Health Check en: http://localhost:${port}/v1/api/health`);
+    logger.log(`🏥 Health Check at: http://localhost:${port}/v1/api/health`);
     logger.log(`🔗 Base Path: /v1/api`);
-    logger.log(`📊 Endpoints disponibles:`);
-    logger.log(`   - Proyectos: http://localhost:${port}/v1/api/projects`);
+    logger.log(`📊 Available endpoints:`);
+    logger.log(`   - Projects: http://localhost:${port}/v1/api/projects`);
     logger.log(`   - Endpoints: http://localhost:${port}/v1/api/endpoints`);
     logger.log(`   - Test Execution: http://localhost:${port}/v1/api/projects/:id/test-execution`);
   } catch (error) {
-    logger.error('❌ Error al iniciar el servidor:', error.message);
+    logger.error('❌ Error starting server:', error.message);
     process.exit(1);
   }
 }
 
+// Start the application
 bootstrap();

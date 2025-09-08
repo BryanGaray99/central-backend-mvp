@@ -6,14 +6,50 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const exec = promisify(execCallback);
-const MAX_RETRIES = 1;
-const RETRY_DELAY = 1000; // 1 second
-const COMMAND_TIMEOUT = 10 * 60 * 1000; // 5 minutes
 
+/** Maximum number of retry attempts for file operations */
+const MAX_RETRIES = 1;
+
+/** Delay between retry attempts in milliseconds */
+const RETRY_DELAY = 1000;
+
+/** Command execution timeout in milliseconds */
+const COMMAND_TIMEOUT = 10 * 60 * 1000;
+
+/**
+ * Service for Playwright project initialization and management.
+ * 
+ * This service handles the initialization of Playwright projects, including
+ * dependency installation, example file cleanup, and health checks.
+ * It provides a robust interface for managing Playwright testing environments.
+ * 
+ * @class PlaywrightService
+ * @since 1.0.0
+ */
 @Injectable()
 export class PlaywrightService {
+  /** Logger instance for this service */
   private readonly logger = new Logger(PlaywrightService.name);
 
+  /**
+   * Initializes a Playwright project with BDD support.
+   * 
+   * This method performs a complete Playwright project initialization including:
+   * 1. Playwright project creation with browser download skip
+   * 2. BDD dependencies installation
+   * 3. Example files cleanup
+   * 
+   * @param project - The project to initialize
+   * @returns Promise that resolves when initialization is complete
+   * @throws {Error} When initialization fails
+   * 
+   * @example
+   * ```typescript
+   * const project = await projectRepo.findOne({ where: { id: 'project-id' } });
+   * await playwrightService.initializeProject(project);
+   * console.log('Playwright project initialized');
+   * ```
+   */
   async initializeProject(project: Project): Promise<void> {
     this.logger.log(
       `Starting Playwright initialization for project: ${project.name}`,
@@ -57,6 +93,16 @@ export class PlaywrightService {
     }
   }
 
+  /**
+   * Cleans up example files from the Playwright project.
+   * 
+   * This method removes default example files and directories that are not
+   * needed for the BDD testing setup.
+   * 
+   * @param projectPath - The path to the project directory
+   * @returns Promise that resolves when cleanup is complete
+   * @private
+   */
   private async cleanExampleFiles(projectPath: string): Promise<void> {
     const filesToDelete = [
       'tests/example.spec.ts',
@@ -100,10 +146,36 @@ export class PlaywrightService {
     }
   }
 
+  /**
+   * Creates a delay for the specified number of milliseconds.
+   * 
+   * @param ms - The number of milliseconds to delay
+   * @returns Promise that resolves after the specified delay
+   * @private
+   */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  /**
+   * Runs a health check to verify the project setup.
+   * 
+   * This method creates and runs a test to verify that all dependencies
+   * are properly installed and the project structure is correct.
+   * 
+   * @param project - The project to check
+   * @returns Promise that resolves to true if health check passes, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * const isHealthy = await playwrightService.runHealthCheck(project);
+   * if (isHealthy) {
+   *   console.log('Project is ready');
+   * } else {
+   *   console.log('Project has issues');
+   * }
+   * ```
+   */
   async runHealthCheck(project: Project): Promise<boolean> {
     this.logger.log(`Running health check for project: ${project.name}`);
 
@@ -149,6 +221,17 @@ test('health check - project setup', async () => {
     }
   }
 
+  /**
+   * Executes a command with timeout and environment configuration.
+   * 
+   * @param command - The command to execute
+   * @param cwd - The working directory for the command
+   * @param operationName - Name of the operation for logging
+   * @param extraEnv - Additional environment variables
+   * @returns Promise that resolves when the command completes
+   * @throws {Error} When command execution fails or times out
+   * @private
+   */
   private async execCommandWithTimeout(
     command: string,
     cwd: string,
@@ -196,6 +279,14 @@ test('health check - project setup', async () => {
     }
   }
 
+  /**
+   * Executes a command with default settings.
+   * 
+   * @param command - The command to execute
+   * @param cwd - The working directory for the command
+   * @returns Promise that resolves when the command completes
+   * @private
+   */
   private async execCommand(command: string, cwd: string): Promise<void> {
     return this.execCommandWithTimeout(command, cwd, 'Command execution');
   }

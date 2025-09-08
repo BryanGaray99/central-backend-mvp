@@ -3,53 +3,78 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as Handlebars from 'handlebars';
 
+/**
+ * Service for template processing and rendering.
+ * 
+ * This service provides functionality for rendering Handlebars templates
+ * with project-specific variables. It includes a comprehensive set of
+ * Handlebars helpers for common template operations and supports both
+ * file-based and string-based template rendering.
+ * 
+ * @class TemplateService
+ * @since 1.0.0
+ */
 @Injectable()
 export class TemplateService {
+  /** Path to the templates directory */
   private readonly templatesPath: string;
 
+  /**
+   * Creates an instance of TemplateService.
+   * 
+   * Initializes the templates path and registers Handlebars helpers.
+   */
   constructor() {
-    // NestJS copia los assets al mismo nivel que el código compilado
+    // NestJS copies assets to the same level as compiled code
     this.templatesPath = path.join(__dirname, '..', 'templates');
     
-    // Registrar helpers de Handlebars necesarios para los templates
+    // Register Handlebars helpers needed for templates
     this.registerHandlebarsHelpers();
   }
 
+  /**
+   * Registers Handlebars helpers for template processing.
+   * 
+   * This method registers a comprehensive set of Handlebars helpers that
+   * support both function and block usage patterns.
+   * 
+   * @private
+   */
   private registerHandlebarsHelpers(): void {
-    // Comparación de igualdad - soporta uso como función y como bloque
+    // Equality comparison - supports both function and block usage
     Handlebars.registerHelper('eq', function(a, b, options) {
       const isEqual = a === b;
-      // Si el último argumento es el objeto options de Handlebars (uso como bloque)
+      // If the last argument is the Handlebars options object (block usage)
       if (typeof options === 'object' && options && typeof options.fn === 'function') {
         return isEqual ? options.fn(this) : options.inverse(this);
       }
-      // Si se usa como función (en expresiones)
+      // If used as a function (in expressions)
       return isEqual;
     });
 
-    // Comparación de desigualdad - soporta uso como función y como bloque
+    // Inequality comparison - supports both function and block usage
     Handlebars.registerHelper('neq', function(a, b, options) {
       const isNotEqual = a !== b;
-      // Si el último argumento es el objeto options de Handlebars (uso como bloque)
+      // If the last argument is the Handlebars options object (block usage)
       if (typeof options === 'object' && options && typeof options.fn === 'function') {
         return isNotEqual ? options.fn(this) : options.inverse(this);
       }
-      // Si se usa como función (en expresiones)
+      // If used as a function (in expressions)
       return isNotEqual;
     });
 
-    // Concatenar strings
+    // String concatenation
     Handlebars.registerHelper('concat', function(...args) {
       return args.slice(0, -1).join('');
     });
 
-    // Capitalizar la primera letra
+    // Capitalize first letter
     Handlebars.registerHelper('capitalize', function(str) {
       if (typeof str !== 'string') return str;
       return str.charAt(0).toUpperCase() + str.slice(1);
     });
 
-    // Convertir a kebab-case
+    // Convert to kebab-case
     Handlebars.registerHelper('kebabCase', function(str) {
       if (typeof str !== 'string') return str;
       return str
@@ -58,81 +83,96 @@ export class TemplateService {
         .toLowerCase();
     });
 
-    // Escapar comillas para evitar HTML encoding
+    // Escape quotes to avoid HTML encoding
     Handlebars.registerHelper('escapeQuotes', function(str) {
       if (typeof str !== 'string') return str;
       return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
     });
 
-    // Verificar si un array contiene un valor - soporta uso como función y como bloque
+    // Check if an array contains a value - supports both function and block usage
     Handlebars.registerHelper('includes', function(array, value, options) {
       const hasValue = Array.isArray(array) && array.includes(value);
-      // Si el último argumento es el objeto options de Handlebars (uso como bloque)
+      // If the last argument is the Handlebars options object (block usage)
       if (typeof options === 'object' && options && typeof options.fn === 'function') {
         return hasValue ? options.fn(this) : options.inverse(this);
       }
-      // Si se usa como función (en expresiones)
+      // If used as a function (in expressions)
       return hasValue;
     });
 
-    // Obtener el primer elemento de un array
+    // Get the first element of an array
     Handlebars.registerHelper('first', function(array) {
       if (!Array.isArray(array) || array.length === 0) return '';
       return array[0];
     });
 
-    // Obtener el último elemento de un array
+    // Get the last element of an array
     Handlebars.registerHelper('last', function(array) {
       if (!Array.isArray(array) || array.length === 0) return '';
       return array[array.length - 1];
     });
 
-    // Verificar si un objeto tiene una propiedad - soporta uso como función y como bloque
+    // Check if an object has a property - supports both function and block usage
     Handlebars.registerHelper('hasProperty', function(obj, property, options) {
       const hasProp = obj && typeof obj === 'object' && obj.hasOwnProperty(property);
-      // Si el último argumento es el objeto options de Handlebars (uso como bloque)
+      // If the last argument is the Handlebars options object (block usage)
       if (typeof options === 'object' && options && typeof options.fn === 'function') {
         return hasProp ? options.fn(this) : options.inverse(this);
       }
-      // Si se usa como función (en expresiones)
+      // If used as a function (in expressions)
       return hasProp;
     });
 
-    // Obtener el tipo de dato
+    // Get the data type
     Handlebars.registerHelper('getType', function(value) {
       if (value === null) return 'null';
       if (Array.isArray(value)) return 'array';
       return typeof value;
     });
 
-    // Verificar si es el primer elemento en un loop
+    // Check if it's the first element in a loop
     Handlebars.registerHelper('isFirst', function(index, options) {
       const isFirst = index === 0;
-      // Si el último argumento es el objeto options de Handlebars (uso como bloque)
+      // If the last argument is the Handlebars options object (block usage)
       if (typeof options === 'object' && options && typeof options.fn === 'function') {
         return isFirst ? options.fn(this) : options.inverse(this);
       }
-      // Si se usa como función (en expresiones)
+      // If used as a function (in expressions)
       return isFirst;
     });
 
-    // Verificar si es el último elemento en un loop
+    // Check if it's the last element in a loop
     Handlebars.registerHelper('isLast', function(index, array, options) {
       const isLast = index === array.length - 1;
-      // Si el último argumento es el objeto options de Handlebars (uso como bloque)
+      // If the last argument is the Handlebars options object (block usage)
       if (typeof options === 'object' && options && typeof options.fn === 'function') {
         return isLast ? options.fn(this) : options.inverse(this);
       }
-      // Si se usa como función (en expresiones)
+      // If used as a function (in expressions)
       return isLast;
     });
 
-    // Registrar helper ifDefined para valores como minimum: 0
+    // Register ifDefined helper for values like minimum: 0
     Handlebars.registerHelper('ifDefined', function (value, options) {
       return typeof value !== 'undefined' ? options.fn(this) : options.inverse(this);
     });
   }
 
+  /**
+   * Renders a template with the provided variables.
+   * 
+   * @param templateNameOrPath - Template name or full path to template file
+   * @param variables - Variables to use in template rendering
+   * @returns Promise that resolves to the rendered template content
+   * 
+   * @example
+   * ```typescript
+   * const content = await templateService.renderTemplate('package.json.template', {
+   *   name: 'my-project',
+   *   version: '1.0.0'
+   * });
+   * ```
+   */
   async renderTemplate(
     templateNameOrPath: string,
     variables: Record<string, any>,
@@ -146,7 +186,7 @@ export class TemplateService {
 
     const templateSource = await fs.readFile(templatePath, 'utf-8');
 
-    // Configurar Handlebars para no escapar HTML automáticamente
+    // Configure Handlebars to not automatically escape HTML
     const template = Handlebars.compile(templateSource, {
       noEscape: true,
       strict: false,
@@ -155,6 +195,23 @@ export class TemplateService {
     return template(variables);
   }
 
+  /**
+   * Renders a template and writes it to a file.
+   * 
+   * @param templateNameOrPath - Template name or full path to template file
+   * @param targetPath - Path where to write the rendered content
+   * @param variables - Variables to use in template rendering
+   * @returns Promise that resolves when the file is written
+   * 
+   * @example
+   * ```typescript
+   * await templateService.writeRenderedTemplate(
+   *   'package.json.template',
+   *   '/project/package.json',
+   *   { name: 'my-project', version: '1.0.0' }
+   * );
+   * ```
+   */
   async writeRenderedTemplate(
     templateNameOrPath: string,
     targetPath: string,

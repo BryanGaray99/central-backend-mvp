@@ -17,12 +17,20 @@ export interface ExecutionEvent {
 }
 
 @Injectable()
+/**
+ * Service: ExecutionEventsService
+ *
+ * Provides a lightweight server-sent events (SSE) publisher to stream
+ * execution lifecycle events to subscribed clients.
+ */
 export class ExecutionEventsService {
   private readonly logger = new Logger(ExecutionEventsService.name);
   private readonly executionEvents = new Subject<ExecutionEvent>();
 
   /**
-   * Emitir evento de ejecución
+   * Emits an execution event to all subscribers.
+   *
+   * @param event - Execution event payload
    */
   emitExecutionEvent(event: ExecutionEvent) {
     this.logger.log(`Emitting execution event: ${event.type} for ${event.executionId}`);
@@ -31,12 +39,14 @@ export class ExecutionEventsService {
   }
 
   /**
-   * Obtener stream de eventos para un proyecto específico
+   * Returns an SSE stream filtered by project ID.
+   *
+   * @param projectId - Project identifier to filter events
    */
   getExecutionEvents(projectId: string): Observable<MessageEvent> {
     return this.executionEvents.asObservable().pipe(
       map(event => {
-        // Solo enviar eventos del proyecto específico
+        // Only send events for the specific project
         if (event.projectId === projectId) {
           const messageEvent = {
             data: JSON.stringify(event),
@@ -52,14 +62,14 @@ export class ExecutionEventsService {
   }
 
   /**
-   * Emitir evento de inicio de ejecución
+   * Emits an execution started event.
    */
   emitExecutionStarted(executionId: string, projectId: string, entityName?: string, testSuiteId?: string, testCaseId?: string) {
     this.emitExecutionEvent({
       executionId,
       type: 'started',
       status: 'running',
-      message: `Ejecución iniciada${entityName ? ` para ${entityName}` : ''}`,
+      message: `Execution started${entityName ? ` for ${entityName}` : ''}`,
       timestamp: new Date().toISOString(),
       projectId,
       entityName,
@@ -69,7 +79,7 @@ export class ExecutionEventsService {
   }
 
   /**
-   * Emitir evento de progreso
+   * Emits an execution progress event.
    */
   emitExecutionProgress(executionId: string, projectId: string, progress: number, message?: string) {
     this.emitExecutionEvent({
@@ -84,14 +94,14 @@ export class ExecutionEventsService {
   }
 
   /**
-   * Emitir evento de ejecución completada
+   * Emits an execution completed event.
    */
   emitExecutionCompleted(executionId: string, projectId: string, results: any) {
     this.emitExecutionEvent({
       executionId,
       type: 'completed',
       status: 'completed',
-      message: 'Ejecución completada exitosamente',
+      message: 'Execution completed successfully',
       timestamp: new Date().toISOString(),
       projectId,
       results,
@@ -99,14 +109,14 @@ export class ExecutionEventsService {
   }
 
   /**
-   * Emitir evento de ejecución fallida
+   * Emits an execution failed event.
    */
   emitExecutionFailed(executionId: string, projectId: string, error: string) {
     this.emitExecutionEvent({
       executionId,
       type: 'failed',
       status: 'failed',
-      message: `Ejecución fallida: ${error}`,
+      message: `Execution failed: ${error}`,
       timestamp: new Date().toISOString(),
       projectId,
     });

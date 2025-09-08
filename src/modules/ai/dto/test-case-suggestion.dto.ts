@@ -1,6 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty } from 'class-validator';
 
+/**
+ * DTO for test case suggestion requests.
+ * Contains the parameters needed to generate AI-powered test case suggestions.
+ */
 export class TestCaseSuggestionRequestDto {
   @ApiProperty({
     description: 'Section of the API (e.g., ecommerce, auth, user)',
@@ -27,6 +31,10 @@ export class TestCaseSuggestionRequestDto {
   requirements: string;
 }
 
+/**
+ * DTO representing a single test case suggestion.
+ * Contains the structured information for a suggested test case.
+ */
 export class TestCaseSuggestionDto {
   @ApiProperty({
     description: 'Short prompt describing the test case',
@@ -50,6 +58,10 @@ export class TestCaseSuggestionDto {
   detailedDescription: string;
 }
 
+/**
+ * DTO for test case suggestion responses.
+ * Contains the generated suggestions and metadata about the generation process.
+ */
 export class TestCaseSuggestionResponseDto {
   @ApiProperty({
     description: 'List of test case suggestions',

@@ -11,6 +11,9 @@ import {
 import { Project } from '../../projects/project.entity';
 import { TestResult } from './test-result.entity';
 
+/**
+ * Execution status lifecycle for a test execution.
+ */
 export enum ExecutionStatus {
   PENDING = 'pending',
   RUNNING = 'running',
@@ -19,6 +22,9 @@ export enum ExecutionStatus {
   CANCELLED = 'cancelled',
 }
 
+/**
+ * Type of test selection for an execution.
+ */
 export enum TestType {
   POSITIVE = 'positive',
   NEGATIVE = 'negative',
@@ -26,6 +32,11 @@ export enum TestType {
 }
 
 @Entity('test_executions')
+/**
+ * Entity: TestExecution
+ *
+ * Represents a test execution process and its aggregated outcomes for a project.
+ */
 export class TestExecution {
   @PrimaryGeneratedColumn('uuid')
   id: string;

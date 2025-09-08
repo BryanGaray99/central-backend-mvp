@@ -2,6 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsEnum, IsString, IsNumber, IsArray } from 'class-validator';
 import { TestSuiteType, TestSuiteStatus } from '../entities/test-suite.entity';
 
+/**
+ * DTO: Query filters for listing test suites.
+ */
 export class TestSuiteFiltersDto {
   @ApiProperty({
     description: 'Filter by test suite type',

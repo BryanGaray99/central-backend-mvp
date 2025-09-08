@@ -5,7 +5,11 @@ export class ExecutionLoggerService {
   private readonly logger = new Logger(ExecutionLoggerService.name);
 
   /**
-   * Registra información sobre la ejecución completada
+   * Logs information about a completed execution.
+   *
+   * @param projectId - Project identifier
+   * @param entityName - Entity name
+   * @param executionResults - Aggregated execution results
    */
   async logExecutionCompleted(
     projectId: string,
@@ -13,16 +17,21 @@ export class ExecutionLoggerService {
     executionResults: any,
   ): Promise<void> {
     try {
-      this.logger.log(`Ejecución completada para entidad ${entityName} en proyecto ${projectId}`);
-      this.logger.log(`Ejecución ${executionResults.executionId} completada con ${executionResults.summary.totalScenarios} escenarios`);
+      this.logger.log(`Execution completed for entity ${entityName} in project ${projectId}`);
+      this.logger.log(`Execution ${executionResults.executionId} completed with ${executionResults.summary.totalScenarios} scenarios`);
     } catch (error) {
-      this.logger.error(`Error registrando ejecución: ${error.message}`);
-      // No lanzar error para evitar que falle toda la ejecución
+      this.logger.error(`Error logging execution: ${error.message}`);
+      // Do not throw to avoid failing the whole execution path
     }
   }
 
   /**
-   * Registra el cambio de estado de un escenario
+   * Logs scenario status changes.
+   *
+   * @param projectId - Project identifier
+   * @param entityName - Entity name
+   * @param scenarioName - Scenario name
+   * @param status - New scenario status
    */
   async logScenarioStatusChange(
     projectId: string,
@@ -31,14 +40,19 @@ export class ExecutionLoggerService {
     status: string,
   ): Promise<void> {
     try {
-      this.logger.log(`Estado de escenario actualizado: ${scenarioName} -> ${status} en proyecto ${projectId}`);
+      this.logger.log(`Scenario status updated: ${scenarioName} -> ${status} in project ${projectId}`);
     } catch (error) {
-      this.logger.error(`Error registrando cambio de estado de escenario: ${error.message}`);
+      this.logger.error(`Error logging scenario status change: ${error.message}`);
     }
   }
 
   /**
-   * Registra los resultados de pasos procesados
+   * Logs processed step results for a scenario.
+   *
+   * @param projectId - Project identifier
+   * @param entityName - Entity name
+   * @param scenarioName - Scenario name
+   * @param stepResults - Array of step results
    */
   async logStepResults(
     projectId: string,
@@ -47,21 +61,24 @@ export class ExecutionLoggerService {
     stepResults: any[],
   ): Promise<void> {
     try {
-      this.logger.log(`Resultados de pasos procesados para escenario ${scenarioName} en proyecto ${projectId}`);
-      this.logger.log(`Total de pasos procesados: ${stepResults.length}`);
+      this.logger.log(`Processed step results for scenario ${scenarioName} in project ${projectId}`);
+      this.logger.log(`Total processed steps: ${stepResults.length}`);
     } catch (error) {
-      this.logger.error(`Error registrando resultados de pasos: ${error.message}`);
+      this.logger.error(`Error logging step results: ${error.message}`);
     }
   }
 
   /**
-   * Registra la obtención del historial de ejecuciones
+   * Logs a request for execution history.
+   *
+   * @param projectId - Project identifier
+   * @param entityName - Entity name
    */
   async logExecutionHistoryRequest(projectId: string, entityName: string): Promise<void> {
     try {
-      this.logger.log(`Solicitud de historial de ejecuciones para entidad ${entityName} en proyecto ${projectId}`);
+      this.logger.log(`Execution history requested for entity ${entityName} in project ${projectId}`);
     } catch (error) {
-      this.logger.error(`Error registrando solicitud de historial: ${error.message}`);
+      this.logger.error(`Error logging history request: ${error.message}`);
     }
   }
 } 

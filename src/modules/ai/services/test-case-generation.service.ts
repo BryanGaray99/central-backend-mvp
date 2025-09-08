@@ -29,6 +29,15 @@ import { TestStepRegistrationService } from '../../test-cases/services/test-step
 import { AIGenerationService } from './ai-generation.service';
 import { AIGenerationStatus } from '../../test-cases/entities/ai-generation.entity';
 
+/**
+ * Test Case Generation Service
+ * 
+ * Handles AI-powered test case generation using OpenAI's Assistant API.
+ * Manages the complete workflow from prompt construction to code insertion
+ * and database storage of generated test cases.
+ * 
+ * @service TestCaseGenerationService
+ */
 @Injectable()
 export class TestCaseGenerationService {
   private readonly logger = new Logger(TestCaseGenerationService.name);
@@ -55,25 +64,43 @@ export class TestCaseGenerationService {
   ) {}
 
   /**
-   * Configura la API key de OpenAI dinámicamente
+   * Configures the OpenAI API key dynamically.
+   * 
+   * @private
+   * @throws Error - If API key is not configured
    */
   private async configureOpenAI() {
     const apiKey = await this.openAIConfigService.getOpenAIKey();
     if (!apiKey) {
-      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+      throw new Error('OpenAI API key not configured. Configure the API key in Settings > OpenAI Configuration.');
     }
     
-    // Crear la instancia de OpenAI si no existe
+    // Create OpenAI instance if it doesn't exist
     if (!this.openai) {
       this.openai = new OpenAI({ apiKey });
     } else {
-      // Actualizar la instancia existente con la nueva API key
+      // Update existing instance with new API key
       this.openai.apiKey = apiKey;
     }
   }
 
   /**
-   * Genera casos de prueba usando IA con Assistant API
+   * Generates test cases using AI with Assistant API.
+   * 
+   * @param request - The AI generation request parameters
+   * @returns Promise<AIGenerationResponse> - The generation response with generated code and metadata
+   * @throws Error - If generation fails
+   * 
+   * @example
+   * ```typescript
+   * const response = await testCaseGenerationService.generateTestCases({
+   *   projectId: 'project-123',
+   *   entityName: 'Product',
+   *   section: 'ecommerce',
+   *   operation: 'add-scenario',
+   *   requirements: 'Create product with validation'
+   * });
+   * ```
    */
   async generateTestCases(request: AIGenerationRequest): Promise<AIGenerationResponse> {
     const startTime = Date.now();
@@ -82,7 +109,7 @@ export class TestCaseGenerationService {
     let promptTokens = 0;
     let completionTokens = 0;
     
-    // Nombres fijos para los archivos de debug (sobrescribir siempre)
+    // Fixed names for debug files (always overwrite)
     const debugFiles = {
       prompt: 'ai-generation-prompt.txt',
       response: 'ai-generation-response.txt',
@@ -91,17 +118,17 @@ export class TestCaseGenerationService {
       error: 'ai-generation-error.json'
     };
     
-    this.logger.log(`🚀 [${generationId}] INICIANDO GENERACIÓN DE TESTS CON ASSISTANT API`);
+    this.logger.log(`🚀 [${generationId}] STARTING TEST GENERATION WITH ASSISTANT API`);
     this.logger.log(`📋 [${generationId}] Request: ${JSON.stringify(request, null, 2)}`);
     
     try {
-      // Crear registro en la tabla ai_generations
+      // Create record in ai_generations table
       const aiGenerationDto = {
         generationId,
         projectId: request.projectId,
         entityName: request.entityName,
-        method: 'POST', // Por defecto, se actualizará después
-        scenarioName: request.requirements.substring(0, 100), // Primeros 100 caracteres
+        method: 'POST', // Default, will be updated later
+        scenarioName: request.requirements.substring(0, 100), // First 100 characters
         section: request.section,
         requestData: request,
         metadata: {
@@ -111,55 +138,55 @@ export class TestCaseGenerationService {
       };
       
       await this.aiGenerationService.create(aiGenerationDto);
-      this.logger.log(`💾 [${generationId}] Registro creado en tabla ai_generations`);
+      this.logger.log(`💾 [${generationId}] Record created in ai_generations table`);
       
-      // Configurar OpenAI antes de hacer la llamada
+      // Configure OpenAI before making the call
       await this.configureOpenAI();
       
-      // Actualizar status a processing
+      // Update status to processing
       await this.aiGenerationService.updateStatus(generationId, AIGenerationStatus.PROCESSING);
-      this.logger.log(`🔄 [${generationId}] Status actualizado a PROCESSING`);
+      this.logger.log(`🔄 [${generationId}] Status updated to PROCESSING`);
       
-      // Obtener el proyecto para usar su path
+      // Get the project to use its path
       const project = await this.projectRepository.findOneBy({ id: request.projectId });
       if (!project) {
         throw new Error(`Project with ID ${request.projectId} not found`);
       }
       
-      this.logger.log(`📁 [${generationId}] Proyecto encontrado: ${project.name} (${project.path})`);
+      this.logger.log(`📁 [${generationId}] Project found: ${project.name} (${project.path})`);
       
-      // Crear directorio de debug en la raíz de playwright-workspaces
-      const debugDir = path.join(path.dirname(project.path), 'debug');
-      if (!fs.existsSync(debugDir)) {
-        fs.mkdirSync(debugDir, { recursive: true });
-      }
+      // Create debug directory in playwright-workspaces root
+      // const debugDir = path.join(path.dirname(project.path), 'debug');
+      // if (!fs.existsSync(debugDir)) {
+      //   fs.mkdirSync(debugDir, { recursive: true });
+      // }
 
-      // Paso 1: Obtener Assistant existente
-      this.logger.log(`🤖 [${generationId}] PASO 1: Obteniendo Assistant existente...`);
+      // Step 1: Get existing Assistant
+      this.logger.log(`🤖 [${generationId}] STEP 1: Getting existing Assistant...`);
       const assistant = await this.assistantManagerService.getAssistant(request.projectId);
       if (!assistant) {
-        this.logger.error(`❌ [${generationId}] ERROR: No existe un assistant creado para el proyecto ${request.projectId}. Debes inicializar el contexto IA antes de generar test cases.`);
-        throw new Error(`No existe un assistant creado para el proyecto. Inicializa el contexto IA con el endpoint /ai/projects/:projectId/assistant/init antes de generar test cases.`);
+        this.logger.error(`❌ [${generationId}] ERROR: No assistant created for project ${request.projectId}. You must initialize the AI context before generating test cases.`);
+        throw new Error(`No assistant created for the project. Initialize the AI context with endpoint /ai/projects/:projectId/assistant/init before generating test cases.`);
       }
-      this.logger.log(`✅ [${generationId}] Assistant listo: ${assistant.assistantId}`);
+      this.logger.log(`✅ [${generationId}] Assistant ready: ${assistant.assistantId}`);
 
-      // Paso 2: Crear Thread NUEVO para cada generación (evitar historial)
-      this.logger.log(`🧵 [${generationId}] PASO 2: Creando Thread NUEVO para evitar historial...`);
+      // Step 2: Create NEW Thread for each generation (avoid history)
+      this.logger.log(`🧵 [${generationId}] STEP 2: Creating NEW Thread to avoid history...`);
       let thread = await this.threadManagerService.createThread(request.projectId, assistant.assistantId);
-      this.logger.log(`✅ [${generationId}] Thread NUEVO creado: ${thread.threadId} (0/${thread.maxMessages} mensajes)`);
+      this.logger.log(`✅ [${generationId}] NEW Thread created: ${thread.threadId} (0/${thread.maxMessages} messages)`);
 
-      // Paso 3: Construir prompt optimizado
-      this.logger.log(`📝 [${generationId}] PASO 3: Construyendo prompt optimizado...`);
+      // Step 3: Build optimized prompt
+      this.logger.log(`📝 [${generationId}] STEP 3: Building optimized prompt...`);
       const { prompt, featureContent, stepsContent } = await this.buildOptimizedPrompt(request);
-      this.logger.log(`📤 [${generationId}] Prompt construido (${prompt.length} caracteres)`);
+      this.logger.log(`📤 [${generationId}] Prompt built (${prompt.length} characters)`);
       
-      // Guardar prompt enviado
-      const promptPath = path.join(debugDir, debugFiles.prompt);
-      fs.writeFileSync(promptPath, prompt);
-      this.logger.log(`📄 [${generationId}] Prompt guardado en: ${promptPath}`);
+      // Save sent prompt
+      // const promptPath = path.join(debugDir, debugFiles.prompt);
+      // fs.writeFileSync(promptPath, prompt);
+      // this.logger.log(`📄 [${generationId}] Prompt saved to: ${promptPath}`);
 
-      // Paso 4: Enviar mensaje al assistant
-      this.logger.log(`💬 [${generationId}] PASO 4: Enviando mensaje al assistant...`);
+      // Step 4: Send message to assistant
+      this.logger.log(`💬 [${generationId}] STEP 4: Sending message to assistant...`);
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
@@ -167,50 +194,50 @@ export class TestCaseGenerationService {
         role: 'user',
         content: prompt
       });
-      this.logger.log(`✅ [${generationId}] Mensaje enviado: ${message.id}`);
+      this.logger.log(`✅ [${generationId}] Message sent: ${message.id}`);
 
-      // Paso 5: Ejecutar run con optimizaciones de tokens
-      this.logger.log(`▶️ [${generationId}] PASO 5: Ejecutando run con optimizaciones...`);
+      // Step 5: Execute run with token optimizations
+      this.logger.log(`▶️ [${generationId}] STEP 5: Executing run with optimizations...`);
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
       const run = await this.openai.beta.threads.runs.create(thread.threadId, {
         assistant_id: assistant.assistantId,
         tool_choice: 'auto',
-        truncation_strategy: { type: 'auto' }, // Recorta contexto antiguo automáticamente
+        truncation_strategy: { type: 'auto' }, // Automatically truncates old context
       });
-      this.logger.log(`✅ [${generationId}] Run optimizado iniciado: ${run.id} (status: ${run.status})`);
+      this.logger.log(`✅ [${generationId}] Optimized run started: ${run.id} (status: ${run.status})`);
 
-      // Paso 6: Esperar completación del run
-      this.logger.log(`⏳ [${generationId}] PASO 6: Esperando completación del run...`);
+      // Step 6: Wait for run completion
+      this.logger.log(`⏳ [${generationId}] STEP 6: Waiting for run completion...`);
       const result = await this.waitForRunCompletion(thread.threadId, run.id, generationId);
-      this.logger.log(`✅ [${generationId}] Run completado: ${result.status}`);
+      this.logger.log(`✅ [${generationId}] Run completed: ${result.status}`);
 
-      // Obtener tokens reales del run completado
+      // Get real tokens from completed run
       if (result.usage) {
         promptTokens = result.usage.prompt_tokens || 0;
         completionTokens = result.usage.completion_tokens || 0;
         totalTokensUsed = result.usage.total_tokens || 0;
-        this.logger.log(`💰 [${generationId}] TOKENS REALES DEL RUN: Prompt=${promptTokens}, Completion=${completionTokens}, Total=${totalTokensUsed}`);
+        this.logger.log(`💰 [${generationId}] REAL TOKENS FROM RUN: Prompt=${promptTokens}, Completion=${completionTokens}, Total=${totalTokensUsed}`);
       } else {
-        this.logger.warn(`⚠️ [${generationId}] No se encontraron datos de uso de tokens en el run`);
-        this.logger.log(`🔍 [${generationId}] Estructura del run: ${JSON.stringify(result, null, 2)}`);
+        this.logger.warn(`⚠️ [${generationId}] No token usage data found in run`);
+        this.logger.log(`🔍 [${generationId}] Run structure: ${JSON.stringify(result, null, 2)}`);
         
-        // Intentar obtener usage desde los steps del run
+        // Try to get usage from run steps
         try {
           if (!this.openai) {
             throw new Error('OpenAI client not configured');
           }
           const runSteps = await this.openai.beta.threads.runs.steps.list(thread.threadId, run.id);
-          this.logger.log(`🔍 [${generationId}] Analizando run steps para distribución de tokens...`);
+          this.logger.log(`🔍 [${generationId}] Analyzing run steps for token distribution...`);
           
-          // Analizar cada step para entender distribución de tokens
+          // Analyze each step to understand token distribution
           for (const step of runSteps.data) {
             if (step.step_details?.type === 'tool_calls') {
               const toolCalls = step.step_details.tool_calls;
               for (const toolCall of toolCalls) {
                 if (toolCall.type === 'file_search') {
-                  this.logger.log(`🔍 [${generationId}] Tool call: file_search ejecutado`);
+                  this.logger.log(`🔍 [${generationId}] Tool call: file_search executed`);
                 }
               }
             }
@@ -225,40 +252,40 @@ export class TestCaseGenerationService {
                 promptTokens = (message as any).usage.prompt_tokens || 0;
                 completionTokens = (message as any).usage.completion_tokens || 0;
                 totalTokensUsed = (message as any).usage.total_tokens || 0;
-                this.logger.log(`💰 [${generationId}] TOKENS REALES DEL MESSAGE: Prompt=${promptTokens}, Completion=${completionTokens}, Total=${totalTokensUsed}`);
+                this.logger.log(`💰 [${generationId}] REAL TOKENS FROM MESSAGE: Prompt=${promptTokens}, Completion=${completionTokens}, Total=${totalTokensUsed}`);
                 break;
               }
             }
           }
         } catch (error) {
-          this.logger.warn(`⚠️ [${generationId}] Error obteniendo usage de steps: ${error.message}`);
+          this.logger.warn(`⚠️ [${generationId}] Error getting usage from steps: ${error.message}`);
         }
       }
 
-      // Paso 7: Obtener respuesta
-      this.logger.log(`📥 [${generationId}] PASO 7: Obteniendo respuesta...`);
+      // Step 7: Get response
+      this.logger.log(`📥 [${generationId}] STEP 7: Getting response...`);
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
       }
       const messages = await this.openai.beta.threads.messages.list(thread.threadId);
-      const lastMessage = messages.data[0]; // El más reciente
+      const lastMessage = messages.data[0]; // The most recent
       
       if (!lastMessage || !lastMessage.content || lastMessage.content.length === 0) {
-        throw new Error('No se recibió respuesta del assistant');
+        throw new Error('No response received from assistant');
       }
 
       const generatedText = lastMessage.content[0].type === 'text' 
         ? lastMessage.content[0].text.value 
-        : 'No se pudo extraer texto de la respuesta';
+        : 'Could not extract text from response';
 
-      this.logger.log(`📥 [${generationId}] Respuesta recibida (${generatedText.length} caracteres)`);
+      this.logger.log(`📥 [${generationId}] Response received (${generatedText.length} characters)`);
       
-      // Guardar respuesta bruta
-      const responsePath = path.join(debugDir, debugFiles.response);
-      fs.writeFileSync(responsePath, generatedText);
-      this.logger.log(`📄 [${generationId}] Respuesta guardada en: ${responsePath}`);
+      // Save raw response
+      // const responsePath = path.join(debugDir, debugFiles.response);
+      // fs.writeFileSync(responsePath, generatedText);
+      // this.logger.log(`📄 [${generationId}] Response saved to: ${responsePath}`);
       
-      // Guardar metadata de la respuesta con tokens reales
+      // Save response metadata with real tokens
       const responseMetadata = {
         generationId,
         assistantId: assistant.assistantId,
@@ -274,35 +301,35 @@ export class TestCaseGenerationService {
         timestamp: new Date().toISOString(),
       };
       
-      const metadataPath = path.join(debugDir, debugFiles.metadata);
-      fs.writeFileSync(metadataPath, JSON.stringify(responseMetadata, null, 2));
-      this.logger.log(`📄 [${generationId}] Metadata guardada en: ${metadataPath}`);
-      this.logger.log(`💰 [${generationId}] USO REAL DE TOKENS: Prompt=${promptTokens}, Completion=${completionTokens}, Total=${totalTokensUsed}`);
+      // const metadataPath = path.join(debugDir, debugFiles.metadata);
+      // fs.writeFileSync(metadataPath, JSON.stringify(responseMetadata, null, 2));
+      // this.logger.log(`📄 [${generationId}] Metadata saved to: ${metadataPath}`);
+      this.logger.log(`💰 [${generationId}] REAL TOKEN USAGE: Prompt=${promptTokens}, Completion=${completionTokens}, Total=${totalTokensUsed}`);
 
-      // Paso 8: Incrementar contador de mensajes
+      // Step 8: Increment message counter
       await this.threadManagerService.incrementMessageCount(thread.threadId);
-      this.logger.log(`📊 [${generationId}] Contador de mensajes incrementado`);
+      this.logger.log(`📊 [${generationId}] Message counter incremented`);
 
-      // Paso 9: Parsear la respuesta para extraer código
-      this.logger.log(`🔍 [${generationId}] PASO 9: Parseando respuesta...`);
+      // Step 9: Parse response to extract code
+      this.logger.log(`🔍 [${generationId}] STEP 9: Parsing response...`);
       const parsedCode = this.codeParsingService.parseGeneratedCode(generatedText);
-      this.logger.log(`✅ [${generationId}] Código parseado: ${JSON.stringify(parsedCode, null, 2)}`);
+      this.logger.log(`✅ [${generationId}] Code parsed: ${JSON.stringify(parsedCode, null, 2)}`);
       
-      // Paso 10: Analizar archivos existentes y determinar inserción
-      this.logger.log(`🔍 [${generationId}] PASO 10: Analizando archivos existentes...`);
+      // Step 10: Analyze existing files and determine insertion
+      this.logger.log(`🔍 [${generationId}] STEP 10: Analyzing existing files...`);
       const insertions = await this.testCaseAnalysisService.analyzeAndDetermineInsertions(request, parsedCode, generationId);
-      this.logger.log(`✅ [${generationId}] Inserciones determinadas: ${JSON.stringify(insertions, null, 2)}`);
+      this.logger.log(`✅ [${generationId}] Insertions determined: ${JSON.stringify(insertions, null, 2)}`);
       
-      // Paso 11: Insertar código en archivos
-      this.logger.log(`📝 [${generationId}] PASO 11: Insertando código en archivos...`);
+      // Step 11: Insert code into files
+      this.logger.log(`📝 [${generationId}] STEP 11: Inserting code into files...`);
       const insertionResult = await this.codeInsertionService.insertCode(insertions, generationId);
-      this.logger.log(`✅ [${generationId}] Resultado de inserción: ${JSON.stringify(insertionResult, null, 2)}`);
+      this.logger.log(`✅ [${generationId}] Insertion result: ${JSON.stringify(insertionResult, null, 2)}`);
 
-      // Paso 11.5: Guardar steps en base de datos si se insertaron steps
-      this.logger.log(`💾 [${generationId}] PASO 11.5: Guardando steps en base de datos...`);
+      // Step 11.5: Save steps to database if steps were inserted
+      this.logger.log(`💾 [${generationId}] STEP 11.5: Saving steps to database...`);
       if (parsedCode.steps && parsedCode.steps.trim() && insertionResult.success) {
         try {
-          // Verificar si se insertaron steps exitosamente
+          // Check if steps were inserted successfully
           const stepsInserted = insertions.some(insertion => insertion.type === 'step');
           if (stepsInserted) {
             await this.testStepRegistrationService.processStepsFileAndRegisterSteps(
@@ -310,49 +337,49 @@ export class TestCaseGenerationService {
               request.section,
               request.entityName
             );
-            this.logger.log(`✅ [${generationId}] Steps guardados en base de datos exitosamente`);
+            this.logger.log(`✅ [${generationId}] Steps saved to database successfully`);
           } else {
-            this.logger.log(`⚠️ [${generationId}] No se insertaron steps, saltando guardado en BD`);
+            this.logger.log(`⚠️ [${generationId}] No steps inserted, skipping database save`);
           }
         } catch (stepDbError) {
-          this.logger.error(`❌ [${generationId}] Error al guardar steps en BD: ${stepDbError.message}`);
-          // No lanzar error aquí, solo loggear como error pero continuar
+          this.logger.error(`❌ [${generationId}] Error saving steps to database: ${stepDbError.message}`);
+          // Don't throw error here, just log as error but continue
         }
       } else {
-        this.logger.log(`⚠️ [${generationId}] No hay código steps para guardar en BD`);
+        this.logger.log(`⚠️ [${generationId}] No steps code to save to database`);
       }
 
-      // Paso 12: Guardar test case en base de datos
-      this.logger.log(`💾 [${generationId}] PASO 12: Guardando test case en base de datos...`);
+      // Step 12: Save test case to database
+      this.logger.log(`💾 [${generationId}] STEP 12: Saving test case to database...`);
       let savedTestCase: any = null;
       if (parsedCode.feature && parsedCode.feature.trim()) {
         try {
-          // Extraer información del test case generado
+          // Extract information from generated test case
           const testCaseData = this.extractTestCaseFromGeneratedCode(parsedCode.feature, request);
           if (testCaseData) {
             savedTestCase = await this.testCasesService.createTestCase(request.projectId, testCaseData, true); // true = skip feature insertion
-            this.logger.log(`✅ [${generationId}] Test case guardado en BD: ${savedTestCase.testCaseId}`);
+            this.logger.log(`✅ [${generationId}] Test case saved to database: ${savedTestCase.testCaseId}`);
           }
         } catch (dbError) {
-          this.logger.error(`❌ [${generationId}] Error al guardar test case en BD: ${dbError.message}`);
-          this.logger.error(`❌ [${generationId}] Feature code que causó el error: ${parsedCode.feature}`);
-          // No lanzar error aquí, solo loggear como error pero continuar
+          this.logger.error(`❌ [${generationId}] Error saving test case to database: ${dbError.message}`);
+          this.logger.error(`❌ [${generationId}] Feature code that caused the error: ${parsedCode.feature}`);
+          // Don't throw error here, just log as error but continue
         }
       } else {
-        this.logger.warn(`⚠️ [${generationId}] No se encontró código feature para guardar en BD`);
+        this.logger.warn(`⚠️ [${generationId}] No feature code found to save to database`);
       }
 
-      // Paso 13: Los archivos se incluyen directamente en el prompt (no vector store)
-      this.logger.log(`📤 [${generationId}] PASO 13: Archivos incluidos directamente en el prompt`);
-      this.logger.log(`📤 [${generationId}] Feature content length: ${featureContent?.length || 0} caracteres`);
-      this.logger.log(`📤 [${generationId}] Steps content length: ${stepsContent?.length || 0} caracteres`);
+      // Step 13: Files are included directly in the prompt (no vector store)
+      this.logger.log(`📤 [${generationId}] STEP 13: Files included directly in prompt`);
+      this.logger.log(`📤 [${generationId}] Feature content length: ${featureContent?.length || 0} characters`);
+      this.logger.log(`📤 [${generationId}] Steps content length: ${stepsContent?.length || 0} characters`);
 
       const processingTime = Date.now() - startTime;
 
-      this.logger.log(`🎉 [${generationId}] GENERACIÓN COMPLETADA en ${processingTime}ms`);
-      this.logger.log(`💰 [${generationId}] TOKENS FINALES REALES: ${totalTokensUsed}`);
+      this.logger.log(`🎉 [${generationId}] GENERATION COMPLETED in ${processingTime}ms`);
+      this.logger.log(`💰 [${generationId}] FINAL REAL TOKENS: ${totalTokensUsed}`);
       
-      // Actualizar status a completed en la tabla ai_generations
+      // Update status to completed in ai_generations table
       const finalMetadata = {
         modelUsed: assistant.model,
         processingTime,
@@ -364,24 +391,24 @@ export class TestCaseGenerationService {
         runId: run.id,
       };
       
-      // Actualizar el método basado en el test case generado
+      // Update method based on generated test case
       if (savedTestCase && savedTestCase.method) {
         try {
           const aiGeneration = await this.aiGenerationService.findByGenerationId(generationId);
           if (aiGeneration) {
             aiGeneration.method = savedTestCase.method;
             await this.aiGenerationService['aiGenerationRepository'].save(aiGeneration);
-            this.logger.log(`✅ [${generationId}] Método actualizado a ${savedTestCase.method} en tabla ai_generations`);
+            this.logger.log(`✅ [${generationId}] Method updated to ${savedTestCase.method} in ai_generations table`);
           }
         } catch (updateError) {
-          this.logger.warn(`⚠️ [${generationId}] Error actualizando método: ${updateError.message}`);
+          this.logger.warn(`⚠️ [${generationId}] Error updating method: ${updateError.message}`);
         }
       }
       
       await this.aiGenerationService.markAsCompleted(generationId, parsedCode, finalMetadata);
-      this.logger.log(`✅ [${generationId}] Status actualizado a COMPLETED en tabla ai_generations`);
+      this.logger.log(`✅ [${generationId}] Status updated to COMPLETED in ai_generations table`);
 
-      // Guardar resumen final con tokens reales
+      // Save final summary with real tokens
       const summary = {
         generationId,
         request,
@@ -402,9 +429,9 @@ export class TestCaseGenerationService {
         timestamp: new Date().toISOString(),
       };
       
-      const summaryPath = path.join(debugDir, debugFiles.summary);
-      fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
-      this.logger.log(`📄 [${generationId}] Resumen guardado en: ${summaryPath}`);
+      // const summaryPath = path.join(debugDir, debugFiles.summary);
+      // fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+      // this.logger.log(`📄 [${generationId}] Summary saved to: ${summaryPath}`);
 
       return {
         success: true,
@@ -424,11 +451,11 @@ export class TestCaseGenerationService {
       };
 
     } catch (error) {
-      this.logger.error(`❌ [${generationId}] ERROR en generación de tests: ${error.message}`);
+      this.logger.error(`❌ [${generationId}] ERROR in test generation: ${error.message}`);
       this.logger.error(`❌ [${generationId}] Stack trace: ${error.stack}`);
-      this.logger.error(`💰 [${generationId}] TOKENS CONSUMIDOS ANTES DEL ERROR: ${totalTokensUsed}`);
+      this.logger.error(`💰 [${generationId}] TOKENS CONSUMED BEFORE ERROR: ${totalTokensUsed}`);
       
-      // Actualizar status a failed en la tabla ai_generations
+      // Update status to failed in ai_generations table
       const errorMetadata = {
         processingTime: Date.now() - startTime,
         tokensUsed: totalTokensUsed,
@@ -439,12 +466,12 @@ export class TestCaseGenerationService {
       
       try {
         await this.aiGenerationService.markAsFailed(generationId, error.message, errorMetadata);
-        this.logger.log(`❌ [${generationId}] Status actualizado a FAILED en tabla ai_generations`);
+        this.logger.log(`❌ [${generationId}] Status updated to FAILED in ai_generations table`);
       } catch (dbError) {
-        this.logger.error(`❌ [${generationId}] Error actualizando status en BD: ${dbError.message}`);
+        this.logger.error(`❌ [${generationId}] Error updating status in database: ${dbError.message}`);
       }
       
-      // Guardar error con tokens
+      // Save error with tokens
       const errorLog = {
         generationId,
         request,
@@ -458,18 +485,18 @@ export class TestCaseGenerationService {
         timestamp: new Date().toISOString(),
       };
       
-      // Obtener el proyecto para usar su path
-      const project = await this.projectRepository.findOneBy({ id: request.projectId });
-      if (project) {
-        const debugDir = path.join(path.dirname(project.path), 'debug');
-        if (!fs.existsSync(debugDir)) {
-          fs.mkdirSync(debugDir, { recursive: true });
-        }
-        
-        const errorPath = path.join(debugDir, debugFiles.error);
-        fs.writeFileSync(errorPath, JSON.stringify(errorLog, null, 2));
-        this.logger.log(`📄 [${generationId}] Error guardado en: ${errorPath}`);
-      }
+      // Get the project to use its path
+      // const project = await this.projectRepository.findOneBy({ id: request.projectId });
+      // if (project) {
+      //   const debugDir = path.join(path.dirname(project.path), 'debug');
+      //   if (!fs.existsSync(debugDir)) {
+      //     fs.mkdirSync(debugDir, { recursive: true });
+      //   }
+      //   
+      //   const errorPath = path.join(debugDir, debugFiles.error);
+      //   fs.writeFileSync(errorPath, JSON.stringify(errorLog, null, 2));
+      //   this.logger.log(`📄 [${generationId}] Error saved to: ${errorPath}`);
+      // }
       
       return {
         success: false,
@@ -485,11 +512,16 @@ export class TestCaseGenerationService {
   }
 
   /**
-   * Construye un prompt optimizado para la generación de test cases.
-   * Este prompt incluye los archivos actuales directamente.
+   * Builds an optimized prompt for test case generation.
+   * This prompt includes current files directly.
+   * 
+   * @private
+   * @param request - The AI generation request parameters
+   * @returns Promise<{ prompt: string; featureContent: string; stepsContent: string }> - The optimized prompt and file contents
+   * @throws Error - If project or endpoint not found
    */
   private async buildOptimizedPrompt(request: AIGenerationRequest): Promise<{ prompt: string; featureContent: string; stepsContent: string }> {
-    // Obtener archivos actuales de la entidad
+    // Get current files for the entity
     const project = await this.projectRepository.findOneBy({ id: request.projectId });
     if (!project) {
       throw new Error(`Project with ID ${request.projectId} not found`);
@@ -500,132 +532,139 @@ export class TestCaseGenerationService {
     let featurePath = '';
     let stepsPath = '';
 
-    // Buscar el endpoint para obtener los archivos generados
+    // Find the endpoint to get generated files
     const endpoint = await this.endpointRepository.findOne({ 
       where: { projectId: request.projectId, section: request.section, entityName: request.entityName } 
     });
 
     if (endpoint && endpoint.generatedArtifacts) {
-      // Parsear generatedArtifacts si es string JSON
+      // Parse generatedArtifacts if it's a JSON string
       let artifacts: any;
       try {
         artifacts = typeof endpoint.generatedArtifacts === 'string'
           ? JSON.parse(endpoint.generatedArtifacts)
           : endpoint.generatedArtifacts;
         
-        this.logger.log(`📁 [PROMPT] GeneratedArtifacts parseado: ${JSON.stringify(artifacts, null, 2)}`);
+        this.logger.log(`📁 [PROMPT] GeneratedArtifacts parsed: ${JSON.stringify(artifacts, null, 2)}`);
       } catch (e) {
-        this.logger.warn(`⚠️ Error parseando generatedArtifacts: ${e.message}`);
+        this.logger.warn(`⚠️ Error parsing generatedArtifacts: ${e.message}`);
         artifacts = {};
       }
 
-      // Leer archivo feature si existe
+      // Read feature file if it exists
       if (artifacts.feature) {
         featurePath = path.join(project.path, artifacts.feature);
-        this.logger.log(`📁 [PROMPT] Intentando leer feature file: ${featurePath}`);
+        this.logger.log(`📁 [PROMPT] Trying to read feature file: ${featurePath}`);
         
         if (fs.existsSync(featurePath)) {
           featureContent = fs.readFileSync(featurePath, 'utf-8');
-          this.logger.log(`✅ [PROMPT] Feature file leído exitosamente (${featureContent.length} caracteres)`);
+          this.logger.log(`✅ [PROMPT] Feature file read successfully (${featureContent.length} characters)`);
         } else {
-          this.logger.warn(`⚠️ [PROMPT] Feature file no encontrado: ${featurePath}`);
+          this.logger.warn(`⚠️ [PROMPT] Feature file not found: ${featurePath}`);
         }
       } else {
-        this.logger.warn(`⚠️ [PROMPT] No se encontró ruta de feature en generatedArtifacts`);
+        this.logger.warn(`⚠️ [PROMPT] No feature path found in generatedArtifacts`);
       }
 
-      // Leer archivo steps si existe
+      // Read steps file if it exists
       if (artifacts.steps) {
         stepsPath = path.join(project.path, artifacts.steps);
-        this.logger.log(`📁 [PROMPT] Intentando leer steps file: ${stepsPath}`);
+        this.logger.log(`📁 [PROMPT] Trying to read steps file: ${stepsPath}`);
         
         if (fs.existsSync(stepsPath)) {
           stepsContent = fs.readFileSync(stepsPath, 'utf-8');
-          this.logger.log(`✅ [PROMPT] Steps file leído exitosamente (${stepsContent.length} caracteres)`);
+          this.logger.log(`✅ [PROMPT] Steps file read successfully (${stepsContent.length} characters)`);
         } else {
-          this.logger.warn(`⚠️ [PROMPT] Steps file no encontrado: ${stepsPath}`);
+          this.logger.warn(`⚠️ [PROMPT] Steps file not found: ${stepsPath}`);
         }
       } else {
-        this.logger.warn(`⚠️ [PROMPT] No se encontró ruta de steps en generatedArtifacts`);
+        this.logger.warn(`⚠️ [PROMPT] No steps path found in generatedArtifacts`);
       }
     } else {
-      this.logger.warn(`⚠️ [PROMPT] No se encontró endpoint o generatedArtifacts para ${request.entityName} (${request.section})`);
+      this.logger.warn(`⚠️ [PROMPT] No endpoint or generatedArtifacts found for ${request.entityName} (${request.section})`);
     }
 
     return {
-      prompt: `Genera tests para "${request.entityName}" (${request.section}).
+      prompt: `Generate tests for "${request.entityName}" (${request.section}).
 
-OPERACIÓN: ${request.operation}
-REQUISITOS: ${request.requirements}
+OPERATION: ${request.operation}
+REQUIREMENTS: ${request.requirements}
 
-📁 ARCHIVOS ACTUALES INCLUIDOS EN EL PROMPT:
+📁 CURRENT FILES INCLUDED IN PROMPT:
 
-=== FEATURE FILE (${featurePath || 'No existe'}) ===
-${featureContent || 'No existe archivo feature para esta entidad'}
+=== FEATURE FILE (${featurePath || 'Does not exist'}) ===
+${featureContent || 'No feature file exists for this entity'}
 
-=== STEPS FILE (${stepsPath || 'No existe'}) ===
-${stepsContent || 'No existe archivo steps para esta entidad'}
+=== STEPS FILE (${stepsPath || 'Does not exist'}) ===
+${stepsContent || 'No steps file exists for this entity'}
 
-📋 INSTRUCCIONES DETALLADAS:
+📋 DETAILED INSTRUCTIONS:
 
-1. **ANÁLISIS DE ARCHIVOS EXISTENTES:**
-   - Revisa el FEATURE FILE para ver qué escenarios ya existen
-   - Revisa el STEPS FILE para ver qué steps ya están implementados
-   - NO dupliques escenarios ni steps existentes
-   - Identifica el siguiente ID incremental disponible
+1. **ANALYSIS OF EXISTING FILES:**
+   - Review the FEATURE FILE to see what scenarios already exist
+   - Review the STEPS FILE to see what steps are already implemented
+   - DO NOT duplicate existing scenarios or steps
+   - Identify the next available incremental ID
 
-2. **GENERACIÓN DE NUEVO CONTENIDO:**
-   - Si no existe feature file: Crea uno nuevo con escenarios Gherkin
-   - Si existe feature file: Agrega solo el nuevo escenario solicitado
-   - Si no existe steps file: Crea uno nuevo con steps de Cucumber
-   - Si existe steps file: Agrega solo los steps que faltan
+2. **GENERATION OF NEW CONTENT:**
+   - If no feature file exists: Create a new one with Gherkin scenarios
+   - If feature file exists: Add only the requested new scenario
+   - If no steps file exists: Create a new one with Cucumber steps
+   - If steps file exists: Add only the missing steps
 
-3. **REGLAS ESTRICTAS:**
-   - SOLO APIs REST
-   - NO incluyas "Feature:" ni rutas en la respuesta
-   - Usa clientes API existentes (ProductClient, etc.)
-   - Respeta secciones: Given antes de "// When steps", When antes de "// Then steps"
-   - Agrega tag del feature y el ID incremental: @TC-${request.section}-{entityName}-{Number}
-   - NO incluyas imports duplicados
-   - Mantén el formato y estructura existente
-   - Usa imports específicos solo si son necesarios
+3. **STRICT RULES:**
+   - REST APIs ONLY
+   - DO NOT include "Feature:" or routes in the response
+   - Use existing API clients (ProductClient, etc.)
+   - Respect sections: Given before "// When steps", When before "// Then steps"
+   - Add feature tag and incremental ID: @TC-${request.section}-{entityName}-{Number}
+   - DO NOT include duplicate imports
+   - Maintain existing format and structure
+   - Use specific imports only if necessary
 
-4. **FORMATO DE RESPUESTA OBLIGATORIO:**
-   DEBES usar exactamente este formato para que el sistema pueda procesar tu respuesta:
+4. **MANDATORY RESPONSE FORMAT:**
+   YOU MUST use exactly this format for the system to process your response:
 
    ***Features:***
-   [Aquí va el código completo del feature/scenario]
+   [Here goes the complete feature/scenario code]
 
    ***Steps:***
-   [Aquí va el código de los steps]
+   [Here goes the steps code]
 
-   - Si solo agregas feature: Deja ***Steps:*** vacío
-   - Si solo agregas steps: Deja ***Features:*** vacío
-   - Si agregas ambos: Incluye ambos bloques
-   - NO incluyas otros marcadores ni comentarios fuera de estos bloques
-   - NO incluyas comentarios explicativos fuera de los bloques
+   - If you only add feature: Leave ***Steps:*** empty
+   - If you only add steps: Leave ***Features:*** empty
+   - If you add both: Include both blocks
+   - DO NOT include other markers or comments outside these blocks
+   - DO NOT include explanatory comments outside the blocks
 
-5. **ESTRUCTURA ESPECÍFICA:**
-   - FEATURE: Incluye tags (@create, @smoke, etc.) y el escenario completo
-   - STEPS: Incluye solo el step nuevo, sin imports si ya existen
-   - Mantén la indentación y formato exacto del archivo existente
+5. **SPECIFIC STRUCTURE:**
+   - FEATURE: Include tags (@create, @smoke, etc.) and the complete scenario
+   - STEPS: Include only the new step, without imports if they already exist
+   - Maintain exact indentation and format of the existing file
 
-Genera SOLO el código necesario para completar la operación solicitada usando el formato especificado.`,
+Generate ONLY the necessary code to complete the requested operation using the specified format.`,
       featureContent,
       stepsContent
     };
   }
 
   /**
-   * Espera a que un run se complete
+   * Waits for a run to complete.
+   * 
+   * @private
+   * @param threadId - The thread ID
+   * @param runId - The run ID
+   * @param generationId - The generation ID for logging
+   * @returns Promise<any> - The completed run object
+   * @throws Error - If run fails, is cancelled, expires, or times out
    */
   private async waitForRunCompletion(threadId: string, runId: string, generationId: string): Promise<any> {
     let attempts = 0;
-    const maxAttempts = 60; // 5 minutos máximo (60 * 5 segundos)
+    const maxAttempts = 60; // 5 minutes maximum (60 * 5 seconds)
     
     while (attempts < maxAttempts) {
       attempts++;
-      this.logger.log(`⏳ [${generationId}] Verificando run (intento ${attempts}/${maxAttempts})...`);
+      this.logger.log(`⏳ [${generationId}] Checking run (attempt ${attempts}/${maxAttempts})...`);
       
       if (!this.openai) {
         throw new Error('OpenAI client not configured');
@@ -635,22 +674,22 @@ Genera SOLO el código necesario para completar la operación solicitada usando 
       this.logger.log(`📊 [${generationId}] Run status: ${run.status}`);
       
       if (run.status === 'completed') {
-        this.logger.log(`✅ [${generationId}] Run completado exitosamente`);
+        this.logger.log(`✅ [${generationId}] Run completed successfully`);
         
-        // Logging detallado de tokens
+        // Detailed token logging
         if (run.usage) {
-          this.logger.log(`💰 [${generationId}] TOKENS DETALLADOS:`);
+          this.logger.log(`💰 [${generationId}] DETAILED TOKENS:`);
           this.logger.log(`   - Prompt: ${run.usage.prompt_tokens || 0}`);
           this.logger.log(`   - Completion: ${run.usage.completion_tokens || 0}`);
           this.logger.log(`   - Total: ${run.usage.total_tokens || 0}`);
           
-          // Análisis de optimización
+          // Optimization analysis
           if ((run.usage.prompt_tokens || 0) > 3000) {
-            this.logger.warn(`⚠️ [${generationId}] PROMPT MUY ALTO: ${run.usage.prompt_tokens}. Revisar system prompt y tools.`);
+            this.logger.warn(`⚠️ [${generationId}] PROMPT TOO HIGH: ${run.usage.prompt_tokens}. Review system prompt and tools.`);
           }
           
           if ((run.usage.total_tokens || 0) > 2000) {
-            this.logger.warn(`⚠️ [${generationId}] TOTAL MUY ALTO: ${run.usage.total_tokens}. Revisar optimizaciones.`);
+            this.logger.warn(`⚠️ [${generationId}] TOTAL TOO HIGH: ${run.usage.total_tokens}. Review optimizations.`);
           }
         }
         
@@ -658,21 +697,21 @@ Genera SOLO el código necesario para completar la operación solicitada usando 
       }
       
       if (run.status === 'failed') {
-        this.logger.error(`❌ [${generationId}] Run falló: ${run.last_error?.message || 'Error desconocido'}`);
-        throw new Error(`Run failed: ${run.last_error?.message || 'Error desconocido'}`);
+        this.logger.error(`❌ [${generationId}] Run failed: ${run.last_error?.message || 'Unknown error'}`);
+        throw new Error(`Run failed: ${run.last_error?.message || 'Unknown error'}`);
       }
       
       if (run.status === 'cancelled') {
-        this.logger.error(`❌ [${generationId}] Run cancelado`);
+        this.logger.error(`❌ [${generationId}] Run cancelled`);
         throw new Error('Run was cancelled');
       }
       
       if (run.status === 'expired') {
-        this.logger.error(`❌ [${generationId}] Run expirado`);
+        this.logger.error(`❌ [${generationId}] Run expired`);
         throw new Error('Run expired');
       }
       
-      // Esperar 5 segundos antes del siguiente intento
+      // Wait 5 seconds before next attempt
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
     
@@ -680,37 +719,43 @@ Genera SOLO el código necesario para completar la operación solicitada usando 
   }
 
   /**
-   * Extrae la información del test case generado del código feature.
+   * Extracts test case information from generated feature code.
+   * 
+   * @private
+   * @param featureCode - The generated feature code
+   * @param request - The AI generation request
+   * @returns any - The extracted test case data
+   * @throws Error - If test case ID is not found or extraction fails
    */
   private extractTestCaseFromGeneratedCode(featureCode: string, request: AIGenerationRequest): any {
     try {
-      // Verificar que existe un @TC- en el código
+      // Check that @TC- exists in the code
       if (!featureCode.includes('@TC-')) {
-        throw new Error('No se encontró un test case ID (@TC-) en la respuesta generada. La IA debe generar siempre un test case con formato @TC-{section}-{entity}-{number}');
+        throw new Error('No test case ID (@TC-) found in generated response. AI must always generate a test case with format @TC-{section}-{entity}-{number}');
       }
 
-      // Extraer el test case ID específico (@TC-...)
+      // Extract the specific test case ID (@TC-...)
       const tcIdMatch = featureCode.match(/@TC-[^\s]+/);
       if (!tcIdMatch) {
-        throw new Error('No se pudo extraer el test case ID (@TC-...) de la respuesta generada');
+        throw new Error('Could not extract test case ID (@TC-...) from generated response');
       }
-      const testCaseId = tcIdMatch[0].substring(1); // Remover el @ del inicio
+      const testCaseId = tcIdMatch[0].substring(1); // Remove @ from the beginning
 
-      // Extraer todos los tags del feature code, excluyendo el @TC-
+      // Extract all tags from feature code, excluding @TC-
       const tagMatches = featureCode.match(/@([^\s]+)/g);
       const allTags = tagMatches ? tagMatches.map(tag => tag.trim()) : [];
       
-      // Filtrar solo los tags funcionales (excluir @TC-)
+      // Filter only functional tags (exclude @TC-)
       const tags = allTags.filter(tag => !tag.startsWith('@TC-'));
       
-      // Extraer nombre del escenario
+      // Extract scenario name
       const scenarioMatch = featureCode.match(/Scenario(?: Outline)?:\s*(.+?)(?:\n|$)/i);
       const scenarioName = scenarioMatch ? scenarioMatch[1].trim() : 'AI Generated Test Case';
       
-      // Extraer descripción del escenario
+      // Extract scenario description
       const description = scenarioName;
       
-      // Determinar método basado en tags o requirements
+      // Determine method based on tags or requirements
       let method = 'GET';
       const requirementsLower = request.requirements.toLowerCase();
       if (requirementsLower.includes('create') || tags.some(tag => tag.includes('create'))) {
@@ -723,14 +768,14 @@ Genera SOLO el código necesario para completar la operación solicitada usando 
         method = 'GET';
       }
       
-      // Determinar test type basado en tags
+      // Determine test type based on tags
       let testType = 'positive';
       if (tags.some(tag => tag.includes('negative'))) {
         testType = 'negative';
       }
       
-             // El featureCode ya está limpio del parsing, usarlo directamente
-       const cleanedScenario = featureCode.trim();
+      // The featureCode is already clean from parsing, use it directly
+      const cleanedScenario = featureCode.trim();
       
       const testCaseData = {
         section: request.section,
@@ -740,16 +785,16 @@ Genera SOLO el código necesario para completar la operación solicitada usando 
         method: method,
         testType: testType,
         tags: tags,
-                 scenario: cleanedScenario,
+        scenario: cleanedScenario,
         testCaseId: testCaseId,
       };
 
-      this.logger.log(`✅ Test case extraído exitosamente: ${testCaseId} - ${scenarioName}`);
+      this.logger.log(`✅ Test case extracted successfully: ${testCaseId} - ${scenarioName}`);
       return testCaseData;
     } catch (error) {
-      this.logger.error(`❌ Error extrayendo información del test case: ${error.message}`);
-      this.logger.error(`❌ Feature code recibido: ${featureCode}`);
-      throw error; // Re-lanzar el error para que se maneje en el nivel superior
+      this.logger.error(`❌ Error extracting test case information: ${error.message}`);
+      this.logger.error(`❌ Feature code received: ${featureCode}`);
+      throw error; // Re-throw the error to be handled at the upper level
     }
   }
 }

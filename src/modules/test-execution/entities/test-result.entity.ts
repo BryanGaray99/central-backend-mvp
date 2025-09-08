@@ -8,6 +8,9 @@ import {
 } from 'typeorm';
 import { TestExecution } from './test-execution.entity';
 
+/**
+ * Status of an individual test result (scenario level).
+ */
 export enum TestResultStatus {
   PASSED = 'passed',
   FAILED = 'failed',
@@ -15,6 +18,11 @@ export enum TestResultStatus {
 }
 
 @Entity('test_results')
+/**
+ * Entity: TestResult
+ *
+ * Stores the result of a single executed scenario within a test execution.
+ */
 export class TestResult {
   @PrimaryGeneratedColumn('uuid')
   id: string;

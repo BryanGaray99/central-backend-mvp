@@ -11,10 +11,26 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StepFilesManipulationService, FeatureFilesManipulationService } from './index';
 
+/**
+ * Test Case Analysis Service
+ * 
+ * Analyzes existing project files and determines the necessary insertions for test cases.
+ * Provides functionality to analyze feature files, step files, and other project artifacts
+ * to determine optimal insertion points for AI-generated test code.
+ * 
+ * @class TestCaseAnalysisService
+ */
 @Injectable()
 export class TestCaseAnalysisService {
   private readonly logger = new Logger(TestCaseAnalysisService.name);
 
+  /**
+   * Creates an instance of TestCaseAnalysisService.
+   * 
+   * @param projectRepository - Repository for project entities
+   * @param stepFilesManipulationService - Service for step file manipulation
+   * @param featureFilesManipulationService - Service for feature file manipulation
+   */
   constructor(
     @InjectRepository(Project)
     private readonly projectRepository: Repository<Project>,
@@ -23,45 +39,60 @@ export class TestCaseAnalysisService {
   ) {}
 
   /**
-   * Analiza archivos existentes y determina las inserciones necesarias para test cases
+   * Analyzes existing files and determines the necessary insertions for test cases.
+   * 
+   * @param request - AI generation request containing project and entity information
+   * @param newCode - Generated code to be inserted
+   * @param generationId - Unique identifier for the generation process
+   * @returns Promise with array of code insertions
+   * 
+   * @example
+   * ```typescript
+   * const insertions = await analysisService.analyzeAndDetermineInsertions(
+   *   request,
+   *   generatedCode,
+   *   'gen-123'
+   * );
+   * console.log(`Found ${insertions.length} insertion points`);
+   * ```
    */
   async analyzeAndDetermineInsertions(
     request: AIGenerationRequest, 
     newCode: GeneratedCode,
     generationId: string
   ): Promise<CodeInsertion[]> {
-    this.logger.log(`🔍 [${generationId}] Analizando archivos existentes...`);
+    this.logger.log(`🔍 [${generationId}] Analyzing existing files...`);
     
-    // Obtener el proyecto para usar su path
+    // Get project to use its path
     const project = await this.projectRepository.findOneBy({ id: request.projectId });
     if (!project) {
       throw new Error(`Project with ID ${request.projectId} not found`);
     }
     
-    this.logger.log(`📁 [${generationId}] Proyecto encontrado: ${project.name}`);
-    this.logger.log(`📁 [${generationId}] Path del proyecto: ${project.path}`);
+    this.logger.log(`📁 [${generationId}] Project found: ${project.name}`);
+    this.logger.log(`📁 [${generationId}] Project path: ${project.path}`);
     
     const insertions: CodeInsertion[] = [];
     
-    // Analizar archivo feature
+    // Analyze feature file
     if (newCode.feature) {
       const featureInsertion = await this.analyzeFeatureInsertion(project, request, newCode.feature, generationId);
       if (featureInsertion) {
         insertions.push(featureInsertion);
       }
     } else {
-      this.logger.log(`⚠️ [${generationId}] No hay código feature para analizar`);
+      this.logger.log(`⚠️ [${generationId}] No feature code to analyze`);
     }
     
-    // Analizar archivo steps
+    // Analyze step file
     if (newCode.steps) {
       const stepsInsertions = await this.analyzeStepsInsertion(project, request, newCode.steps, generationId);
       insertions.push(...stepsInsertions);
     } else {
-      this.logger.log(`⚠️ [${generationId}] No hay código steps para analizar`);
+      this.logger.log(`⚠️ [${generationId}] No steps code to analyze`);
     }
     
-    // Analizar otros tipos de archivos si es necesario
+    // Analyze other types of files if necessary
     if (newCode.fixtures) {
       const fixturesInsertion = await this.analyzeFixturesInsertion(project, request, newCode.fixtures, generationId);
       if (fixturesInsertion) {
@@ -90,14 +121,21 @@ export class TestCaseAnalysisService {
       }
     }
     
-    this.logger.log(`📊 [${generationId}] Total de inserciones determinadas: ${insertions.length}`);
-    this.logger.log(`✅ [${generationId}] Inserciones determinadas: ${JSON.stringify(insertions, null, 2)}`);
+    this.logger.log(`📊 [${generationId}] Total insertions determined: ${insertions.length}`);
+    this.logger.log(`✅ [${generationId}] Insertions determined: ${JSON.stringify(insertions, null, 2)}`);
     
     return insertions;
   }
 
   /**
-   * Analiza la inserción para archivo feature
+   * Analyzes insertion for feature file.
+   * 
+   * @private
+   * @param project - Project entity containing path information
+   * @param request - AI generation request
+   * @param featureCode - Feature code to insert
+   * @param generationId - Unique identifier for the generation process
+   * @returns Promise with code insertion for feature file or null
    */
   private async analyzeFeatureInsertion(
     project: Project,
@@ -105,16 +143,23 @@ export class TestCaseAnalysisService {
     featureCode: string,
     generationId: string
   ): Promise<CodeInsertion | null> {
-    this.logger.log(`🔍 [${generationId}] Analizando archivo feature...`);
+    this.logger.log(`🔍 [${generationId}] Analyzing feature file...`);
     const featurePath = path.join(project.path, `src/features/${request.section}/${request.entityName.toLowerCase()}.feature`);
-    this.logger.log(`📄 [${generationId}] Ruta del archivo feature: ${featurePath}`);
-    this.logger.log(`📄 [${generationId}] ¿Existe el archivo feature? ${fs.existsSync(featurePath)}`);
+    this.logger.log(`📄 [${generationId}] Feature file path: ${featurePath}`);
+    this.logger.log(`📄 [${generationId}] Does feature file exist? ${fs.existsSync(featurePath)}`);
     
     return await this.featureFilesManipulationService.analyzeFeatureFile(featurePath, featureCode, generationId);
   }
 
   /**
-   * Analiza la inserción para archivo steps
+   * Analyzes insertion for step file.
+   * 
+   * @private
+   * @param project - Project entity containing path information
+   * @param request - AI generation request
+   * @param stepsCode - Steps code to insert
+   * @param generationId - Unique identifier for the generation process
+   * @returns Promise with array of code insertions for step file
    */
   private async analyzeStepsInsertion(
     project: Project,
@@ -122,16 +167,23 @@ export class TestCaseAnalysisService {
     stepsCode: string,
     generationId: string
   ): Promise<CodeInsertion[]> {
-    this.logger.log(`🔍 [${generationId}] Analizando archivo steps...`);
+    this.logger.log(`🔍 [${generationId}] Analyzing step file...`);
     const stepsPath = path.join(project.path, `src/steps/${request.section}/${request.entityName.toLowerCase()}.steps.ts`);
-    this.logger.log(`📄 [${generationId}] Ruta del archivo steps: ${stepsPath}`);
-    this.logger.log(`📄 [${generationId}] ¿Existe el archivo steps? ${fs.existsSync(stepsPath)}`);
+    this.logger.log(`📄 [${generationId}] Step file path: ${stepsPath}`);
+    this.logger.log(`📄 [${generationId}] Does step file exist? ${fs.existsSync(stepsPath)}`);
     
     return await this.stepFilesManipulationService.analyzeStepsFile(stepsPath, stepsCode, generationId);
   }
 
   /**
-   * Analiza la inserción para archivo fixtures
+   * Analyzes insertion for fixtures file.
+   * 
+   * @private
+   * @param project - Project entity containing path information
+   * @param request - AI generation request
+   * @param fixturesCode - Fixtures code to insert
+   * @param generationId - Unique identifier for the generation process
+   * @returns Promise with code insertion for fixtures file or null
    */
   private async analyzeFixturesInsertion(
     project: Project,
@@ -139,17 +191,24 @@ export class TestCaseAnalysisService {
     fixturesCode: string,
     generationId: string
   ): Promise<CodeInsertion | null> {
-    this.logger.log(`🔍 [${generationId}] Analizando archivo fixtures...`);
+    this.logger.log(`🔍 [${generationId}] Analyzing fixtures file...`);
     const fixturesPath = path.join(project.path, `src/fixtures/${request.section}/${request.entityName.toLowerCase()}.fixture.ts`);
-    this.logger.log(`📄 [${generationId}] Ruta del archivo fixtures: ${fixturesPath}`);
+    this.logger.log(`📄 [${generationId}] Fixtures file path: ${fixturesPath}`);
     
-    // TODO: Implementar lógica específica para fixtures
-    this.logger.log(`⚠️ [${generationId}] Análisis de fixtures no implementado aún`);
+    // TODO: Implement specific logic for fixtures
+    this.logger.log(`⚠️ [${generationId}] Fixtures analysis not implemented yet`);
     return null;
   }
 
   /**
-   * Analiza la inserción para archivo schemas
+   * Analyzes insertion for schemas file.
+   * 
+   * @private
+   * @param project - Project entity containing path information
+   * @param request - AI generation request
+   * @param schemasCode - Schemas code to insert
+   * @param generationId - Unique identifier for the generation process
+   * @returns Promise with code insertion for schemas file or null
    */
   private async analyzeSchemasInsertion(
     project: Project,
@@ -157,17 +216,24 @@ export class TestCaseAnalysisService {
     schemasCode: string,
     generationId: string
   ): Promise<CodeInsertion | null> {
-    this.logger.log(`🔍 [${generationId}] Analizando archivo schemas...`);
+    this.logger.log(`🔍 [${generationId}] Analyzing schemas file...`);
     const schemasPath = path.join(project.path, `src/schemas/${request.section}/${request.entityName.toLowerCase()}.schema.ts`);
-    this.logger.log(`📄 [${generationId}] Ruta del archivo schemas: ${schemasPath}`);
+    this.logger.log(`📄 [${generationId}] Schemas file path: ${schemasPath}`);
     
-    // TODO: Implementar lógica específica para schemas
-    this.logger.log(`⚠️ [${generationId}] Análisis de schemas no implementado aún`);
+    // TODO: Implement specific logic for schemas
+    this.logger.log(`⚠️ [${generationId}] Schemas analysis not implemented yet`);
     return null;
   }
 
   /**
-   * Analiza la inserción para archivo types
+   * Analyzes insertion for types file.
+   * 
+   * @private
+   * @param project - Project entity containing path information
+   * @param request - AI generation request
+   * @param typesCode - Types code to insert
+   * @param generationId - Unique identifier for the generation process
+   * @returns Promise with code insertion for types file or null
    */
   private async analyzeTypesInsertion(
     project: Project,
@@ -175,17 +241,24 @@ export class TestCaseAnalysisService {
     typesCode: string,
     generationId: string
   ): Promise<CodeInsertion | null> {
-    this.logger.log(`🔍 [${generationId}] Analizando archivo types...`);
+    this.logger.log(`🔍 [${generationId}] Analyzing types file...`);
     const typesPath = path.join(project.path, `src/types/${request.section}/${request.entityName.toLowerCase()}.ts`);
-    this.logger.log(`📄 [${generationId}] Ruta del archivo types: ${typesPath}`);
+    this.logger.log(`📄 [${generationId}] Types file path: ${typesPath}`);
     
-    // TODO: Implementar lógica específica para types
-    this.logger.log(`⚠️ [${generationId}] Análisis de types no implementado aún`);
+    // TODO: Implement specific logic for types
+    this.logger.log(`⚠️ [${generationId}] Types analysis not implemented yet`);
     return null;
   }
 
   /**
-   * Analiza la inserción para archivo client
+   * Analyzes insertion for client file.
+   * 
+   * @private
+   * @param project - Project entity containing path information
+   * @param request - AI generation request
+   * @param clientCode - Client code to insert
+   * @param generationId - Unique identifier for the generation process
+   * @returns Promise with code insertion for client file or null
    */
   private async analyzeClientInsertion(
     project: Project,
@@ -193,22 +266,34 @@ export class TestCaseAnalysisService {
     clientCode: string,
     generationId: string
   ): Promise<CodeInsertion | null> {
-    this.logger.log(`🔍 [${generationId}] Analizando archivo client...`);
+    this.logger.log(`🔍 [${generationId}] Analyzing client file...`);
     const clientPath = path.join(project.path, `src/api/${request.section}/${request.entityName.toLowerCase()}Client.ts`);
-    this.logger.log(`📄 [${generationId}] Ruta del archivo client: ${clientPath}`);
+    this.logger.log(`📄 [${generationId}] Client file path: ${clientPath}`);
     
-    // TODO: Implementar lógica específica para client
-    this.logger.log(`⚠️ [${generationId}] Análisis de client no implementado aún`);
+    // TODO: Implement specific logic for client
+    this.logger.log(`⚠️ [${generationId}] Client analysis not implemented yet`);
     return null;
   }
 
   /**
-   * Valida que el proyecto tenga la estructura necesaria para las inserciones
+   * Validates that the project has the necessary structure for insertions.
+   * 
+   * @param project - Project entity to validate
+   * @param request - AI generation request containing section information
+   * @returns Validation result with success status and error messages
+   * 
+   * @example
+   * ```typescript
+   * const validation = analysisService.validateProjectStructure(project, request);
+   * if (!validation.isValid) {
+   *   console.log('Structure errors:', validation.errors);
+   * }
+   * ```
    */
   validateProjectStructure(project: Project, request: AIGenerationRequest): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
     
-    // Verificar que existan las carpetas necesarias
+    // Verify that necessary directories exist
     const requiredDirs = [
       path.join(project.path, 'src/features', request.section),
       path.join(project.path, 'src/steps', request.section),
@@ -220,7 +305,7 @@ export class TestCaseAnalysisService {
     
     for (const dir of requiredDirs) {
       if (!fs.existsSync(dir)) {
-        errors.push(`Directorio no encontrado: ${dir}`);
+        errors.push(`Directory not found: ${dir}`);
       }
     }
     
@@ -228,7 +313,18 @@ export class TestCaseAnalysisService {
   }
 
   /**
-   * Obtiene estadísticas de los archivos que se van a modificar
+   * Gets statistics of files that will be modified.
+   * 
+   * @param project - Project entity containing path information
+   * @param request - AI generation request containing section and entity information
+   * @returns Object with boolean flags indicating which files exist
+   * 
+   * @example
+   * ```typescript
+   * const stats = analysisService.getModificationStats(project, request);
+   * console.log(`Feature exists: ${stats.featureExists}`);
+   * console.log(`Steps exist: ${stats.stepsExists}`);
+   * ```
    */
   getModificationStats(project: Project, request: AIGenerationRequest): {
     featureExists: boolean;

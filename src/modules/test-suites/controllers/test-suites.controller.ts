@@ -17,6 +17,15 @@ import { TestSuiteResponseDto } from '../dto/test-suite-response.dto';
 import { TestSuiteFiltersDto } from '../dto/test-suite-filters.dto';
 import { ExecuteTestSuiteDto } from '../dto/execute-test-suite.dto';
 
+/**
+ * Test Suites Controller
+ * 
+ * Handles HTTP requests for test suite management operations.
+ * Provides endpoints for creating, reading, updating, deleting, and executing
+ * test suites (test sets and test plans) within projects.
+ * 
+ * @controller TestSuitesController
+ */
 @ApiTags('test-suites')
 @Controller('projects/:projectId/test-suites')
 export class TestSuitesController {
@@ -24,6 +33,24 @@ export class TestSuitesController {
 
   constructor(private readonly testSuitesService: TestSuitesService) {}
 
+  /**
+   * Creates a new test suite (test set or test plan).
+   * 
+   * @param projectId - The project ID
+   * @param dto - The test suite creation data
+   * @returns Promise<TestSuiteResponseDto> - The created test suite
+   * @throws 400 - Invalid input data
+   * @throws 404 - Project not found
+   * 
+   * @example
+   * ```typescript
+   * const testSuite = await testSuitesController.createTestSuite('project-123', {
+   *   name: 'E2E Tests',
+   *   type: 'test_set',
+   *   description: 'End-to-end test suite'
+   * });
+   * ```
+   */
   @Post()
   @ApiOperation({
     summary: 'Create test suite',
@@ -45,6 +72,23 @@ export class TestSuitesController {
     return await this.testSuitesService.createTestSuite(projectId, dto);
   }
 
+  /**
+   * Gets all test suites for a project with optional filters.
+   * 
+   * @param projectId - The project ID
+   * @param filters - Optional filters for test suite retrieval
+   * @returns Promise<TestSuiteResponseDto[]> - Array of test suites
+   * 
+   * @example
+   * ```typescript
+   * const testSuites = await testSuitesController.getTestSuites('project-123', {
+   *   type: 'test_set',
+   *   status: 'active',
+   *   page: 1,
+   *   limit: 10
+   * });
+   * ```
+   */
   @Get()
   @ApiOperation({
     summary: 'Get test suites',
@@ -70,6 +114,19 @@ export class TestSuitesController {
     return await this.testSuitesService.getTestSuites(projectId, filters);
   }
 
+  /**
+   * Gets a specific test suite by its ID.
+   * 
+   * @param projectId - The project ID
+   * @param suiteId - The test suite ID
+   * @returns Promise<TestSuiteResponseDto> - The test suite
+   * @throws 404 - Test suite not found
+   * 
+   * @example
+   * ```typescript
+   * const testSuite = await testSuitesController.getTestSuite('project-123', 'suite-456');
+   * ```
+   */
   @Get(':suiteId')
   @ApiOperation({
     summary: 'Get test suite by ID',
@@ -91,6 +148,24 @@ export class TestSuitesController {
     return await this.testSuitesService.getTestSuite(projectId, suiteId);
   }
 
+  /**
+   * Updates an existing test suite.
+   * 
+   * @param projectId - The project ID
+   * @param suiteId - The test suite ID
+   * @param dto - The test suite update data
+   * @returns Promise<TestSuiteResponseDto> - The updated test suite
+   * @throws 400 - Invalid input data
+   * @throws 404 - Test suite not found
+   * 
+   * @example
+   * ```typescript
+   * const updatedSuite = await testSuitesController.updateTestSuite('project-123', 'suite-456', {
+   *   name: 'Updated E2E Tests',
+   *   description: 'Updated description'
+   * });
+   * ```
+   */
   @Put(':suiteId')
   @ApiOperation({
     summary: 'Update test suite',
@@ -114,6 +189,20 @@ export class TestSuitesController {
     return await this.testSuitesService.updateTestSuite(projectId, suiteId, dto);
   }
 
+  /**
+   * Deletes a test suite.
+   * 
+   * @param projectId - The project ID
+   * @param suiteId - The test suite ID
+   * @returns Promise<{ success: boolean; message: string }> - Deletion result
+   * @throws 404 - Test suite not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await testSuitesController.deleteTestSuite('project-123', 'suite-456');
+   * console.log(result.message); // "Test suite deleted successfully"
+   * ```
+   */
   @Delete(':suiteId')
   @ApiOperation({
     summary: 'Delete test suite',
@@ -141,6 +230,24 @@ export class TestSuitesController {
     return await this.testSuitesService.deleteTestSuite(projectId, suiteId);
   }
 
+  /**
+   * Executes a test suite and runs all its test cases.
+   * 
+   * @param projectId - The project ID
+   * @param suiteId - The test suite ID
+   * @param dto - The execution configuration
+   * @returns Promise<object> - Execution result with execution ID and status
+   * @throws 404 - Test suite not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await testSuitesController.executeTestSuite('project-123', 'suite-456', {
+   *   environment: 'staging',
+   *   parallel: true
+   * });
+   * console.log(result.data.executionId); // "exec-789"
+   * ```
+   */
   @Post(':suiteId/execute')
   @ApiOperation({
     summary: 'Execute test suite',
@@ -177,6 +284,20 @@ export class TestSuitesController {
     return await this.testSuitesService.executeTestSuite(projectId, suiteId, dto);
   }
 
+  /**
+   * Gets execution history for a specific test suite.
+   * 
+   * @param projectId - The project ID
+   * @param suiteId - The test suite ID
+   * @returns Promise<object[]> - Array of execution history records
+   * @throws 404 - Test suite not found
+   * 
+   * @example
+   * ```typescript
+   * const history = await testSuitesController.getExecutionHistory('project-123', 'suite-456');
+   * console.log(`Found ${history.length} executions`);
+   * ```
+   */
   @Get(':suiteId/execution-history')
   @ApiOperation({
     summary: 'Get test suite execution history',
@@ -197,6 +318,19 @@ export class TestSuitesController {
     return await this.testSuitesService.getExecutionHistory(projectId, suiteId);
   }
 
+  /**
+   * Gets all test sets for a specific section to use in test plans.
+   * 
+   * @param projectId - The project ID
+   * @param section - The section name
+   * @returns Promise<TestSuiteResponseDto[]> - Array of test sets for the section
+   * 
+   * @example
+   * ```typescript
+   * const testSets = await testSuitesController.getTestSetsBySection('project-123', 'ecommerce');
+   * console.log(`Found ${testSets.length} test sets for ecommerce section`);
+   * ```
+   */
   @Get('test-sets/:section')
   @ApiOperation({
     summary: 'Get test sets by section for test plans',

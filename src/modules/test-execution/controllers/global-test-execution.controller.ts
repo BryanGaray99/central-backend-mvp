@@ -6,6 +6,14 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { TestExecutionService } from '../services/test-execution.service';
 
+/**
+ * Global Test Execution Controller
+ *
+ * Exposes project-agnostic endpoints to retrieve aggregated test execution
+ * information across all projects.
+ *
+ * @since 1.0.0
+ */
 @ApiTags('test-execution')
 @Controller('test-execution')
 export class GlobalTestExecutionController {
@@ -13,14 +21,19 @@ export class GlobalTestExecutionController {
 
   constructor(private readonly testExecutionService: TestExecutionService) {}
 
+  /**
+   * Retrieves the global test execution summary for all projects.
+   *
+   * @returns A global statistical summary of all executions across projects.
+   */
   @Get('summary')
   @ApiOperation({
-    summary: 'Obtener resumen global de todas las ejecuciones',
-    description: 'Obtiene un resumen estadístico de todas las ejecuciones de todos los proyectos',
+    summary: 'Get global summary of all executions',
+    description: 'Retrieves statistical summary across executions of all projects',
   })
   @ApiResponse({
     status: 200,
-    description: 'Resumen global obtenido exitosamente',
+    description: 'Global summary retrieved successfully',
     schema: {
       type: 'object',
       properties: {

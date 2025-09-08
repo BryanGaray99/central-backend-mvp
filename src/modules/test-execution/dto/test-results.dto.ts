@@ -1,52 +1,55 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TestSummary, ExecutionMetadata } from '../interfaces/execution-metadata.interface';
 
+/**
+ * DTO: Detailed execution results returned by the API.
+ */
 export class TestResultsDto {
   @ApiProperty({
-    description: 'ID único de la ejecución',
+    description: 'Unique execution ID',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   executionId: string;
 
   @ApiProperty({
-    description: 'Estado de la ejecución',
+    description: 'Execution status',
     example: 'completed',
   })
   status: string;
 
   @ApiProperty({
-    description: 'Resumen de la ejecución',
+    description: 'Execution summary',
   })
   summary: TestSummary;
 
   @ApiProperty({
-    description: 'Resultados detallados de cada escenario',
+    description: 'Detailed results for each scenario',
     type: 'array',
   })
   results: any[];
 
   @ApiPropertyOptional({
-    description: 'Metadatos de la ejecución',
+    description: 'Execution metadata',
   })
   metadata?: ExecutionMetadata;
 
   @ApiProperty({
-    description: 'Fecha de inicio de la ejecución',
+    description: 'Execution start date-time',
   })
   startedAt: Date;
 
   @ApiPropertyOptional({
-    description: 'Fecha de finalización de la ejecución',
+    description: 'Execution completion date-time',
   })
   completedAt?: Date;
 
   @ApiProperty({
-    description: 'Tiempo total de ejecución en milisegundos',
+    description: 'Total execution time in milliseconds',
   })
   executionTime: number;
 
   @ApiPropertyOptional({
-    description: 'Mensaje de error si la ejecución falló',
+    description: 'Error message if the execution failed',
   })
   errorMessage?: string;
 } 

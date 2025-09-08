@@ -2,6 +2,15 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber } from 'class-validator';
 import { BugType, BugSeverity, BugPriority, BugStatus } from '../entities/bug.entity';
 
+/**
+ * Update Bug DTO
+ * 
+ * Defines the structure for updating existing bugs with optional
+ * fields for title, description, status, priority, and other
+ * bug properties that can be modified.
+ * 
+ * @class UpdateBugDto
+ */
 export class UpdateBugDto {
   @ApiProperty({
     description: 'Title of the bug',

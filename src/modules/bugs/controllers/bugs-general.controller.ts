@@ -9,6 +9,15 @@ import { BugsService } from '../services/bugs.service';
 import { BugFiltersDto } from '../dto/bug-filters.dto';
 import { BugResponseDto } from '../dto/bug-response.dto';
 
+/**
+ * Bugs General Controller
+ * 
+ * Handles global bug management operations across all projects.
+ * Provides endpoints for retrieving bugs, statistics, and failed executions
+ * without requiring a specific project context.
+ * 
+ * @controller BugsGeneralController
+ */
 @ApiTags('Bugs General')
 @Controller('bugs')
 export class BugsGeneralController {
@@ -16,6 +25,23 @@ export class BugsGeneralController {
 
   constructor(private readonly bugsService: BugsService) {}
 
+  /**
+   * Gets all bugs across all projects with optional filters.
+   * 
+   * @param filters - Optional filters for bug retrieval
+   * @returns Promise<object> - Paginated list of bugs with metadata
+   * 
+   * @example
+   * ```typescript
+   * const result = await bugsGeneralController.getAllBugs({
+   *   severity: 'high',
+   *   status: 'open',
+   *   page: 1,
+   *   limit: 20
+   * });
+   * console.log(`Found ${result.total} bugs`);
+   * ```
+   */
   @Get()
   @ApiOperation({ summary: 'Get all bugs with filters (general endpoint)' })
   @ApiResponse({ status: 200, description: 'Bugs retrieved successfully' })
@@ -32,6 +58,17 @@ export class BugsGeneralController {
     return this.bugsService.getAllBugs(filters);
   }
 
+  /**
+   * Gets comprehensive bug statistics across all projects.
+   * 
+   * @returns Promise<object> - Statistics object with counts by status, severity, type, and priority
+   * 
+   * @example
+   * ```typescript
+   * const stats = await bugsGeneralController.getAllBugStatistics();
+   * console.log(`Total bugs: ${stats.total}, Open: ${stats.open}`);
+   * ```
+   */
   @Get('statistics')
   @ApiOperation({ summary: 'Get bug statistics (general endpoint)' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
@@ -49,6 +86,17 @@ export class BugsGeneralController {
     return this.bugsService.getAllBugStatistics();
   }
 
+  /**
+   * Gets all failed test executions across all projects for bug creation.
+   * 
+   * @returns Promise<Array<object>> - Array of failed execution details
+   * 
+   * @example
+   * ```typescript
+   * const failedExecutions = await bugsGeneralController.getAllFailedExecutions();
+   * console.log(`Found ${failedExecutions.length} failed executions`);
+   * ```
+   */
   @Get('failed-executions')
   @ApiOperation({ summary: 'Get all failed executions (general endpoint)' })
   @ApiResponse({ status: 200, description: 'Failed executions retrieved successfully' })

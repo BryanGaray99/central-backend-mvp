@@ -1,3 +1,15 @@
+/**
+ * Main Application Module
+ * 
+ * Root module of the Central Backend MVP application that orchestrates
+ * all feature modules and configures the database connection. This module
+ * serves as the central hub for the test generation and orchestration system.
+ * 
+ * @module AppModule
+ * @version 1.0.0
+ * @author Central Backend MVP Team
+ */
+
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
@@ -26,6 +38,15 @@ import { BugsModule } from './modules/bugs/bugs.module';
 import { TestSuitesModule } from './modules/test-suites/test-suites.module';
 import { SyncModule } from './modules/sync/sync.module';
 
+/**
+ * Main Application Module
+ * 
+ * Configures the root module with all feature modules and database connection.
+ * Uses SQLite database with TypeORM for data persistence and includes all
+ * business modules for the test generation system.
+ * 
+ * @class AppModule
+ */
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,7 +55,7 @@ import { SyncModule } from './modules/sync/sync.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule, DatabaseModule],
       useFactory: async (configService: ConfigService) => {
-        // Usar la nueva ruta de la base de datos
+        // Use the new database path
         const workspacesPath = configService.get('PLAYWRIGHT_WORKSPACES_PATH') || '../playwright-workspaces';
         const dbPath = require('path').resolve(workspacesPath, 'central-backend.sqlite');
         
@@ -55,7 +76,7 @@ import { SyncModule } from './modules/sync/sync.module';
             Bug,
             TestSuite,
           ],
-          synchronize: false, // Desactivar synchronize ya que usamos migraciones
+          synchronize: false, // Disable synchronize since we use migrations
         };
       },
       inject: [ConfigService],

@@ -1,51 +1,54 @@
 import { ExecuteTestsDto } from '../dto/execute-tests.dto';
 import { BadRequestException } from '@nestjs/common';
 
+/**
+ * Utility helpers to validate execution inputs and project readiness.
+ */
 export class ExecutionValidatorUtils {
   /**
-   * Valida la configuración de ejecución
+   * Validates execution configuration DTO.
    */
   static validateExecutionConfig(dto: ExecuteTestsDto): void {
-    // Validar entidad
+    // Validate entity
     if (!dto.entityName || dto.entityName.trim() === '') {
-      throw new BadRequestException('El nombre de la entidad es requerido');
+      throw new BadRequestException('Entity name is required');
     }
 
-    // Validar timeout
+    // Validate timeout
     if (dto.timeout && (dto.timeout < 1000 || dto.timeout > 300000)) {
-      throw new BadRequestException('El timeout debe estar entre 1000 y 300000 milisegundos');
+      throw new BadRequestException('Timeout must be between 1000 and 300000 milliseconds');
     }
 
-    // Validar retries
+    // Validate retries
     if (dto.retries && (dto.retries < 0 || dto.retries > 5)) {
-      throw new BadRequestException('El número de reintentos debe estar entre 0 y 5');
+      throw new BadRequestException('Retries must be between 0 and 5');
     }
 
-    // Validar workers
+    // Validate workers
     if (dto.workers && (dto.workers < 1 || dto.workers > 10)) {
-      throw new BadRequestException('El número de workers debe estar entre 1 y 10');
+      throw new BadRequestException('Workers must be between 1 and 10');
     }
 
-    // Validar tags
+    // Validate tags
     if (dto.tags) {
       for (const tag of dto.tags) {
         if (!tag.startsWith('@')) {
-          throw new BadRequestException(`Los tags deben comenzar con @: ${tag}`);
+          throw new BadRequestException(`Tags must start with @: ${tag}`);
         }
       }
     }
 
-    // Validar método
+    // Validate method
     if (dto.method) {
       const validMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
       if (!validMethods.includes(dto.method.toUpperCase())) {
-        throw new BadRequestException(`Método HTTP inválido: ${dto.method}`);
+        throw new BadRequestException(`Invalid HTTP method: ${dto.method}`);
       }
     }
   }
 
   /**
-   * Valida que el proyecto tenga la estructura necesaria
+   * Validates that the project has the required structure.
    */
   static async validateProjectStructure(projectPath: string): Promise<void> {
     const fs = require('fs');
@@ -67,14 +70,14 @@ export class ExecutionValidatorUtils {
       const fullPath = path.join(projectPath, requiredPath);
       if (!fs.existsSync(fullPath)) {
         throw new BadRequestException(
-          `El proyecto no tiene la estructura requerida. Falta: ${requiredPath}`
+          `Project is missing required structure. Missing: ${requiredPath}`
         );
       }
     }
   }
 
   /**
-   * Valida que la entidad tenga casos de prueba
+   * Validates that the entity has test cases.
    */
   static async validateEntityHasTestCases(projectPath: string, entityName: string): Promise<void> {
     const fs = require('fs');
@@ -85,27 +88,27 @@ export class ExecutionValidatorUtils {
 
     if (!fs.existsSync(featurePath)) {
       throw new BadRequestException(
-        `No se encontraron casos de prueba para la entidad '${entityName}'. Verifique que la entidad esté registrada.`
+        `No test cases found for entity '${entityName}'. Ensure the entity is registered.`
       );
     }
 
     if (!fs.existsSync(stepsPath)) {
       throw new BadRequestException(
-        `No se encontraron definiciones de pasos para la entidad '${entityName}'. Verifique que la entidad esté registrada.`
+        `No step definitions found for entity '${entityName}'. Ensure the entity is registered.`
       );
     }
 
-    // Validar que el archivo feature tenga contenido
+    // Validate that the feature file has content
     const featureContent = fs.readFileSync(featurePath, 'utf8');
     if (!featureContent.includes('Scenario:')) {
       throw new BadRequestException(
-        `El archivo de feature para '${entityName}' no contiene escenarios válidos.`
+        `The feature file for '${entityName}' does not contain valid scenarios.`
       );
     }
   }
 
   /**
-   * Valida que los filtros especificados tengan casos de prueba disponibles
+   * Validates that the specified filters match available test cases.
    */
   static async validateFiltersHaveTestCases(
     projectPath: string,
@@ -118,11 +121,11 @@ export class ExecutionValidatorUtils {
     
     if (availableScenarios.length === 0) {
       throw new BadRequestException(
-        `No se encontraron escenarios para la entidad '${entityName}'.`
+        `No scenarios found for entity '${entityName}'.`
       );
     }
 
-    // Aplicar filtros para verificar que hay escenarios que coincidan
+    // Apply filters to verify there are matching scenarios
     const filteredScenarios = availableScenarios.filter(scenario => {
       const filters = {
         entityName: dto.entityName,
@@ -138,13 +141,13 @@ export class ExecutionValidatorUtils {
     if (filteredScenarios.length === 0) {
       const availableInfo = this.getAvailableScenariosInfo(availableScenarios);
       throw new BadRequestException(
-        `No se encontraron escenarios que coincidan con los filtros especificados. ${availableInfo}`
+        `No scenarios match the specified filters. ${availableInfo}`
       );
     }
   }
 
   /**
-   * Obtiene información sobre los escenarios disponibles para mostrar en el error
+   * Builds a summary of available scenarios to include in error messages.
    */
   private static getAvailableScenariosInfo(scenarios: any[]): string {
     const methods = new Set<string>();
@@ -159,11 +162,11 @@ export class ExecutionValidatorUtils {
       }
     }
 
-    return `Escenarios disponibles: ${scenarios.length} total. Métodos: ${Array.from(methods).join(', ')}. Tags: ${Array.from(tags).slice(0, 5).join(', ')}${tags.size > 5 ? '...' : ''}`;
+    return `Available scenarios: ${scenarios.length} total. Methods: ${Array.from(methods).join(', ')}. Tags: ${Array.from(tags).slice(0, 5).join(', ')}${tags.size > 5 ? '...' : ''}`;
   }
 
   /**
-   * Valida la configuración de Playwright
+   * Validates Playwright configuration file presence and basic structure.
    */
   static async validatePlaywrightConfig(projectPath: string): Promise<void> {
     const fs = require('fs');
@@ -172,19 +175,19 @@ export class ExecutionValidatorUtils {
     const configPath = path.join(projectPath, 'playwright.config.ts');
     
     if (!fs.existsSync(configPath)) {
-      throw new BadRequestException('No se encontró la configuración de Playwright');
+      throw new BadRequestException('Playwright configuration not found');
     }
 
-    // Validar que el archivo de configuración tenga el contenido mínimo necesario
+    // Validate that the configuration file has the minimal required content
     const configContent = fs.readFileSync(configPath, 'utf8');
     
     if (!configContent.includes('defineConfig')) {
-      throw new BadRequestException('La configuración de Playwright no es válida');
+      throw new BadRequestException('Invalid Playwright configuration');
     }
   }
 
   /**
-   * Valida las dependencias del proyecto
+   * Validates project dependencies for test execution.
    */
   static async validateProjectDependencies(projectPath: string): Promise<void> {
     const fs = require('fs');
@@ -193,7 +196,7 @@ export class ExecutionValidatorUtils {
     const packagePath = path.join(projectPath, 'package.json');
     
     if (!fs.existsSync(packagePath)) {
-      throw new BadRequestException('No se encontró el archivo package.json');
+      throw new BadRequestException('package.json not found');
     }
 
     const packageContent = fs.readFileSync(packagePath, 'utf8');
@@ -211,13 +214,13 @@ export class ExecutionValidatorUtils {
 
     if (missingDependencies.length > 0) {
       throw new BadRequestException(
-        `Faltan dependencias requeridas: ${missingDependencies.join(', ')}`
+        `Missing required dependencies: ${missingDependencies.join(', ')}`
       );
     }
   }
 
   /**
-   * Valida que el proyecto esté listo para ejecutar pruebas
+   * Validates that the project is ready to run tests.
    */
   static async validateProjectReady(projectPath: string): Promise<void> {
     await this.validateProjectStructure(projectPath);
@@ -226,7 +229,7 @@ export class ExecutionValidatorUtils {
   }
 
   /**
-   * Obtiene información de validación para mostrar al usuario
+   * Builds validation info about available scenarios and statistics.
    */
   static async getValidationInfo(projectPath: string, entityName: string): Promise<any> {
     const { TestFilterUtils } = require('./test-filter.utils');

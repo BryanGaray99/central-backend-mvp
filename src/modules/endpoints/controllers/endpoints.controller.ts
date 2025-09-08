@@ -6,13 +6,44 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EndpointsService } from '../endpoints.service';
 
+/**
+ * Controller for managing endpoints across all projects.
+ * 
+ * This controller provides endpoints for listing and managing API endpoints
+ * across all projects in the system. It handles global endpoint operations
+ * and provides aggregated views of endpoint data.
+ * 
+ * @class EndpointsController
+ * @since 1.0.0
+ */
 @ApiTags('endpoints')
 @Controller('endpoints')
 export class EndpointsController {
+  /** Logger instance for this controller */
   private readonly logger = new Logger(EndpointsController.name);
 
+  /**
+   * Creates an instance of EndpointsController.
+   * 
+   * @param endpointsService - The endpoints service for business logic
+   */
   constructor(private readonly endpointsService: EndpointsService) {}
 
+  /**
+   * Lists all registered endpoints across all projects.
+   * 
+   * This endpoint retrieves all endpoints from all projects in the system,
+   * providing a comprehensive view of all registered API endpoints with
+   * their analysis results and generated artifacts.
+   * 
+   * @returns Array of all endpoints with processed data
+   * 
+   * @example
+   * ```typescript
+   * const endpoints = await endpointsController.listAllEndpoints();
+   * console.log(`Found ${endpoints.length} endpoints across all projects`);
+   * ```
+   */
   @Get()
   @ApiOperation({
     summary: 'List all registered endpoints across all projects',
@@ -109,7 +140,7 @@ export class EndpointsController {
     const endpoints = await this.endpointsService.listAllEndpoints();
       
     return endpoints.map((endpoint) => {
-      // Usar los métodos de procesamiento del servicio
+      // Use service processing methods
       const processedMethods = this.endpointsService.processMethods(endpoint.methods);
       const processedAnalysisResults = this.endpointsService.processAnalysisResults(endpoint.analysisResults);
       

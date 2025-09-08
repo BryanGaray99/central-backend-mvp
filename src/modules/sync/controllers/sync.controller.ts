@@ -3,6 +3,16 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SyncService } from '../services/sync.service';
 import { SyncResponseDto } from '../dto/sync-response.dto';
 
+/**
+ * Sync Controller
+ * 
+ * Handles HTTP requests for project synchronization operations.
+ * Provides endpoints for full project sync, endpoints-only sync,
+ * and test cases-only sync to maintain consistency between
+ * file system artifacts and database entities.
+ * 
+ * @controller SyncController
+ */
 @ApiTags('Sync')
 @Controller('sync')
 export class SyncController {
@@ -10,69 +20,108 @@ export class SyncController {
 
   constructor(private readonly syncService: SyncService) {}
 
+  /**
+   * Synchronizes the complete project including endpoints, test cases, and steps.
+   * 
+   * @param projectId - The project ID to synchronize
+   * @returns Promise<SyncResponseDto> - Synchronization result with detailed statistics
+   * @throws NotFoundException - If project not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await syncController.syncProject('project-123');
+   * console.log(`Sync completed: ${result.data.endpointsUpdated} endpoints, ${result.data.testCasesSynced} test cases`);
+   * ```
+   */
   @Post('projects/:projectId')
   @ApiOperation({
-    summary: 'Sincronizar proyecto completo',
-    description: 'Sincroniza todos los archivos del proyecto con la base de datos: endpoints, test cases y steps'
+    summary: 'Synchronize complete project',
+    description: 'Synchronizes all project files with the database: endpoints, test cases and steps'
   })
   @ApiResponse({
     status: 200,
-    description: 'Proyecto sincronizado exitosamente',
+    description: 'Project synchronized successfully',
     type: SyncResponseDto
   })
   @ApiResponse({
     status: 404,
-    description: 'Proyecto no encontrado'
+    description: 'Project not found'
   })
   @ApiResponse({
     status: 500,
-    description: 'Error interno del servidor'
+    description: 'Internal server error'
   })
   async syncProject(@Param('projectId') projectId: string) {
-    this.logger.log(`Iniciando sincronización del proyecto: ${projectId}`);
+    this.logger.log(`Starting project synchronization: ${projectId}`);
     
     try {
       const result = await this.syncService.syncProject(projectId);
-      this.logger.log(`Sincronización completada para proyecto: ${projectId}`);
+      this.logger.log(`Project synchronization completed: ${projectId}`);
       return result;
     } catch (error) {
-      this.logger.error(`Error en sincronización del proyecto ${projectId}:`, error);
+      this.logger.error(`Error synchronizing project ${projectId}:`, error);
       throw error;
     }
   }
 
+  /**
+   * Synchronizes only the endpoints of the project.
+   * 
+   * @param projectId - The project ID to synchronize endpoints for
+   * @returns Promise<object> - Endpoints synchronization result
+   * @throws NotFoundException - If project not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await syncController.syncEndpoints('project-123');
+   * console.log(`Endpoints synchronized: ${result.endpointsUpdated}`);
+   * ```
+   */
   @Post('projects/:projectId/endpoints')
   @ApiOperation({
-    summary: 'Sincronizar solo endpoints',
-    description: 'Sincroniza únicamente los endpoints del proyecto'
+    summary: 'Synchronize endpoints only',
+    description: 'Synchronizes only the project endpoints'
   })
   async syncEndpoints(@Param('projectId') projectId: string) {
-    this.logger.log(`Sincronizando endpoints del proyecto: ${projectId}`);
+    this.logger.log(`Synchronizing project endpoints: ${projectId}`);
     
     try {
       const result = await this.syncService.syncEndpoints(projectId);
-      this.logger.log(`Endpoints sincronizados para proyecto: ${projectId}`);
+      this.logger.log(`Endpoints synchronized for project: ${projectId}`);
       return result;
     } catch (error) {
-      this.logger.error(`Error sincronizando endpoints del proyecto ${projectId}:`, error);
+      this.logger.error(`Error synchronizing project endpoints ${projectId}:`, error);
       throw error;
     }
   }
 
+  /**
+   * Synchronizes only the test cases of the project.
+   * 
+   * @param projectId - The project ID to synchronize test cases for
+   * @returns Promise<object> - Test cases synchronization result
+   * @throws NotFoundException - If project not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await syncController.syncTestCases('project-123');
+   * console.log(`Test cases synchronized: ${result.testCasesSynced}`);
+   * ```
+   */
   @Post('projects/:projectId/test-cases')
   @ApiOperation({
-    summary: 'Sincronizar solo test cases',
-    description: 'Sincroniza únicamente los test cases del proyecto'
+    summary: 'Synchronize test cases only',
+    description: 'Synchronizes only the project test cases'
   })
   async syncTestCases(@Param('projectId') projectId: string) {
-    this.logger.log(`Sincronizando test cases del proyecto: ${projectId}`);
+    this.logger.log(`Synchronizing project test cases: ${projectId}`);
     
     try {
       const result = await this.syncService.syncTestCases(projectId);
-      this.logger.log(`Test cases sincronizados para proyecto: ${projectId}`);
+      this.logger.log(`Test cases synchronized for project: ${projectId}`);
       return result;
     } catch (error) {
-      this.logger.error(`Error sincronizando test cases del proyecto ${projectId}:`, error);
+      this.logger.error(`Error synchronizing project test cases ${projectId}:`, error);
       throw error;
     }
   }

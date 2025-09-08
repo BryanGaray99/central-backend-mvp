@@ -20,7 +20,11 @@ export class TestCaseUpdateService {
   ) {}
 
   /**
-   * Actualiza los test cases con los resultados de ejecución
+   * Updates test cases with aggregated execution results.
+   *
+   * @param projectId - Project identifier
+   * @param entityName - Entity name
+   * @param results - Array of scenario execution results
    */
   async updateTestCasesWithExecutionResults(
     projectId: string,
@@ -28,56 +32,56 @@ export class TestCaseUpdateService {
     results: TestCaseExecutionResult[],
   ): Promise<void> {
     try {
-      this.logger.log(`Actualizando ${results.length} test cases con resultados de ejecución`);
+      this.logger.log(`Updating ${results.length} test cases with execution results`);
 
       for (const result of results) {
         await this.updateTestCaseWithResult(result);
       }
 
-      this.logger.log(`Test cases actualizados exitosamente`);
+      this.logger.log(`Test cases updated successfully`);
     } catch (error) {
-      this.logger.error(`Error actualizando test cases: ${error.message}`);
+      this.logger.error(`Error updating test cases: ${error.message}`);
       throw error;
     }
   }
 
   /**
-   * Actualiza un test case individual con el resultado de ejecución
+   * Updates a single test case with the given execution result.
    */
   private async updateTestCaseWithResult(result: TestCaseExecutionResult): Promise<void> {
     try {
-      // Buscar el test case por nombre en lugar de por ID
+      // Look up the test case by scenario name instead of ID
       const testCase = await this.testCaseRepository.findOne({
         where: { name: result.scenarioName },
       });
 
       if (!testCase) {
-        this.logger.warn(`Test case con nombre "${result.scenarioName}" no encontrado`);
+        this.logger.warn(`Test case with name "${result.scenarioName}" not found`);
         return;
       }
 
-      // Actualizar campos de última ejecución
+      // Update last execution fields
       testCase.lastRun = new Date();
       testCase.lastRunStatus = result.status;
 
-      // Actualizar el estado del test case basado en el resultado
+      // Update test case status based on result
       if (result.status === 'failed') {
-        testCase.status = TestCaseStatus.ACTIVE; // Mantener activo pero marcar como fallido en lastRunStatus
+        testCase.status = TestCaseStatus.ACTIVE; // Keep active but mark failure on lastRunStatus
       } else if (result.status === 'passed') {
         testCase.status = TestCaseStatus.ACTIVE;
       }
 
       await this.testCaseRepository.save(testCase);
 
-      // this.logger.debug(`Test case "${result.scenarioName}" actualizado con status: ${result.status}`);
+      // this.logger.debug(`Test case "${result.scenarioName}" updated with status: ${result.status}`);
     } catch (error) {
-      this.logger.error(`Error actualizando test case "${result.scenarioName}": ${error.message}`);
-      // No lanzar error para evitar que falle toda la actualización
+      this.logger.error(`Error updating test case "${result.scenarioName}": ${error.message}`);
+      // Do not throw to avoid failing the whole batch update
     }
   }
 
   /**
-   * Obtiene el resumen de ejecución para una entidad específica
+   * Gets the execution summary for a specific entity.
    */
   async getExecutionSummaryForEntity(
     projectId: string,
@@ -118,7 +122,7 @@ export class TestCaseUpdateService {
   }
 
   /**
-   * Limpia los resultados de ejecución de test cases (útil para resetear)
+   * Clears execution results from test cases (useful to reset state).
    */
   async clearExecutionResults(projectId: string, entityName?: string): Promise<void> {
     const whereClause: any = { projectId };
@@ -131,11 +135,11 @@ export class TestCaseUpdateService {
       lastRunStatus: undefined,
     });
 
-    this.logger.log(`Resultados de ejecución limpiados para ${entityName || 'todas las entidades'}`);
+    this.logger.log(`Execution results cleared for ${entityName || 'all entities'}`);
   }
 
   /**
-   * Obtiene el conteo de test cases para una entidad específica o todo el proyecto
+   * Returns the count of test cases for a specific entity or the whole project.
    */
   async getTestCasesCount(projectId: string, entityName?: string): Promise<number> {
     const whereClause: any = { projectId };

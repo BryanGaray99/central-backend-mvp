@@ -2,6 +2,15 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber } from 'class-validator';
 import { BugType, BugSeverity, BugPriority } from '../entities/bug.entity';
 
+/**
+ * Create Bug DTO
+ * 
+ * Defines the structure for creating new bugs including required
+ * fields like title, description, type, and severity, along with
+ * optional fields for test case context and error details.
+ * 
+ * @class CreateBugDto
+ */
 export class CreateBugDto {
   @ApiProperty({
     description: 'Title of the bug',

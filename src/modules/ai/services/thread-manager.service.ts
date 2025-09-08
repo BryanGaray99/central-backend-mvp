@@ -7,6 +7,15 @@ import { AIThread } from '../entities/ai-thread.entity';
 import { AIAssistant } from '../entities/ai-assistant.entity';
 import { OpenAIConfigService } from './openai-config.service';
 
+/**
+ * Thread Manager Service
+ * 
+ * Manages AI conversation threads for OpenAI Assistant API interactions.
+ * Handles thread creation, lifecycle management, message counting, and cleanup
+ * to optimize token usage and maintain conversation context.
+ * 
+ * @service ThreadManagerService
+ */
 @Injectable()
 export class ThreadManagerService {
   private readonly logger = new Logger(ThreadManagerService.name);
@@ -22,44 +31,59 @@ export class ThreadManagerService {
   ) {}
 
   /**
-   * Configura la API key de OpenAI dinámicamente
+   * Configures the OpenAI API key dynamically.
+   * 
+   * @private
+   * @throws Error - If API key is not configured
    */
   private async configureOpenAI() {
     const apiKey = await this.openAIConfigService.getOpenAIKey();
     if (!apiKey) {
-      throw new Error('OpenAI API key no configurada. Configure la API key en Settings > OpenAI Configuration.');
+      throw new Error('OpenAI API key not configured. Configure the API key in Settings > OpenAI Configuration.');
     }
     
-    // Crear la instancia de OpenAI si no existe
+    // Create OpenAI instance if it doesn't exist
     if (!this.openai) {
       this.openai = new OpenAI({ apiKey });
     } else {
-      // Actualizar la instancia existente con la nueva API key
+      // Update existing instance with new API key
       this.openai.apiKey = apiKey;
     }
   }
 
   /**
-   * Obtiene un thread activo para un proyecto
+   * Gets an active thread for a project.
+   * 
+   * @param projectId - The project ID
+   * @param assistantId - The assistant ID
+   * @returns Promise<AIThread | null> - The active thread or null if not found
+   * 
+   * @example
+   * ```typescript
+   * const thread = await threadManagerService.getThread('project-123', 'assistant-456');
+   * if (thread) {
+   *   console.log(`Found active thread: ${thread.threadId}`);
+   * }
+   * ```
    */
   async getThread(projectId: string, assistantId: string): Promise<AIThread | null> {
-    this.logger.log(`🔍 Buscando thread activo para proyecto ${projectId}`);
+    this.logger.log(`🔍 Searching for active thread for project ${projectId}`);
 
-    // Configurar OpenAI antes de hacer la llamada
+    // Configure OpenAI before making the call
     await this.configureOpenAI();
 
-    // Buscar threads activos
+    // Search for active threads
     const activeThreads = await this.aiThreadRepository.find({
       where: { projectId, assistantId, status: 'active' },
       order: { lastUsedAt: 'DESC' },
     });
 
     if (activeThreads.length === 0) {
-      this.logger.log(`❌ No se encontraron threads activos para proyecto ${projectId}`);
+      this.logger.log(`❌ No active threads found for project ${projectId}`);
       return null;
     }
 
-    // Reutilizar el thread más reciente que no esté lleno
+    // Reuse the most recent thread that is not full
     for (const thread of activeThreads) {
       try {
         if (!this.openai) {
@@ -67,52 +91,62 @@ export class ThreadManagerService {
         }
         await this.openai.beta.threads.retrieve(thread.threadId);
         if (thread.messageCount < thread.maxMessages) {
-          this.logger.log(`✅ Thread activo encontrado: ${thread.threadId}`);
+          this.logger.log(`✅ Active thread found: ${thread.threadId}`);
           return thread;
         } else {
-          this.logger.log(`⚠️ Thread lleno (${thread.messageCount}/${thread.maxMessages}), marcando como inactivo: ${thread.threadId}`);
+          this.logger.log(`⚠️ Thread full (${thread.messageCount}/${thread.maxMessages}), marking as inactive: ${thread.threadId}`);
           await this.deactivateThread(thread.id);
         }
       } catch (error) {
-        this.logger.warn(`⚠️ Thread no encontrado en OpenAI, eliminando: ${thread.threadId}`);
+        this.logger.warn(`⚠️ Thread not found in OpenAI, removing: ${thread.threadId}`);
         await this.aiThreadRepository.remove(thread);
       }
     }
 
-    this.logger.log(`❌ No se encontraron threads válidos para proyecto ${projectId}`);
+    this.logger.log(`❌ No valid threads found for project ${projectId}`);
     return null;
   }
 
   /**
-   * Crea un nuevo thread para un proyecto
+   * Creates a new thread for a project.
+   * 
+   * @param projectId - The project ID
+   * @param assistantId - The assistant ID
+   * @returns Promise<AIThread> - The created thread
+   * 
+   * @example
+   * ```typescript
+   * const thread = await threadManagerService.createThread('project-123', 'assistant-456');
+   * console.log(`Created thread: ${thread.threadId}`);
+   * ```
    */
   async createThread(projectId: string, assistantId: string): Promise<AIThread> {
-    this.logger.log(`🚀 Creando nuevo thread para proyecto ${projectId}`);
+    this.logger.log(`🚀 Creating new thread for project ${projectId}`);
 
-    // Configurar OpenAI antes de hacer la llamada
+    // Configure OpenAI before making the call
     await this.configureOpenAI();
 
-    // Limitar a máximo 1 thread activo por proyecto/assistant (optimización de tokens)
+    // Limit to maximum 1 active thread per project/assistant (token optimization)
     const allThreads = await this.aiThreadRepository.find({
       where: { projectId, assistantId },
       order: { lastUsedAt: 'DESC' },
     });
     
     if (allThreads.length >= 1) {
-      // Eliminar todos los threads anteriores para evitar acumulación
+      // Remove all previous threads to avoid accumulation
       for (const oldThread of allThreads) {
-        this.logger.log(`♻️ Limpiando thread anterior: ${oldThread.threadId}`);
+        this.logger.log(`♻️ Cleaning up previous thread: ${oldThread.threadId}`);
         try {
           if (!this.openai) {
             throw new Error('OpenAI client not configured');
           }
           await this.openai.beta.threads.del(oldThread.threadId);
-          this.logger.log(`🗑️ Thread eliminado de OpenAI: ${oldThread.threadId}`);
+          this.logger.log(`🗑️ Thread deleted from OpenAI: ${oldThread.threadId}`);
         } catch (err) {
-          this.logger.warn(`⚠️ Error eliminando thread de OpenAI: ${err.message}`);
+          this.logger.warn(`⚠️ Error deleting thread from OpenAI: ${err.message}`);
         }
         await this.aiThreadRepository.remove(oldThread);
-        this.logger.log(`🗑️ Thread eliminado de BD: ${oldThread.id}`);
+        this.logger.log(`🗑️ Thread deleted from database: ${oldThread.id}`);
       }
     }
 
@@ -120,19 +154,25 @@ export class ThreadManagerService {
   }
 
   /**
-   * Crea un nuevo thread para un proyecto (método privado)
+   * Creates a new thread for a project (private method).
+   * 
+   * @private
+   * @param projectId - The project ID
+   * @param assistantId - The assistant ID
+   * @returns Promise<AIThread> - The created thread
+   * @throws Error - If OpenAI client is not configured
    */
   private async createNewThread(projectId: string, assistantId: string): Promise<AIThread> {
-    this.logger.log(`📋 Creando thread para proyecto: ${projectId}`);
+    this.logger.log(`📋 Creating thread for project: ${projectId}`);
 
-    // Crear thread en OpenAI
+    // Create thread in OpenAI
     if (!this.openai) {
       throw new Error('OpenAI client not configured');
     }
     const openaiThread = await this.openai.beta.threads.create();
-    this.logger.log(`✅ Thread creado en OpenAI: ${openaiThread.id}`);
+    this.logger.log(`✅ Thread created in OpenAI: ${openaiThread.id}`);
 
-    // Guardar thread en BD
+    // Save thread to database
     const thread = new AIThread();
     thread.projectId = projectId;
     thread.threadId = openaiThread.id;
@@ -143,13 +183,21 @@ export class ThreadManagerService {
     thread.lastUsedAt = new Date();
 
     const savedThread = await this.aiThreadRepository.save(thread);
-    this.logger.log(`💾 Thread guardado en BD: ${savedThread.id}`);
+    this.logger.log(`💾 Thread saved to database: ${savedThread.id}`);
 
     return savedThread;
   }
 
   /**
-   * Incrementa el contador de mensajes de un thread
+   * Increments the message counter of a thread.
+   * 
+   * @param threadId - The thread ID
+   * @returns Promise<void>
+   * 
+   * @example
+   * ```typescript
+   * await threadManagerService.incrementMessageCount('thread-123');
+   * ```
    */
   async incrementMessageCount(threadId: string): Promise<void> {
     const thread = await this.aiThreadRepository.findOne({
@@ -161,40 +209,68 @@ export class ThreadManagerService {
       thread.lastUsedAt = new Date();
       await this.aiThreadRepository.save(thread);
       
-      this.logger.log(`📊 Thread ${threadId}: ${thread.messageCount}/${thread.maxMessages} mensajes`);
+      this.logger.log(`📊 Thread ${threadId}: ${thread.messageCount}/${thread.maxMessages} messages`);
       
-      // Si el thread está lleno, marcarlo como inactivo
+      // If thread is full, mark as inactive
       if (thread.messageCount >= thread.maxMessages) {
-        this.logger.log(`⚠️ Thread ${threadId} lleno, marcando como inactivo`);
+        this.logger.log(`⚠️ Thread ${threadId} full, marking as inactive`);
         await this.deactivateThread(thread.id);
       }
     }
   }
 
   /**
-   * Marca un thread como inactivo
+   * Marks a thread as inactive.
+   * 
+   * @param threadId - The thread ID (database ID)
+   * @returns Promise<void>
+   * 
+   * @example
+   * ```typescript
+   * await threadManagerService.deactivateThread(123);
+   * ```
    */
   async deactivateThread(threadId: number): Promise<void> {
     await this.aiThreadRepository.update(threadId, {
       status: 'inactive',
     });
-    this.logger.log(`🔒 Thread ${threadId} marcado como inactivo`);
+    this.logger.log(`🔒 Thread ${threadId} marked as inactive`);
   }
 
   /**
-   * Reactiva un thread inactivo
+   * Reactivates an inactive thread.
+   * 
+   * @param threadId - The thread ID (database ID)
+   * @returns Promise<void>
+   * 
+   * @example
+   * ```typescript
+   * await threadManagerService.reactivateThread(123);
+   * ```
    */
   async reactivateThread(threadId: number): Promise<void> {
     await this.aiThreadRepository.update(threadId, {
       status: 'active',
-      messageCount: 0, // Resetear contador
+      messageCount: 0, // Reset counter
       lastUsedAt: new Date(),
     });
-    this.logger.log(`🔄 Thread ${threadId} reactivado`);
+    this.logger.log(`🔄 Thread ${threadId} reactivated`);
   }
 
   /**
-   * Busca un thread inactivo para reutilizar
+   * Finds an inactive thread for reuse.
+   * 
+   * @param projectId - The project ID
+   * @param assistantId - The assistant ID
+   * @returns Promise<AIThread | null> - The inactive thread or null if not found
+   * 
+   * @example
+   * ```typescript
+   * const thread = await threadManagerService.findInactiveThread('project-123', 'assistant-456');
+   * if (thread) {
+   *   console.log(`Found inactive thread: ${thread.threadId}`);
+   * }
+   * ```
    */
   async findInactiveThread(projectId: string, assistantId: string): Promise<AIThread | null> {
     return await this.aiThreadRepository.findOne({
@@ -203,12 +279,21 @@ export class ThreadManagerService {
         assistantId, 
         status: 'inactive' 
       },
-      order: { lastUsedAt: 'DESC' }, // Tomar el más reciente
+      order: { lastUsedAt: 'DESC' }, // Take the most recent
     });
   }
 
   /**
-   * Obtiene estadísticas de threads de un proyecto
+   * Gets thread statistics for a project.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<object> - Statistics object with thread counts and totals
+   * 
+   * @example
+   * ```typescript
+   * const stats = await threadManagerService.getThreadStats('project-123');
+   * console.log(`Total threads: ${stats.total}, Active: ${stats.active}`);
+   * ```
    */
   async getThreadStats(projectId: string): Promise<{
     total: number;
@@ -222,7 +307,7 @@ export class ThreadManagerService {
 
     const total = threads.length;
     const active = threads.filter(t => t.status === 'active').length;
-    const inactive = threads.filter(t => t.status === 'inactivo').length;
+    const inactive = threads.filter(t => t.status === 'inactive').length;
     const totalMessages = threads.reduce((sum, t) => sum + t.messageCount, 0);
 
     return {
@@ -234,7 +319,16 @@ export class ThreadManagerService {
   }
 
   /**
-   * Limpia threads antiguos (mantiene solo los últimos 3)
+   * Cleans up old threads (keeps only the last 3).
+   * 
+   * @param projectId - The project ID
+   * @param assistantId - The assistant ID
+   * @returns Promise<void>
+   * 
+   * @example
+   * ```typescript
+   * await threadManagerService.cleanupOldThreads('project-123', 'assistant-456');
+   * ```
    */
   async cleanupOldThreads(projectId: string, assistantId: string): Promise<void> {
     const threads = await this.aiThreadRepository.find({
@@ -242,31 +336,39 @@ export class ThreadManagerService {
       order: { lastUsedAt: 'DESC' },
     });
 
-    // Mantener solo los últimos 3 threads
+    // Keep only the last 3 threads
     if (threads.length > 3) {
       const threadsToDelete = threads.slice(3);
       
       for (const thread of threadsToDelete) {
         try {
-          // Eliminar de OpenAI
+          // Delete from OpenAI
           if (!this.openai) {
             throw new Error('OpenAI client not configured');
           }
           await this.openai.beta.threads.del(thread.threadId);
-          this.logger.log(`🗑️ Thread eliminado de OpenAI: ${thread.threadId}`);
+          this.logger.log(`🗑️ Thread deleted from OpenAI: ${thread.threadId}`);
         } catch (error) {
-          this.logger.warn(`⚠️ Error eliminando thread de OpenAI: ${error.message}`);
+          this.logger.warn(`⚠️ Error deleting thread from OpenAI: ${error.message}`);
         }
 
-        // Eliminar de BD
+        // Delete from database
         await this.aiThreadRepository.remove(thread);
-        this.logger.log(`🗑️ Thread eliminado de BD: ${thread.id}`);
+        this.logger.log(`🗑️ Thread deleted from database: ${thread.id}`);
       }
     }
   }
 
   /**
-   * Elimina todos los threads de un proyecto
+   * Deletes all threads for a project.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<void>
+   * 
+   * @example
+   * ```typescript
+   * await threadManagerService.deleteAllProjectThreads('project-123');
+   * ```
    */
   async deleteAllProjectThreads(projectId: string): Promise<void> {
     const threads = await this.aiThreadRepository.find({
@@ -275,19 +377,19 @@ export class ThreadManagerService {
 
     for (const thread of threads) {
       try {
-        // Eliminar de OpenAI
+        // Delete from OpenAI
         if (!this.openai) {
           throw new Error('OpenAI client not configured');
         }
         await this.openai.beta.threads.del(thread.threadId);
-        this.logger.log(`🗑️ Thread eliminado de OpenAI: ${thread.threadId}`);
+        this.logger.log(`🗑️ Thread deleted from OpenAI: ${thread.threadId}`);
       } catch (error) {
-        this.logger.warn(`⚠️ Error eliminando thread de OpenAI: ${error.message}`);
+        this.logger.warn(`⚠️ Error deleting thread from OpenAI: ${error.message}`);
       }
 
-      // Eliminar de BD
+      // Delete from database
       await this.aiThreadRepository.remove(thread);
-      this.logger.log(`🗑️ Thread eliminado de BD: ${thread.id}`);
+      this.logger.log(`🗑️ Thread deleted from database: ${thread.id}`);
     }
   }
 } 

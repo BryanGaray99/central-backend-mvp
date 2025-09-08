@@ -6,6 +6,15 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { TestCasesService } from '../services/test-cases.service';
 
+/**
+ * Test Cases Controller
+ *
+ * This controller handles HTTP requests related to test case management across all projects.
+ * It provides endpoints for listing all registered test cases from all projects in the system.
+ *
+ * @class TestCasesController
+ * @since 1.0.0
+ */
 @ApiTags('test-cases')
 @Controller('test-cases')
 export class TestCasesController {
@@ -13,6 +22,21 @@ export class TestCasesController {
 
   constructor(private readonly testCasesService: TestCasesService) {}
 
+  /**
+   * Lists all registered test cases across all projects.
+   *
+   * This endpoint retrieves all test cases from all projects in the system,
+   * providing a comprehensive view of all registered test cases with their
+   * basic information and metadata.
+   *
+   * @returns Promise resolving to an array of test case response DTOs
+   *
+   * @example
+   * ```typescript
+   * const allTestCases = await controller.listAllTestCases();
+   * console.log(`Total test cases: ${allTestCases.length}`);
+   * ```
+   */
   @Get()
   @ApiOperation({
     summary: 'List all registered test cases across all projects',

@@ -16,6 +16,14 @@ import { TestExecutionService } from '../services/test-execution.service';
 import { ExecuteTestsDto } from '../dto/execute-tests.dto';
 import { ExecutionFiltersDto } from '../dto/execution-filters.dto';
 
+/**
+ * Test Execution Controller
+ *
+ * Provides project-scoped endpoints to execute tests, retrieve execution results,
+ * list past executions, and stream real-time execution events.
+ *
+ * @since 1.0.0
+ */
 @ApiTags('test-execution')
 @Controller('projects/:projectId/test-execution')
 export class TestExecutionController {
@@ -23,15 +31,23 @@ export class TestExecutionController {
 
   constructor(private readonly testExecutionService: TestExecutionService) {}
 
+  /**
+   * Executes tests for a project with optional filters.
+   *
+   * Starts an asynchronous execution and returns a brief receipt with execution info.
+   *
+   * @param projectId - Project identifier
+   * @param dto - Execution configuration and filters
+   */
   @Post('execute')
   @ApiOperation({
-    summary: 'Ejecutar casos de prueba',
-    description: 'Ejecuta casos de prueba para una entidad específica con filtros opcionales',
+    summary: 'Execute test cases',
+    description: 'Executes test cases for a specific entity with optional filters',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
   @ApiResponse({
     status: 202,
-    description: 'Ejecución iniciada exitosamente',
+    description: 'Execution started successfully',
     schema: {
       type: 'object',
       properties: {
@@ -52,31 +68,35 @@ export class TestExecutionController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Datos de entrada inválidos o entidad sin casos de prueba',
+    description: 'Invalid input data or entity without test cases',
   })
-  @ApiResponse({ status: 404, description: 'Proyecto no encontrado' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
   async executeTests(
     @Param('projectId') projectId: string,
     @Body() dto: ExecuteTestsDto,
   ) {
-    const entityName = dto.entityName || 'todos los test cases';
-    this.logger.log(
-      `[CONTROLLER] Ejecutando pruebas para entidad: ${entityName} en proyecto: ${projectId}`,
-    );
+    const entityName = dto.entityName || 'all test cases';
+    this.logger.log(`[CONTROLLER] Executing tests for entity: ${entityName} in project: ${projectId}`);
 
     return await this.testExecutionService.executeTests(projectId, dto);
   }
 
+  /**
+   * Retrieves detailed results for a specific execution.
+   *
+   * @param projectId - Project identifier
+   * @param executionId - Execution identifier
+   */
   @Get('results/:executionId')
   @ApiOperation({
-    summary: 'Obtener resultados de una ejecución específica',
-    description: 'Obtiene los resultados detallados de una ejecución de pruebas',
+    summary: 'Get results for a specific execution',
+    description: 'Obtains detailed results for a test execution',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
-  @ApiParam({ name: 'executionId', description: 'ID de la ejecución', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'executionId', description: 'Execution ID', type: 'string' })
   @ApiResponse({
     status: 200,
-    description: 'Resultados obtenidos exitosamente',
+    description: 'Results retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -168,35 +188,39 @@ export class TestExecutionController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Ejecución no encontrada' })
+  @ApiResponse({ status: 404, description: 'Execution not found' })
   async getResults(
     @Param('projectId') projectId: string,
     @Param('executionId') executionId: string,
   ) {
-    this.logger.log(
-      `[CONTROLLER] Obteniendo resultados de ejecución: ${executionId}`,
-    );
+    this.logger.log(`[CONTROLLER] Getting execution results: ${executionId}`);
 
     return await this.testExecutionService.getResults(executionId);
   }
 
+  /**
+   * Lists execution results for a project with optional filters.
+   *
+   * @param projectId - Project identifier
+   * @param filters - Optional query filters
+   */
   @Get('results')
   @ApiOperation({
-    summary: 'Listar resultados de ejecuciones',
-    description: 'Obtiene una lista de ejecuciones con filtros opcionales',
+    summary: 'List execution results',
+    description: 'Retrieves a list of executions with optional filters',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
-  @ApiQuery({ name: 'entityName', required: false, description: 'Filtrar por entidad' })
-  @ApiQuery({ name: 'method', required: false, description: 'Filtrar por método HTTP' })
-  @ApiQuery({ name: 'testType', required: false, description: 'Filtrar por tipo de prueba' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filtrar por estado' })
-  @ApiQuery({ name: 'dateFrom', required: false, description: 'Fecha desde' })
-  @ApiQuery({ name: 'dateTo', required: false, description: 'Fecha hasta' })
-  @ApiQuery({ name: 'page', required: false, description: 'Número de página', type: 'number' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Límite por página', type: 'number' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiQuery({ name: 'entityName', required: false, description: 'Filter by entity' })
+  @ApiQuery({ name: 'method', required: false, description: 'Filter by HTTP method' })
+  @ApiQuery({ name: 'testType', required: false, description: 'Filter by test type' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
+  @ApiQuery({ name: 'dateFrom', required: false, description: 'Start date (ISO string)' })
+  @ApiQuery({ name: 'dateTo', required: false, description: 'End date (ISO string)' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number', type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page', type: 'number' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de ejecuciones obtenida exitosamente',
+    description: 'Execution list retrieved successfully',
   })
   async listResults(
     @Param('projectId') projectId: string,
@@ -207,49 +231,57 @@ export class TestExecutionController {
     return results;
   }
 
+  /**
+   * Deletes all results for a specific execution.
+   *
+   * @param projectId - Project identifier
+   * @param executionId - Execution identifier
+   */
   @Delete('results/:executionId')
   @ApiOperation({
-    summary: 'Eliminar resultados de una ejecución',
-    description: 'Elimina los resultados de una ejecución específica',
+    summary: 'Delete execution results',
+    description: 'Deletes the results of a specific execution',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
-  @ApiParam({ name: 'executionId', description: 'ID de la ejecución', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'executionId', description: 'Execution ID', type: 'string' })
   @ApiResponse({
     status: 200,
-    description: 'Resultados eliminados exitosamente',
+    description: 'Results deleted successfully',
   })
-  @ApiResponse({ status: 404, description: 'Ejecución no encontrada' })
+  @ApiResponse({ status: 404, description: 'Execution not found' })
   async deleteResults(
     @Param('projectId') projectId: string,
     @Param('executionId') executionId: string,
   ) {
-    this.logger.log(
-      `[CONTROLLER] Eliminando resultados de ejecución: ${executionId}`,
-    );
+    this.logger.log(`[CONTROLLER] Deleting execution results: ${executionId}`);
 
     await this.testExecutionService.deleteResults(executionId);
 
-    return { message: 'Resultados de ejecución eliminados exitosamente' };
+    return { message: 'Execution results deleted successfully' };
   }
 
+  /**
+   * Retrieves the execution history for a specific entity within a project.
+   *
+   * @param projectId - Project identifier
+   * @param entityName - Entity name
+   */
   @Get('history/:entityName')
   @ApiOperation({
-    summary: 'Obtener historial de ejecuciones por entidad',
-    description: 'Obtiene el historial de ejecuciones para una entidad específica',
+    summary: 'Get execution history by entity',
+    description: 'Gets the execution history for a specific entity',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
-  @ApiParam({ name: 'entityName', description: 'Nombre de la entidad', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'entityName', description: 'Entity name', type: 'string' })
   @ApiResponse({
     status: 200,
-    description: 'Historial obtenido exitosamente',
+    description: 'History retrieved successfully',
   })
   async getExecutionHistory(
     @Param('projectId') projectId: string,
     @Param('entityName') entityName: string,
   ) {
-    this.logger.log(
-      `[CONTROLLER] Obteniendo historial para entidad: ${entityName}`,
-    );
+    this.logger.log(`[CONTROLLER] Getting history for entity: ${entityName}`);
 
     return await this.testExecutionService.getExecutionHistory(
       projectId,
@@ -257,15 +289,20 @@ export class TestExecutionController {
     );
   }
 
+  /**
+   * Retrieves a summary of all executions for the project.
+   *
+   * @param projectId - Project identifier
+   */
   @Get('summary')
   @ApiOperation({
-    summary: 'Obtener resumen de ejecuciones del proyecto',
-    description: 'Obtiene un resumen estadístico de todas las ejecuciones del proyecto',
+    summary: 'Get project execution summary',
+    description: 'Retrieves a statistical summary of all project executions',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
   @ApiResponse({
     status: 200,
-    description: 'Resumen obtenido exitosamente',
+    description: 'Summary retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -287,37 +324,44 @@ export class TestExecutionController {
     },
   })
   async getExecutionSummary(@Param('projectId') projectId: string) {
-    this.logger.log(
-      `[CONTROLLER] Obteniendo resumen de ejecuciones para proyecto: ${projectId}`,
-    );
+    this.logger.log(`[CONTROLLER] Getting execution summary for project: ${projectId}`);
 
     return await this.testExecutionService.getExecutionSummary(projectId);
   }
 
+  /**
+   * Server-Sent Events endpoint to stream real-time execution events.
+   *
+   * @param projectId - Project identifier
+   */
   @Sse('execution-events')
   @ApiOperation({
-    summary: 'Server-Sent Events para ejecuciones',
-    description: 'Endpoint SSE para recibir eventos de ejecución en tiempo real',
+    summary: 'Server-Sent Events for executions',
+    description: 'SSE endpoint for real-time execution events',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
   async executionEvents(@Param('projectId') projectId: string) {
-    this.logger.log(
-      `[CONTROLLER] Cliente SSE conectado para proyecto: ${projectId}`,
-    );
+    this.logger.log(`[CONTROLLER] SSE client connected for project: ${projectId}`);
 
     return this.testExecutionService.getExecutionEvents(projectId);
   }
 
+  /**
+   * Retrieves the last execution for a given test suite.
+   *
+   * @param projectId - Project identifier
+   * @param testSuiteId - Test suite identifier
+   */
   @Get('last-execution/test-suite/:testSuiteId')
   @ApiOperation({
-    summary: 'Obtener la última ejecución de un test suite',
-    description: 'Obtiene la ejecución más reciente asociada a un test suite específico',
+    summary: 'Get the last execution for a test suite',
+    description: 'Retrieves the most recent execution associated with a specific test suite',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
-  @ApiParam({ name: 'testSuiteId', description: 'ID del test suite', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'testSuiteId', description: 'Test suite ID', type: 'string' })
   @ApiResponse({
     status: 200,
-    description: 'Última ejecución obtenida exitosamente',
+    description: 'Last execution retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -333,28 +377,32 @@ export class TestExecutionController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'No se encontró ejecución para el test suite' })
+  @ApiResponse({ status: 404, description: 'No execution found for test suite' })
   async getLastExecutionByTestSuite(
     @Param('projectId') projectId: string,
     @Param('testSuiteId') testSuiteId: string,
   ) {
-    this.logger.log(
-      `[CONTROLLER] Obteniendo última ejecución para test suite: ${testSuiteId} en proyecto: ${projectId}`,
-    );
+    this.logger.log(`[CONTROLLER] Getting last execution for test suite: ${testSuiteId} in project: ${projectId}`);
 
     return await this.testExecutionService.getLastExecutionByTestSuite(projectId, testSuiteId);
   }
 
+  /**
+   * Retrieves the last execution for a given test case.
+   *
+   * @param projectId - Project identifier
+   * @param testCaseId - Test case identifier
+   */
   @Get('last-execution/test-case/:testCaseId')
   @ApiOperation({
-    summary: 'Obtener la última ejecución de un test case',
-    description: 'Obtiene la ejecución más reciente asociada a un test case específico',
+    summary: 'Get the last execution for a test case',
+    description: 'Retrieves the most recent execution associated with a specific test case',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
-  @ApiParam({ name: 'testCaseId', description: 'ID del test case', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID', type: 'string' })
   @ApiResponse({
     status: 200,
-    description: 'Última ejecución obtenida exitosamente',
+    description: 'Last execution retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -370,28 +418,32 @@ export class TestExecutionController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'No se encontró ejecución para el test case' })
+  @ApiResponse({ status: 404, description: 'No execution found for test case' })
   async getLastExecutionByTestCase(
     @Param('projectId') projectId: string,
     @Param('testCaseId') testCaseId: string,
   ) {
-    this.logger.log(
-      `[CONTROLLER] Obteniendo última ejecución para test case: ${testCaseId} en proyecto: ${projectId}`,
-    );
+    this.logger.log(`[CONTROLLER] Getting last execution for test case: ${testCaseId} in project: ${projectId}`);
 
     return await this.testExecutionService.getLastExecutionByTestCase(projectId, testCaseId);
   }
 
+  /**
+   * Retrieves the failed executions for a given test case ID.
+   *
+   * @param projectId - Project identifier
+   * @param testCaseId - Test case identifier
+   */
   @Get('failed-executions/:testCaseId')
   @ApiOperation({
-    summary: 'Obtener ejecuciones fallidas por test case ID',
-    description: 'Obtiene las ejecuciones fallidas asociadas a un test case específico',
+    summary: 'Get failed executions by test case ID',
+    description: 'Obtains failed executions associated with a specific test case',
   })
-  @ApiParam({ name: 'projectId', description: 'ID del proyecto', type: 'string' })
-  @ApiParam({ name: 'testCaseId', description: 'ID del test case', type: 'string' })
+  @ApiParam({ name: 'projectId', description: 'Project ID', type: 'string' })
+  @ApiParam({ name: 'testCaseId', description: 'Test case ID', type: 'string' })
   @ApiResponse({
     status: 200,
-    description: 'Ejecuciones fallidas obtenidas exitosamente',
+    description: 'Failed executions retrieved successfully',
     schema: {
       type: 'array',
       items: {
@@ -414,9 +466,7 @@ export class TestExecutionController {
     @Param('projectId') projectId: string,
     @Param('testCaseId') testCaseId: string,
   ) {
-    this.logger.log(
-      `[CONTROLLER] Obteniendo ejecuciones fallidas para test case: ${testCaseId} en proyecto: ${projectId}`,
-    );
+    this.logger.log(`[CONTROLLER] Getting failed executions for test case: ${testCaseId} in project: ${projectId}`);
 
     return await this.testExecutionService.getFailedExecutionsByTestCaseId(projectId, testCaseId);
   }

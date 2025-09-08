@@ -2,25 +2,49 @@ import { Injectable, Logger, ConflictException } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+/** Maximum number of retry attempts for file operations */
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // 1 second
 
+/** Delay between retry attempts in milliseconds */
+const RETRY_DELAY = 1000;
+
+/**
+ * Service for managing Playwright testing workspaces.
+ * 
+ * This service handles the creation, deletion, and management of workspace directories
+ * for Playwright testing projects. It provides functionality to create isolated
+ * testing environments with proper configuration files.
+ * 
+ * @class WorkspaceService
+ * @since 1.0.0
+ */
 @Injectable()
 export class WorkspaceService {
+  /** Logger instance for this service */
   private readonly logger = new Logger(WorkspaceService.name);
+  
+  /** Path to the workspaces directory */
   private readonly workspacesDir: string;
 
+  /**
+   * Creates an instance of WorkspaceService.
+   * 
+   * Initializes the workspaces directory path and creates necessary configuration files.
+   * The workspaces directory cannot be located within the central backend directory.
+   * 
+   * @throws {Error} When the workspaces path is within the central backend directory
+   */
   constructor() {
     const envPath = process.env.PLAYWRIGHT_WORKSPACES_PATH || '../playwright-workspaces';
     let dir = envPath;
     if (!path.isAbsolute(dir)) {
       dir = path.resolve(process.cwd(), dir);
     }
-    // Detecta si la ruta está dentro del backend central
+    // Check if the path is within the central backend
     const backendRoot = path.resolve(__dirname, '../../..');
     if (dir.startsWith(backendRoot)) {
       throw new Error(
-        'PLAYWRIGHT_WORKSPACES_PATH no puede estar dentro del backend central.',
+        'PLAYWRIGHT_WORKSPACES_PATH cannot be within the central backend directory.',
       );
     }
     this.workspacesDir = dir;
@@ -29,6 +53,14 @@ export class WorkspaceService {
     this.initSync();
   }
 
+  /**
+   * Synchronously initializes the workspace service.
+   * 
+   * Creates the workspaces directory if it doesn't exist and ensures
+   * the root .env file is created.
+   * 
+   * @private
+   */
   private initSync() {
     try {
       // Create directory synchronously if it doesn't exist
@@ -46,6 +78,14 @@ export class WorkspaceService {
     }
   }
 
+  /**
+   * Asynchronously initializes the workspace service.
+   * 
+   * Creates the workspaces directory if it doesn't exist and ensures
+   * the root .env file is created.
+   * 
+   * @private
+   */
   private async init() {
     try {
       await fs.access(this.workspacesDir);
@@ -61,6 +101,19 @@ export class WorkspaceService {
     await this.createRootEnvFile();
   }
 
+  /**
+   * Creates a new workspace with the specified name.
+   * 
+   * @param name - The name of the workspace to create
+   * @returns Promise that resolves to the full path of the created workspace
+   * @throws {ConflictException} When a workspace with the same name already exists
+   * 
+   * @example
+   * ```typescript
+   * const workspacePath = await workspaceService.createWorkspace('my-project');
+   * console.log(`Workspace created at: ${workspacePath}`);
+   * ```
+   */
   async createWorkspace(name: string): Promise<string> {
     const workspacePath = path.join(this.workspacesDir, name);
 
@@ -82,7 +135,12 @@ export class WorkspaceService {
   }
 
   /**
-   * Creates a .env file in the root of playwright-workspaces with OpenAI API key variable (synchronous)
+   * Creates a .env file in the root of playwright-workspaces with OpenAI API key variable (synchronous).
+   * 
+   * This method creates a template .env file with OpenAI configuration if it doesn't exist
+   * or if the existing file is empty. The file includes placeholders for common environment variables.
+   * 
+   * @private
    */
   private createRootEnvFileSync(): void {
     try {
@@ -124,7 +182,13 @@ OPENAI_API_KEY=your-api-key-here
   }
 
   /**
-   * Creates a .env file in the root of playwright-workspaces with OpenAI API key variable
+   * Creates a .env file in the root of playwright-workspaces with OpenAI API key variable.
+   * 
+   * This method creates a template .env file with OpenAI configuration if it doesn't exist
+   * or if the existing file is empty. The file includes placeholders for common environment variables.
+   * 
+   * @private
+   * @returns Promise that resolves when the .env file is created or already exists
    */
   private async createRootEnvFile(): Promise<void> {
     try {
@@ -165,6 +229,17 @@ OPENAI_API_KEY=your-api-key-here
     }
   }
 
+  /**
+   * Lists all available workspaces.
+   * 
+   * @returns Promise that resolves to an array of workspace names
+   * 
+   * @example
+   * ```typescript
+   * const workspaces = await workspaceService.listWorkspaces();
+   * console.log('Available workspaces:', workspaces);
+   * ```
+   */
   async listWorkspaces(): Promise<string[]> {
     const entries = await fs.readdir(this.workspacesDir, {
       withFileTypes: true,
@@ -174,6 +249,26 @@ OPENAI_API_KEY=your-api-key-here
       .map((entry) => entry.name);
   }
 
+  /**
+   * Deletes a workspace with the specified name.
+   * 
+   * This method attempts to delete the workspace directory with retry logic.
+   * It checks for blocked files and provides detailed error information if deletion fails.
+   * 
+   * @param name - The name of the workspace to delete
+   * @returns Promise that resolves when the workspace is successfully deleted
+   * @throws {ConflictException} When the workspace cannot be deleted due to files in use
+   * 
+   * @example
+   * ```typescript
+   * try {
+   *   await workspaceService.deleteWorkspace('old-project');
+   *   console.log('Workspace deleted successfully');
+   * } catch (error) {
+   *   console.error('Failed to delete workspace:', error.message);
+   * }
+   * ```
+   */
   async deleteWorkspace(name: string): Promise<void> {
     const workspacePath = path.join(this.workspacesDir, name);
 
@@ -242,6 +337,17 @@ OPENAI_API_KEY=your-api-key-here
     }
   }
 
+  /**
+   * Recursively finds files that are currently blocked or in use.
+   * 
+   * This method checks each file in the directory tree to determine if it can be accessed
+   * for writing. Files that are blocked (EBUSY) or have permission issues (EPERM) are
+   * considered blocked.
+   * 
+   * @param dirPath - The directory path to search for blocked files
+   * @returns Promise that resolves to an array of blocked file paths
+   * @private
+   */
   private async findBlockedFiles(dirPath: string): Promise<string[]> {
     const blockedFiles: string[] = [];
 
@@ -273,10 +379,33 @@ OPENAI_API_KEY=your-api-key-here
     return blockedFiles;
   }
 
+  /**
+   * Creates a delay for the specified number of milliseconds.
+   * 
+   * @param ms - The number of milliseconds to delay
+   * @returns Promise that resolves after the specified delay
+   * @private
+   */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  /**
+   * Checks if a workspace with the specified name exists.
+   * 
+   * @param name - The name of the workspace to check
+   * @returns Promise that resolves to true if the workspace exists, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * const exists = await workspaceService.workspaceExists('my-project');
+   * if (exists) {
+   *   console.log('Workspace exists');
+   * } else {
+   *   console.log('Workspace does not exist');
+   * }
+   * ```
+   */
   async workspaceExists(name: string): Promise<boolean> {
     try {
       await fs.access(path.join(this.workspacesDir, name));
@@ -286,6 +415,18 @@ OPENAI_API_KEY=your-api-key-here
     }
   }
 
+  /**
+   * Gets the full path for a workspace with the specified name.
+   * 
+   * @param name - The name of the workspace
+   * @returns The full path to the workspace directory
+   * 
+   * @example
+   * ```typescript
+   * const workspacePath = workspaceService.getWorkspacePath('my-project');
+   * console.log(`Workspace path: ${workspacePath}`);
+   * ```
+   */
   getWorkspacePath(name: string): string {
     return path.join(this.workspacesDir, name);
   }

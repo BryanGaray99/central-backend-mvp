@@ -1,6 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BugType, BugSeverity, BugPriority, BugStatus } from '../entities/bug.entity';
 
+/**
+ * Bug Response DTO
+ * 
+ * Defines the structure of bug data returned by API endpoints.
+ * Contains comprehensive bug information including identification,
+ * classification, error details, execution context, and timestamps.
+ * 
+ * @class BugResponseDto
+ */
 export class BugResponseDto {
   @ApiProperty({
     description: 'Bug ID',

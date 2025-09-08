@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TestSuiteType, TestSuiteStatus } from '../entities/test-suite.entity';
 
+/**
+ * DTO: API response shape for test suite records.
+ */
 export class TestSuiteResponseDto {
   @ApiProperty({
     description: 'Unique identifier for the test suite',

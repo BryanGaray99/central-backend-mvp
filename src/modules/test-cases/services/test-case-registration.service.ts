@@ -7,6 +7,16 @@ import { RegisterEndpointDto } from '../../endpoints/dto/register-endpoint.dto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+/**
+ * Test Case Registration Service
+ *
+ * This service handles the registration of test cases from feature files.
+ * It processes Gherkin feature files, extracts test case scenarios, and
+ * registers them in the database with proper test case IDs and metadata.
+ *
+ * @class TestCaseRegistrationService
+ * @since 1.0.0
+ */
 @Injectable()
 export class TestCaseRegistrationService {
   private readonly logger = new Logger(TestCaseRegistrationService.name);
@@ -18,8 +28,25 @@ export class TestCaseRegistrationService {
     private readonly projectRepository: Repository<Project>,
   ) {}
 
+  /**
+   * Gets the next available test case number for a given project, section, and entity.
+   *
+   * This method searches for existing test cases with the pattern TC-{SECTION}-{ENTITYNAME}-{NUMBER}
+   * and returns the next sequential number to use for a new test case.
+   *
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The entity name
+   * @returns Promise resolving to the next available test case number
+   *
+   * @example
+   * ```typescript
+   * const nextNumber = await service.getNextTestCaseNumber('project-123', 'ecommerce', 'Product');
+   * // Returns 6 if TC-ECOMMERCE-PRODUCT-5 is the highest existing number
+   * ```
+   */
   async getNextTestCaseNumber(projectId: string, section: string, entityName: string): Promise<number> {
-    // Buscar el patrón correcto: TC-{SECTION}-{ENTITYNAME}-{NUMBER}
+    // Search for the correct pattern: TC-{SECTION}-{ENTITYNAME}-{NUMBER}
     const pattern = `TC-${section.toUpperCase()}-${entityName.toUpperCase()}-`;
     const testCases = await this.testCaseRepository
       .createQueryBuilder('testCase')
@@ -37,6 +64,24 @@ export class TestCaseRegistrationService {
     return maxNumber + 1;
   }
 
+  /**
+   * Processes a feature file and registers all test cases found in it.
+   *
+   * This method reads a Gherkin feature file, extracts test case scenarios,
+   * and registers each one in the database with proper test case IDs and metadata.
+   *
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The entity name
+   * @param dto - The endpoint registration data for context
+   * @returns Promise that resolves when all test cases are registered
+   * @throws Error when file processing or database operations fail
+   *
+   * @example
+   * ```typescript
+   * await service.processFeatureFileAndRegisterTestCases('project-123', 'ecommerce', 'Product', endpointDto);
+   * ```
+   */
   async processFeatureFileAndRegisterTestCases(
     projectId: string,
     section: string,
@@ -61,28 +106,28 @@ export class TestCaseRegistrationService {
 
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].includes(tagPattern)) {
-          // Extraer todos los tags del escenario
+
           const tags = this.extractTagsForScenario(lines, i);
           
           let scenarioName = '';
           let steps = '';
           let found = false;
           
-          // Buscar el nombre del escenario
+
           for (let j = i + 1; j < lines.length; j++) {
             const nextLine = lines[j].trim();
             if (nextLine.startsWith('Scenario:') || nextLine.startsWith('Scenario Outline:')) {
               scenarioName = nextLine.replace('Scenario:', '').replace('Scenario Outline:', '').trim();
               found = true;
               
-              // Extraer los steps desde la siguiente línea hasta el próximo escenario o final del archivo
+              // Extract steps from the next line until the next scenario or end of file
               steps = this.extractStepsFromScenario(lines, j + 1);
               break;
             }
             if (nextLine.startsWith('@') || nextLine === '') continue;
           }
           
-          // Si no se encontró, intentar buscar hacia atrás (por si es el último del archivo)
+          // If not found, try searching backwards (in case it's the last one in the file)
           if (!found && i < lines.length - 1) {
             for (let j = i + 1; j < lines.length; j++) {
               if (lines[j].trim() !== '' && !lines[j].trim().startsWith('@')) {
@@ -95,22 +140,22 @@ export class TestCaseRegistrationService {
           }
           
           if (!found) {
-            this.logger.warn(`[REGISTRO] No se encontró el nombre del escenario después del tag en línea ${i + 1}`);
+            this.logger.warn(`[REGISTRATION] Scenario name not found after tag on line ${i + 1}`);
           }
           
           if (scenarioName) {
-            // 1. PRIMERO: Reemplazar "Number" con el número real en el feature file
+            // 1. FIRST: Replace "Number" with the real number in the feature file
             lines[i] = lines[i].replace(tagPattern, `@TC-${section}-${entityName}-${currentNumber}`);
             
-            // 2. SEGUNDO: Extraer el testCaseId real del archivo para guardar en BD
+            // 2. SECOND: Extract the real testCaseId from the file to save in database
             const testCaseId = `TC-${section}-${entityName}-${currentNumber}`;
             
-            this.logger.log(`Encontrado test case: ${testCaseId} - "${scenarioName}"`);
+            this.logger.log(`Found test case: ${testCaseId} - "${scenarioName}"`);
             
             replacements.push({ 
               lineIdx: i, 
               scenarioName, 
-              testCaseId, // Usar el testCaseId extraído del archivo
+              testCaseId, // Use the testCaseId extracted from the file
               tags, 
               steps 
             });
@@ -124,57 +169,68 @@ export class TestCaseRegistrationService {
 
       for (const rep of replacements) {
         const method = this.determineMethodFromScenario(rep.scenarioName, dto.methods);
-        this.logger.log(`Creando test case: ${rep.testCaseId} - ${rep.scenarioName} - Método: ${method}`);
+        this.logger.log(`Creating test case: ${rep.testCaseId} - ${rep.scenarioName} - Method: ${method}`);
         await this.createTestCaseFromScenario(
           projectId,
           section,
           entityName,
           rep.scenarioName,
           method,
-          rep.testCaseId, // Usar el testCaseId extraído
+          rep.testCaseId, // Use the extracted testCaseId
           rep.tags,
           rep.steps
         );
       }
 //     this.logger.log(`Total de test cases registrados: ${replacements.length}`);
     } catch (error) {
-      this.logger.error(`Error procesando feature file:`, error);
+      this.logger.error(`Error processing feature file:`, error);
       throw error;
     }
   }
 
+  /**
+   * Extracts tags for a test case scenario from feature file lines.
+   *
+   * This private method searches for Gherkin tags around a test case tag line,
+   * both upwards and downwards, and returns all relevant tags excluding
+   * the test case numbering tag.
+   *
+   * @private
+   * @param lines - Array of feature file lines
+   * @param tagLineIndex - The index of the line containing the test case tag
+   * @returns Array of tag strings found for the scenario
+   */
   private extractTagsForScenario(lines: string[], tagLineIndex: number): string[] {
     const tags: string[] = [];
 
     const extractTokens = (line: string): string[] => {
-      // Soporta espacios y comas como separadores; ignora el tag de numeración @TC-
+      // Supports spaces and commas as separators; ignores the numbering tag @TC-
       return line
         .split(/[,\s]+/)
         .map(t => t.trim())
         .filter(t => t && t.startsWith('@') && !/^@TC-/i.test(t));
     };
     
-    // Buscar tags hacia arriba desde la línea del tag TC
+    // Search for tags upwards from the TC tag line
     for (let i = tagLineIndex; i >= 0; i--) {
       const line = lines[i].trim();
-      if (line === '') break; // Línea vacía marca el fin de los tags
+      if (line === '') break; // Empty line marks the end of tags
       if (line.startsWith('@')) {
         const tokens = extractTokens(line);
-        // Mantener el orden original usando unshift en orden inverso
         for (let k = tokens.length - 1; k >= 0; k--) {
           tags.unshift(tokens[k]);
         }
       } else if (!line.startsWith('Feature:') && !line.startsWith('Background:')) {
-        break; // Si no es tag ni feature ni background, terminar
+        break; 
       }
     }
     
-    // Buscar tags hacia abajo desde la línea del tag TC (nueva estructura del template)
+    // Search for tags downwards from the TC tag line (new template structure)
     for (let i = tagLineIndex + 1; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (line === '') break; // Línea vacía marca el fin de los tags
+      if (line === '') break; // Empty line marks the end of tags
       if (line.startsWith('Scenario:') || line.startsWith('Scenario Outline:')) {
-        break; // Si encontramos el escenario, terminar
+        break; // If we find the scenario, terminate
       }
       if (line.startsWith('@')) {
         const tokens = extractTokens(line);
@@ -185,23 +241,35 @@ export class TestCaseRegistrationService {
     return tags;
   }
 
+  /**
+   * Extracts step definitions from a test case scenario.
+   *
+   * This private method processes feature file lines starting from a given index
+   * and extracts all step definitions until it encounters another scenario,
+   * outline, or end of content.
+   *
+   * @private
+   * @param lines - Array of feature file lines
+   * @param startLineIndex - The index to start extracting steps from
+   * @returns String containing all step definitions joined by newlines
+   */
   private extractStepsFromScenario(lines: string[], startLineIndex: number): string {
     const steps: string[] = [];
     
     for (let i = startLineIndex; i < lines.length; i++) {
       const line = lines[i].trim();
       
-      // Si encontramos otro escenario, outline, o línea vacía seguida de tag, terminar
+      // If we find another scenario, outline, or empty line followed by tag, terminate
       if (line.startsWith('Scenario:') || line.startsWith('Scenario Outline:')) {
         break;
       }
       
-      // Si encontramos una línea vacía seguida de un tag, también terminar
+      // If we find an empty line followed by a tag, also terminate
       if (line === '' && i + 1 < lines.length && lines[i + 1].trim().startsWith('@')) {
         break;
       }
       
-      // Si la línea no está vacía y no es un tag, es un step
+      // If the line is not empty and not a tag, it's a step
       if (line !== '' && !line.startsWith('@')) {
         steps.push(line);
       }
@@ -210,6 +278,17 @@ export class TestCaseRegistrationService {
     return steps.join('\n');
   }
 
+  /**
+   * Determines the HTTP method from a scenario name.
+   *
+   * This private method analyzes a scenario name to determine the appropriate
+   * HTTP method based on keywords in the scenario name.
+   *
+   * @private
+   * @param scenarioName - The name of the test scenario
+   * @param methods - Array of available HTTP methods as fallback
+   * @returns The determined HTTP method string
+   */
   private determineMethodFromScenario(scenarioName: string, methods: any[]): string {
     const scenarioLower = scenarioName.toLowerCase();
     if (scenarioLower.includes('create') || scenarioLower.includes('post')) return 'POST';
@@ -220,23 +299,40 @@ export class TestCaseRegistrationService {
     return methods[0]?.method || 'GET';
   }
 
+  /**
+   * Creates a test case entity from scenario data and saves it to the database.
+   *
+   * This private method creates a new TestCase entity with the provided scenario
+   * information and saves it to the database with proper metadata and status.
+   *
+   * @private
+   * @param projectId - The ID of the project
+   * @param section - The section/category name
+   * @param entityName - The name of the entity
+   * @param scenarioName - The name of the test scenario
+   * @param method - The HTTP method for the test case
+   * @param testCaseId - The unique identifier for the test case
+   * @param tags - Array of tags associated with the test case
+   * @param steps - The step definitions for the test case
+   * @returns Promise that resolves when the test case is saved to the database
+   */
   private async createTestCaseFromScenario(
     projectId: string,
     section: string,
     entityName: string,
     scenarioName: string,
     method: string,
-    testCaseId: string, // Cambiar de number a string
+    testCaseId: string, 
     tags: string[],
     steps: string,
   ): Promise<void> {
     const testType = this.determineTestType(scenarioName);
     
-    this.logger.log(`Guardando en BD: ${testCaseId} - ${scenarioName} - tags: ${tags.join(', ')} - tipo: ${testType}`);
-//     this.logger.log(`Steps a guardar: ${steps.split('\n').length} líneas`);
+    this.logger.log(`Saving to database: ${testCaseId} - ${scenarioName} - tags: ${tags.join(', ')} - type: ${testType}`);
+//     this.logger.log(`Steps to save: ${steps.split('\n').length} lines`);
     
     const testCase = this.testCaseRepository.create({
-      testCaseId, // Usar el testCaseId extraído del archivo
+      testCaseId, // Use the testCaseId extracted from the file
       projectId,
       entityName,
       section,
@@ -245,12 +341,22 @@ export class TestCaseRegistrationService {
       tags,
       method,
       testType,
-      scenario: steps, // Guardar los steps como texto
+      scenario: steps, 
       status: TestCaseStatus.ACTIVE,
     });
     await this.testCaseRepository.save(testCase);
   }
 
+  /**
+   * Determines the test type from a scenario name.
+   *
+   * This private method analyzes a scenario name to determine whether it's
+   * a positive or negative test case based on keywords in the scenario name.
+   *
+   * @private
+   * @param scenarioName - The name of the test scenario
+   * @returns The determined test type (POSITIVE or NEGATIVE)
+   */
   private determineTestType(scenarioName: string): TestType {
     const scenarioLower = scenarioName.toLowerCase();
     if (scenarioLower.includes('invalid') || scenarioLower.includes('missing') || scenarioLower.includes('error')) {

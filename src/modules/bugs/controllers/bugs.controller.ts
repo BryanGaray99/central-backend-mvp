@@ -18,6 +18,15 @@ import { BugFiltersDto } from '../dto/bug-filters.dto';
 import { BugResponseDto } from '../dto/bug-response.dto';
 import { BugType, BugSeverity, BugPriority, BugStatus } from '../entities/bug.entity';
 
+/**
+ * Bugs Controller
+ * 
+ * Handles bug management operations within specific projects.
+ * Provides endpoints for creating, reading, updating, and deleting bugs,
+ * as well as creating bugs from failed test executions and retrieving statistics.
+ * 
+ * @controller BugsController
+ */
 @ApiTags('Bugs')
 @Controller('projects/:projectId/bugs')
 export class BugsController {
@@ -25,6 +34,25 @@ export class BugsController {
 
   constructor(private readonly bugsService: BugsService) {}
 
+  /**
+   * Creates a new bug for a specific project.
+   * 
+   * @param projectId - The project ID
+   * @param createBugDto - The bug creation data
+   * @returns Promise<BugResponseDto> - The created bug
+   * @throws 400 - Bad request
+   * @throws 404 - Project not found
+   * 
+   * @example
+   * ```typescript
+   * const bug = await bugsController.createBug('project-123', {
+   *   title: 'API returns 500 error',
+   *   description: 'Product creation fails with internal server error',
+   *   type: BugType.TEST_FAILURE,
+   *   severity: BugSeverity.HIGH
+   * });
+   * ```
+   */
   @Post()
   @ApiOperation({ summary: 'Create a new bug' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
@@ -39,6 +67,25 @@ export class BugsController {
     return this.bugsService.createBug(projectId, createBugDto);
   }
 
+  /**
+   * Gets all bugs for a specific project with optional filters.
+   * 
+   * @param projectId - The project ID
+   * @param filters - Optional filters for bug retrieval
+   * @returns Promise<object> - Paginated list of bugs with metadata
+   * @throws 404 - Project not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await bugsController.getBugs('project-123', {
+   *   severity: 'high',
+   *   status: 'open',
+   *   page: 1,
+   *   limit: 10
+   * });
+   * console.log(`Found ${result.total} bugs in project`);
+   * ```
+   */
   @Get()
   @ApiOperation({ summary: 'Get all bugs for a project with filters' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
@@ -58,6 +105,19 @@ export class BugsController {
     return this.bugsService.getBugs(projectId, filters);
   }
 
+  /**
+   * Gets bug statistics for a specific project.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<object> - Statistics object with counts by status, severity, type, and priority
+   * @throws 404 - Project not found
+   * 
+   * @example
+   * ```typescript
+   * const stats = await bugsController.getBugStatistics('project-123');
+   * console.log(`Project has ${stats.total} bugs, ${stats.open} open`);
+   * ```
+   */
   @Get('statistics')
   @ApiOperation({ summary: 'Get bug statistics for a project' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
@@ -79,6 +139,19 @@ export class BugsController {
     return this.bugsService.getBugStatistics(projectId);
   }
 
+  /**
+   * Gets failed test executions for a specific project for bug creation.
+   * 
+   * @param projectId - The project ID
+   * @returns Promise<Array<object>> - Array of failed execution details
+   * @throws 404 - Project not found
+   * 
+   * @example
+   * ```typescript
+   * const failedExecutions = await bugsController.getFailedExecutions('project-123');
+   * console.log(`Found ${failedExecutions.length} failed executions in project`);
+   * ```
+   */
   @Get('failed-executions')
   @ApiOperation({ summary: 'Get failed executions for creating bugs' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
@@ -101,6 +174,25 @@ export class BugsController {
     return this.bugsService.getFailedExecutions(projectId);
   }
 
+  /**
+   * Creates a bug from a failed test execution.
+   * 
+   * @param projectId - The project ID
+   * @param body - The bug creation data from execution
+   * @returns Promise<BugResponseDto> - The created bug
+   * @throws 400 - Bad request
+   * @throws 404 - Project or test case not found
+   * 
+   * @example
+   * ```typescript
+   * const bug = await bugsController.createBugFromExecution('project-123', {
+   *   executionId: 'exec-456',
+   *   testCaseId: 'TC-ECOMMERCE-01',
+   *   title: 'Custom bug title',
+   *   severity: BugSeverity.HIGH
+   * });
+   * ```
+   */
   @Post('from-execution')
   @ApiOperation({ summary: 'Create a bug from a failed execution' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
@@ -138,6 +230,20 @@ export class BugsController {
     );
   }
 
+  /**
+   * Gets a specific bug by its ID.
+   * 
+   * @param projectId - The project ID
+   * @param bugId - The bug ID
+   * @returns Promise<BugResponseDto> - The bug details
+   * @throws 404 - Bug not found
+   * 
+   * @example
+   * ```typescript
+   * const bug = await bugsController.getBug('project-123', 'BUG-ECOMMERCE-001');
+   * console.log(`Bug title: ${bug.title}`);
+   * ```
+   */
   @Get(':bugId')
   @ApiOperation({ summary: 'Get a specific bug' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
@@ -152,6 +258,23 @@ export class BugsController {
     return this.bugsService.getBug(projectId, bugId);
   }
 
+  /**
+   * Updates an existing bug.
+   * 
+   * @param projectId - The project ID
+   * @param bugId - The bug ID
+   * @param updateBugDto - The bug update data
+   * @returns Promise<BugResponseDto> - The updated bug
+   * @throws 404 - Bug not found
+   * 
+   * @example
+   * ```typescript
+   * const updatedBug = await bugsController.updateBug('project-123', 'BUG-ECOMMERCE-001', {
+   *   status: BugStatus.IN_PROGRESS,
+   *   priority: BugPriority.HIGH
+   * });
+   * ```
+   */
   @Put(':bugId')
   @ApiOperation({ summary: 'Update a bug' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
@@ -167,6 +290,20 @@ export class BugsController {
     return this.bugsService.updateBug(projectId, bugId, updateBugDto);
   }
 
+  /**
+   * Deletes a bug.
+   * 
+   * @param projectId - The project ID
+   * @param bugId - The bug ID
+   * @returns Promise<{ success: boolean; message: string }> - Deletion result
+   * @throws 404 - Bug not found
+   * 
+   * @example
+   * ```typescript
+   * const result = await bugsController.deleteBug('project-123', 'BUG-ECOMMERCE-001');
+   * console.log(result.message); // "Bug BUG-ECOMMERCE-001 deleted successfully"
+   * ```
+   */
   @Delete(':bugId')
   @ApiOperation({ summary: 'Delete a bug' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })

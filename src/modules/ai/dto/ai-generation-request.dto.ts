@@ -1,36 +1,46 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsEnum, IsOptional, IsObject } from 'class-validator';
 
+/**
+ * Enumeration of AI operation types for test case generation.
+ */
 export enum AIOperationType {
+  /** Add a new scenario to existing test files */
   ADD_SCENARIO = 'add-scenario',
+  /** Modify an existing scenario in test files */
   MODIFY_SCENARIO = 'modify-scenario',
+  /** Create new test files from scratch */
   CREATE_NEW = 'create-new',
 }
 
+/**
+ * DTO for AI generation requests.
+ * Contains all necessary information to generate test cases using AI.
+ */
 export class AIGenerationRequestDto {
   @ApiPropertyOptional({
-    description: 'ID del proyecto (se inyecta automáticamente desde la URL)',
+    description: 'Project ID (automatically injected from URL)',
   })
   @IsOptional()
   @IsString()
   projectId?: string;
 
   @ApiProperty({
-    description: 'Nombre de la entidad para la cual generar tests',
+    description: 'Entity name for which to generate tests',
     example: 'Product',
   })
   @IsString()
   entityName: string;
 
   @ApiProperty({
-    description: 'Sección del proyecto',
+    description: 'Project section',
     example: 'ecommerce',
   })
   @IsString()
   section: string;
 
   @ApiProperty({
-    description: 'Tipo de operación a realizar',
+    description: 'Type of operation to perform',
     enum: AIOperationType,
     example: AIOperationType.ADD_SCENARIO,
   })
@@ -38,14 +48,14 @@ export class AIGenerationRequestDto {
   operation: AIOperationType;
 
   @ApiProperty({
-    description: 'Requisitos específicos para la generación',
-    example: 'Crear producto con precio 330',
+    description: 'Specific requirements for generation',
+    example: 'Create product with price 330',
   })
   @IsString()
   requirements: string;
 
   @ApiPropertyOptional({
-    description: 'Metadatos adicionales para la generación',
+    description: 'Additional metadata for generation',
     type: 'object',
     additionalProperties: true,
   })

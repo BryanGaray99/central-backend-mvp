@@ -1,5 +1,8 @@
 import { StepResult, StepStatus } from '../interfaces/step-result.interface';
 
+/**
+ * Structure representing a parsed scenario result from Cucumber JSON.
+ */
 export interface ParsedResult {
   scenarioName: string;
   scenarioTags: string[];
@@ -12,16 +15,19 @@ export interface ParsedResult {
   metadata?: any;
 }
 
+/**
+ * Utilities to parse Cucumber JSON output and build summaries.
+ */
 export class ResultParserUtils {
   /**
-   * Parsea la salida de Cucumber en formato JSON
+   * Parses Cucumber JSON output.
    */
   static parseCucumberJsonOutput(output: string): ParsedResult[] {
     try {
-      // Buscar la salida JSON en el output
+      // Find JSON array in the output
       const jsonMatch = output.match(/\[{.*}\]/s);
       if (!jsonMatch) {
-        console.warn('No se encontró salida JSON en el resultado de Cucumber');
+        console.warn('No JSON output found in Cucumber result');
         return [];
       }
 
@@ -39,13 +45,13 @@ export class ResultParserUtils {
 
       return results;
     } catch (error) {
-      console.error(`Error parseando salida de Cucumber: ${error.message}`);
+      console.error(`Error parsing Cucumber output: ${error.message}`);
       return [];
     }
   }
 
   /**
-   * Parsea un escenario individual
+   * Parses a single scenario record.
    */
   private static parseScenario(element: any, feature: any): ParsedResult {
     const steps = this.parseScenarioSteps(element.steps || []);
@@ -73,14 +79,14 @@ export class ResultParserUtils {
   }
 
   /**
-   * Parsea los pasos de un escenario
+   * Parses steps for a scenario.
    */
   private static parseScenarioSteps(steps: any[]): StepResult[] {
     return steps.map(step => ({
       stepName: step.name,
       stepDefinition: step.keyword + step.name,
       status: this.mapStepStatus(step.result?.status),
-      // Cucumber reporta duration en nanosegundos: convertir a milisegundos
+      // Cucumber reports duration in nanoseconds: convert to milliseconds
       duration: step.result?.duration ? step.result.duration / 1_000_000 : 0,
       errorMessage: step.result?.error_message,
       data: this.extractStepData(step),
@@ -97,7 +103,7 @@ export class ResultParserUtils {
   }
 
   /**
-   * Mapea el estado del paso de Cucumber a nuestro enum
+   * Maps Cucumber step status to the local enum.
    */
   private static mapStepStatus(cucumberStatus?: string): StepStatus {
     switch (cucumberStatus) {
@@ -113,22 +119,22 @@ export class ResultParserUtils {
   }
 
   /**
-   * Extrae datos relevantes de un paso
+   * Extracts relevant data from a step.
    */
   private static extractStepData(step: any): any {
     const data: any = {};
 
-    // Extraer doc string
+    // Extract doc string
     if (step.doc_string) {
       data.docString = step.doc_string.content;
     }
 
-    // Extraer data table
+    // Extract data table
     if (step.dataTable) {
       data.dataTable = step.dataTable.rows;
     }
 
-    // Extraer datos del output del paso
+    // Extract data from the step output
     if (step.result?.output) {
       for (const output of step.result.output) {
         if (output.includes('Payload:')) {
@@ -150,7 +156,7 @@ export class ResultParserUtils {
   }
 
   /**
-   * Determina el estado general del escenario
+   * Determines scenario overall status.
    */
   private static determineScenarioStatus(steps: any[]): string {
     const failedSteps = steps.filter(step => step.result?.status === 'failed');
@@ -162,10 +168,10 @@ export class ResultParserUtils {
   }
 
   /**
-   * Calcula la duración total del escenario
+   * Calculates scenario total duration.
    */
   private static calculateScenarioDuration(steps: any[]): number {
-    // Convertir sumatoria de nanosegundos a milisegundos
+    // Convert sum of nanoseconds to milliseconds
     return steps.reduce((total, step) => {
       if (step.result?.duration) {
         return total + (step.result.duration / 1_000_000);
@@ -175,7 +181,7 @@ export class ResultParserUtils {
   }
 
   /**
-   * Extrae el mensaje de error del escenario
+   * Extracts the scenario error message.
    */
   private static extractErrorMessage(steps: any[]): string | undefined {
     const failedStep = steps.find(step => step.result?.status === 'failed');
@@ -183,7 +189,7 @@ export class ResultParserUtils {
   }
 
   /**
-   * Extrae rutas de screenshots
+   * Extracts screenshot paths from steps.
    */
   private static extractScreenshots(steps: any[]): string[] {
     const screenshots: string[] = [];
@@ -203,7 +209,7 @@ export class ResultParserUtils {
   }
 
   /**
-   * Extrae la ruta del video
+   * Extracts video path from steps.
    */
   private static extractVideoPath(steps: any[]): string | undefined {
     for (const step of steps) {
@@ -219,7 +225,7 @@ export class ResultParserUtils {
   }
 
   /**
-   * Genera un resumen de los resultados
+   * Generates a summary for parsed results.
    */
   static generateResultsSummary(results: ParsedResult[]): any {
     const totalScenarios = results.length;
@@ -254,16 +260,16 @@ export class ResultParserUtils {
   }
 
   /**
-   * Filtra resultados por criterios específicos
+   * Filters results using the provided criteria.
    */
   static filterResults(results: ParsedResult[], filters: any): ParsedResult[] {
     return results.filter(result => {
-      // Filtro por estado
+      // Filter by status
       if (filters.status && result.status !== filters.status) {
         return false;
       }
 
-      // Filtro por tags
+      // Filter by tags
       if (filters.tags && filters.tags.length > 0) {
         const hasAllTags = filters.tags.every((tag: string) => 
           result.scenarioTags.includes(tag));
@@ -272,12 +278,12 @@ export class ResultParserUtils {
         }
       }
 
-      // Filtro por duración mínima
+      // Filter by minimum duration
       if (filters.minDuration && result.duration < filters.minDuration) {
         return false;
       }
 
-      // Filtro por duración máxima
+      // Filter by maximum duration
       if (filters.maxDuration && result.duration > filters.maxDuration) {
         return false;
       }

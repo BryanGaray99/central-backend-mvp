@@ -8,6 +8,12 @@ import { TestSuitesController } from './controllers/test-suites.controller';
 import { TestSuitesService } from './services/test-suites.service';
 import { TestExecutionModule } from '../test-execution/test-execution.module';
 
+/**
+ * Module: TestSuitesModule
+ *
+ * Exposes endpoints and services to manage test suites (test sets and plans),
+ * and integrates with the test-execution module.
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([TestSuite, Project, Bug, TestCase]),

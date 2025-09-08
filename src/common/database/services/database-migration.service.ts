@@ -4,54 +4,92 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as sqlite3 from 'sqlite3';
 
+/**
+ * Database Migration Service
+ * 
+ * Handles SQLite database creation, migration execution, and database schema management.
+ * Provides functionality to initialize databases, run migrations from SQL files,
+ * and track migration execution status.
+ * 
+ * @class DatabaseMigrationService
+ */
 @Injectable()
 export class DatabaseMigrationService {
   private readonly logger = new Logger(DatabaseMigrationService.name);
   private readonly migrationsPath = path.join(__dirname, '..', 'migrations');
   private dbPath: string;
 
+  /**
+   * Creates an instance of DatabaseMigrationService.
+   * 
+   * @param configService - Configuration service for accessing environment variables
+   */
   constructor(private readonly configService: ConfigService) {
-    // Cambiar la ruta de la base de datos a playwright-workspaces
+    // Change database path to playwright-workspaces
     const workspacesPath = this.configService.get('PLAYWRIGHT_WORKSPACES_PATH') || '../playwright-workspaces';
     this.dbPath = path.resolve(workspacesPath, 'central-backend.sqlite');
   }
 
+  /**
+   * Initializes the database by creating directories, database file, and running migrations.
+   * 
+   * @returns Promise that resolves when database initialization is complete
+   * @throws {Error} When database initialization fails
+   * 
+   * @example
+   * ```typescript
+   * await migrationService.initializeDatabase();
+   * ```
+   */
   async initializeDatabase(): Promise<void> {
     try {
-      this.logger.log('Inicializando base de datos...');
+      this.logger.log('Initializing database...');
       
-      // Asegurar que el directorio existe
+      // Ensure directory exists
       await this.ensureDirectoryExists();
       
-      // Crear o conectar a la base de datos
+      // Create or connect to database
       await this.createDatabase();
       
-      // Ejecutar migraciones
+      // Execute migrations
       await this.runMigrations();
       
-      this.logger.log('Base de datos inicializada correctamente');
+      this.logger.log('Database initialized successfully');
     } catch (error) {
-      this.logger.error('Error al inicializar la base de datos:', error);
+      this.logger.error('Error initializing database:', error);
       throw error;
     }
   }
 
+  /**
+   * Ensures the database directory exists, creating it if necessary.
+   * 
+   * @private
+   * @returns Promise that resolves when directory is ensured
+   */
   private async ensureDirectoryExists(): Promise<void> {
     const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
-      this.logger.log(`Directorio creado: ${dir}`);
+      this.logger.log(`Directory created: ${dir}`);
     }
   }
 
+  /**
+   * Creates or connects to the SQLite database.
+   * 
+   * @private
+   * @returns Promise that resolves when database connection is established
+   * @throws {Error} When database connection fails
+   */
   private async createDatabase(): Promise<void> {
     return new Promise((resolve, reject) => {
       const db = new sqlite3.Database(this.dbPath, (err) => {
         if (err) {
-          this.logger.error('Error al crear/conectar la base de datos:', err);
+          this.logger.error('Error creating/connecting to database:', err);
           reject(err);
         } else {
-          this.logger.log(`Base de datos conectada: ${this.dbPath}`);
+          this.logger.log(`Database connected: ${this.dbPath}`);
           db.close();
           resolve();
         }
@@ -59,32 +97,49 @@ export class DatabaseMigrationService {
     });
   }
 
+  /**
+   * Runs all pending database migrations.
+   * 
+   * Creates migrations table if it doesn't exist, gets executed migrations,
+   * and executes any pending migration files.
+   * 
+   * @private
+   * @returns Promise that resolves when all migrations are executed
+   */
   private async runMigrations(): Promise<void> {
     const db = new sqlite3.Database(this.dbPath);
     
     try {
-      // Crear tabla de migraciones si no existe
+      // Create migrations table if it doesn't exist
       await this.createMigrationsTable(db);
       
-      // Obtener migraciones ejecutadas
+      // Get executed migrations
       const executedMigrations = await this.getExecutedMigrations(db);
       
-      // Obtener archivos de migración
+      // Get migration files
       const migrationFiles = await this.getMigrationFiles();
       
-      // Ejecutar migraciones pendientes
+      // Execute pending migrations
       for (const file of migrationFiles) {
         if (!executedMigrations.includes(file)) {
           await this.executeMigration(db, file);
         }
       }
       
-      this.logger.log('Migraciones ejecutadas correctamente');
+      this.logger.log('Migrations executed successfully');
     } finally {
       db.close();
     }
   }
 
+  /**
+   * Creates the migrations tracking table if it doesn't exist.
+   * 
+   * @private
+   * @param db - SQLite database instance
+   * @returns Promise that resolves when table is created
+   * @throws {Error} When table creation fails
+   */
   private async createMigrationsTable(db: sqlite3.Database): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = `
@@ -105,6 +160,14 @@ export class DatabaseMigrationService {
     });
   }
 
+  /**
+   * Retrieves the list of already executed migrations.
+   * 
+   * @private
+   * @param db - SQLite database instance
+   * @returns Promise that resolves with array of executed migration filenames
+   * @throws {Error} When query fails
+   */
   private async getExecutedMigrations(db: sqlite3.Database): Promise<string[]> {
     return new Promise((resolve, reject) => {
       db.all('SELECT filename FROM migrations ORDER BY filename', (err, rows) => {
@@ -117,6 +180,13 @@ export class DatabaseMigrationService {
     });
   }
 
+  /**
+   * Retrieves all SQL migration files from the migrations directory.
+   * 
+   * @private
+   * @returns Promise that resolves with array of migration filenames
+   * @throws {Error} When directory reading fails
+   */
   private async getMigrationFiles(): Promise<string[]> {
     return new Promise((resolve, reject) => {
       fs.readdir(this.migrationsPath, (err, files) => {
@@ -132,6 +202,15 @@ export class DatabaseMigrationService {
     });
   }
 
+  /**
+   * Executes a single migration file and records it as executed.
+   * 
+   * @private
+   * @param db - SQLite database instance
+   * @param filename - Name of the migration file to execute
+   * @returns Promise that resolves when migration is executed and recorded
+   * @throws {Error} When migration execution or recording fails
+   */
   private async executeMigration(db: sqlite3.Database, filename: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const filePath = path.join(this.migrationsPath, filename);
@@ -142,15 +221,15 @@ export class DatabaseMigrationService {
           return;
         }
         
-        // Ejecutar las sentencias SQL
+        // Execute SQL statements
         db.exec(content, (err) => {
           if (err) {
-            this.logger.error(`Error ejecutando migración ${filename}:`, err);
+            this.logger.error(`Error executing migration ${filename}:`, err);
             reject(err);
             return;
           }
           
-          // Registrar la migración como ejecutada
+          // Record migration as executed
           const insertSql = 'INSERT INTO migrations (id, filename) VALUES (?, ?)';
           const migrationId = filename.replace('.sql', '');
           
@@ -158,7 +237,7 @@ export class DatabaseMigrationService {
             if (err) {
               reject(err);
             } else {
-              this.logger.log(`Migración ejecutada: ${filename}`);
+              this.logger.log(`Migration executed: ${filename}`);
               resolve();
             }
           });
@@ -167,6 +246,17 @@ export class DatabaseMigrationService {
     });
   }
 
+  /**
+   * Gets the current database file path.
+   * 
+   * @returns The absolute path to the SQLite database file
+   * 
+   * @example
+   * ```typescript
+   * const dbPath = migrationService.getDatabasePath();
+   * console.log(`Database located at: ${dbPath}`);
+   * ```
+   */
   getDatabasePath(): string {
     return this.dbPath;
   }

@@ -3,6 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AIGeneration, AIGenerationStatus, AIGenerationType } from '../../test-cases/entities/ai-generation.entity';
 
+/**
+ * Interface for creating AI generation records.
+ */
 export interface CreateAIGenerationDto {
   generationId: string;
   projectId: string;
@@ -15,6 +18,14 @@ export interface CreateAIGenerationDto {
   metadata?: any;
 }
 
+/**
+ * AI Generation Service
+ * 
+ * Manages AI generation records in the database, tracking the lifecycle
+ * of AI-powered test case generation operations.
+ * 
+ * @service AIGenerationService
+ */
 @Injectable()
 export class AIGenerationService {
   private readonly logger = new Logger(AIGenerationService.name);
@@ -25,7 +36,23 @@ export class AIGenerationService {
   ) {}
 
   /**
-   * Crea un nuevo registro de AI generation
+   * Creates a new AI generation record.
+   * 
+   * @param dto - The AI generation data to create
+   * @returns Promise<AIGeneration> - The created AI generation record
+   * @throws Error - If creation fails
+   * 
+   * @example
+   * ```typescript
+   * const generation = await aiGenerationService.create({
+   *   generationId: 'AI-GEN-123',
+   *   projectId: 'project-123',
+   *   entityName: 'Product',
+   *   method: 'POST',
+   *   scenarioName: 'Create Product',
+   *   section: 'ecommerce'
+   * });
+   * ```
    */
   async create(dto: CreateAIGenerationDto): Promise<AIGeneration> {
     try {
@@ -43,16 +70,27 @@ export class AIGenerationService {
       aiGeneration.metadata = dto.metadata || {};
 
       const saved = await this.aiGenerationRepository.save(aiGeneration);
-      this.logger.log(`✅ AI Generation creada exitosamente: ${saved.generationId}`);
+      this.logger.log(`✅ AI Generation created successfully: ${saved.generationId}`);
       return saved;
     } catch (error) {
-      this.logger.error(`❌ Error creando AI Generation: ${error.message}`);
+      this.logger.error(`❌ Error creating AI Generation: ${error.message}`);
       throw error;
     }
   }
 
   /**
-   * Actualiza el status de una AI generation
+   * Updates the status of an AI generation record.
+   * 
+   * @param generationId - The ID of the generation to update
+   * @param status - The new status to set
+   * @param metadata - Optional additional metadata to merge
+   * @returns Promise<AIGeneration> - The updated AI generation record
+   * @throws Error - If generation is not found or update fails
+   * 
+   * @example
+   * ```typescript
+   * const updated = await aiGenerationService.updateStatus('AI-GEN-123', AIGenerationStatus.PROCESSING);
+   * ```
    */
   async updateStatus(generationId: string, status: AIGenerationStatus, metadata?: any): Promise<AIGeneration> {
     try {
@@ -61,7 +99,7 @@ export class AIGenerationService {
       });
 
       if (!aiGeneration) {
-        throw new Error(`AI Generation no encontrada: ${generationId}`);
+        throw new Error(`AI Generation not found: ${generationId}`);
       }
 
       aiGeneration.status = status;
@@ -70,16 +108,30 @@ export class AIGenerationService {
       }
 
       const updated = await this.aiGenerationRepository.save(aiGeneration);
-      this.logger.log(`✅ AI Generation ${generationId} actualizada a status: ${status}`);
+      this.logger.log(`✅ AI Generation ${generationId} updated to status: ${status}`);
       return updated;
     } catch (error) {
-      this.logger.error(`❌ Error actualizando status de AI Generation ${generationId}: ${error.message}`);
+      this.logger.error(`❌ Error updating status of AI Generation ${generationId}: ${error.message}`);
       throw error;
     }
   }
 
   /**
-   * Marca una AI generation como completada
+   * Marks an AI generation as completed with generated code.
+   * 
+   * @param generationId - The ID of the generation to mark as completed
+   * @param generatedCode - The generated code to store
+   * @param metadata - Optional additional metadata to merge
+   * @returns Promise<AIGeneration> - The updated AI generation record
+   * @throws Error - If generation is not found or update fails
+   * 
+   * @example
+   * ```typescript
+   * const completed = await aiGenerationService.markAsCompleted('AI-GEN-123', {
+   *   feature: 'Feature: Create Product...',
+   *   steps: 'Given I have a product...'
+   * });
+   * ```
    */
   async markAsCompleted(generationId: string, generatedCode: any, metadata?: any): Promise<AIGeneration> {
     try {
@@ -88,7 +140,7 @@ export class AIGenerationService {
       });
 
       if (!aiGeneration) {
-        throw new Error(`AI Generation no encontrada: ${generationId}`);
+        throw new Error(`AI Generation not found: ${generationId}`);
       }
 
       aiGeneration.status = AIGenerationStatus.COMPLETED;
@@ -98,16 +150,27 @@ export class AIGenerationService {
       }
 
       const updated = await this.aiGenerationRepository.save(aiGeneration);
-      this.logger.log(`✅ AI Generation ${generationId} marcada como completada`);
+      this.logger.log(`✅ AI Generation ${generationId} marked as completed`);
       return updated;
     } catch (error) {
-      this.logger.error(`❌ Error marcando AI Generation ${generationId} como completada: ${error.message}`);
+      this.logger.error(`❌ Error marking AI Generation ${generationId} as completed: ${error.message}`);
       throw error;
     }
   }
 
   /**
-   * Marca una AI generation como fallida
+   * Marks an AI generation as failed with error information.
+   * 
+   * @param generationId - The ID of the generation to mark as failed
+   * @param errorMessage - The error message describing the failure
+   * @param metadata - Optional additional metadata to merge
+   * @returns Promise<AIGeneration> - The updated AI generation record
+   * @throws Error - If generation is not found or update fails
+   * 
+   * @example
+   * ```typescript
+   * const failed = await aiGenerationService.markAsFailed('AI-GEN-123', 'OpenAI API timeout');
+   * ```
    */
   async markAsFailed(generationId: string, errorMessage: string, metadata?: any): Promise<AIGeneration> {
     try {
@@ -116,7 +179,7 @@ export class AIGenerationService {
       });
 
       if (!aiGeneration) {
-        throw new Error(`AI Generation no encontrada: ${generationId}`);
+        throw new Error(`AI Generation not found: ${generationId}`);
       }
 
       aiGeneration.status = AIGenerationStatus.FAILED;
@@ -126,16 +189,24 @@ export class AIGenerationService {
       }
 
       const updated = await this.aiGenerationRepository.save(aiGeneration);
-      this.logger.log(`❌ AI Generation ${generationId} marcada como fallida`);
+      this.logger.log(`❌ AI Generation ${generationId} marked as failed`);
       return updated;
     } catch (error) {
-      this.logger.error(`❌ Error marcando AI Generation ${generationId} como fallida: ${error.message}`);
+      this.logger.error(`❌ Error marking AI Generation ${generationId} as failed: ${error.message}`);
       throw error;
     }
   }
 
   /**
-   * Obtiene una AI generation por ID
+   * Finds an AI generation by its generation ID.
+   * 
+   * @param generationId - The ID of the generation to find
+   * @returns Promise<AIGeneration | null> - The AI generation record or null if not found
+   * 
+   * @example
+   * ```typescript
+   * const generation = await aiGenerationService.findByGenerationId('AI-GEN-123');
+   * ```
    */
   async findByGenerationId(generationId: string): Promise<AIGeneration | null> {
     try {
@@ -143,13 +214,21 @@ export class AIGenerationService {
         where: { generationId }
       });
     } catch (error) {
-      this.logger.error(`❌ Error buscando AI Generation ${generationId}: ${error.message}`);
+      this.logger.error(`❌ Error searching for AI Generation ${generationId}: ${error.message}`);
       return null;
     }
   }
 
   /**
-   * Obtiene todas las AI generations de un proyecto
+   * Finds all AI generations for a specific project.
+   * 
+   * @param projectId - The ID of the project to find generations for
+   * @returns Promise<AIGeneration[]> - Array of AI generation records ordered by creation date
+   * 
+   * @example
+   * ```typescript
+   * const generations = await aiGenerationService.findByProjectId('project-123');
+   * ```
    */
   async findByProjectId(projectId: string): Promise<AIGeneration[]> {
     try {
@@ -158,7 +237,7 @@ export class AIGenerationService {
         order: { createdAt: 'DESC' }
       });
     } catch (error) {
-      this.logger.error(`❌ Error buscando AI Generations del proyecto ${projectId}: ${error.message}`);
+      this.logger.error(`❌ Error searching for AI Generations of project ${projectId}: ${error.message}`);
       return [];
     }
   }

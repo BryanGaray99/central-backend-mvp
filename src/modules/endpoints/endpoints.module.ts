@@ -17,6 +17,16 @@ import { TemplateService } from '../projects/services/template.service';
 import { TestCasesModule } from '../test-cases/test-cases.module';
 import { ProjectEndpointsController } from './controllers/project-endpoints.controller';
 
+/**
+ * Endpoints module that provides comprehensive API endpoint management functionality.
+ * 
+ * This module handles the registration, analysis, and generation of testing artifacts
+ * for API endpoints. It includes services for endpoint analysis, artifact generation,
+ * template processing, and cleanup operations.
+ * 
+ * @module EndpointsModule
+ * @since 1.0.0
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Project, Endpoint]),
