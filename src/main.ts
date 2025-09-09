@@ -110,9 +110,12 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
 
-  // Enable CORS
+  // Enable CORS with safer defaults (local only by default)
+  const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+    : [/^http:\/\/localhost(:\d+)?$/, /^http:\/\/127\.0\.0\.1(:\d+)?$/];
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: corsOrigins as any,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
     exposedHeaders: ['X-Total-Count'],
@@ -182,18 +185,20 @@ async function bootstrap() {
   });
 
   try {
-    const port = await findAvailablePort();
-    await app.listen(port);
+    const envPort = Number(process.env.PORT);
+    const port = Number.isFinite(envPort) && envPort > 0 ? envPort : await findAvailablePort();
+    const host = process.env.HOST || '127.0.0.1';
+    await app.listen(port, host);
     
-    logger.log(`🚀 Central Backend MVP running at: http://localhost:${port}`);
-    logger.log(`📚 Swagger documentation at: http://localhost:${port}/docs`);
+    logger.log(`🚀 Central Backend MVP running at: http://${host}:${port}`);
+    logger.log(`📚 Swagger documentation at: http://${host}:${port}/docs`);
     logger.log(`🔒 API Version: v1`);
-    logger.log(`🏥 Health Check at: http://localhost:${port}/v1/api/health`);
+    logger.log(`🏥 Health Check at: http://${host}:${port}/v1/api/health`);
     logger.log(`🔗 Base Path: /v1/api`);
     logger.log(`📊 Available endpoints:`);
-    logger.log(`   - Projects: http://localhost:${port}/v1/api/projects`);
-    logger.log(`   - Endpoints: http://localhost:${port}/v1/api/endpoints`);
-    logger.log(`   - Test Execution: http://localhost:${port}/v1/api/projects/:id/test-execution`);
+    logger.log(`   - Projects: http://${host}:${port}/v1/api/projects`);
+    logger.log(`   - Endpoints: http://${host}:${port}/v1/api/endpoints`);
+    logger.log(`   - Test Execution: http://${host}:${port}/v1/api/projects/:id/test-execution`);
   } catch (error) {
     logger.error('❌ Error starting server:', error.message);
     process.exit(1);

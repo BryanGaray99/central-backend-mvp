@@ -11,6 +11,8 @@
  */
 
 import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -49,6 +51,12 @@ import { SyncModule } from './modules/sync/sync.module';
  */
 @Module({
   imports: [
+    // Serve frontend static assets in local production (monolithic build)
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, 'public'),
+      serveRoot: '/',
+      exclude: ['/v1/api*', '/docs*'],
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
