@@ -71,7 +71,7 @@ export class PlaywrightService {
       // Step 2: Install additional dependencies for BDD
       this.logger.log('Step 2: Installing BDD dependencies...');
       await this.execCommandWithTimeout(
-        'npm install --save-dev @playwright/test @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker ajv ajv-formats typescript ts-node @types/node dotenv',
+        'npm install --save-dev @playwright/test @cucumber/cucumber @cucumber/pretty-formatter @faker-js/faker@^9.0.0 ajv ajv-formats typescript ts-node @types/node dotenv',
         project.path,
         'BDD dependencies installation',
         { NODE_ENV: 'development' },
